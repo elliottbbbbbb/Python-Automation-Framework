@@ -1,0 +1,119 @@
+{
+  "window_title": "RuneLite - ",
+  "colors": {
+    "yellow_tile_marker": "#FFFF00",
+    "blue_tile_marker": "#FF00FFFF",
+    "purple_item_outline": "#7d00ff",
+    "red_outline": "#FF0000",
+    "green_dragon": "#00ffff",
+    "guns_npc": "#00ffff",
+    "banker": "#00FFFF",
+    "manta_ray": "#765C45",
+    "sandwich": "#A81522",
+    "extended_antifire": "#b392cb",
+    "super_combat": "#1e6c0e",
+    "ardy_cloak": "#7d666e",
+    "mythical_cape": "#aea2a3",
+    "Combat Instructor": "#3A3D4B",
+    "Rat": "#79796E"
+  },
+  "coordinates": {
+    "inventory": {
+      "slot_1": {
+        "x": 611,
+        "y": 209
+      },
+      "slot_2": {
+        "x": 656,
+        "y": 213
+      },
+      "slot_3": {
+        "x": 697,
+        "y": 215
+      },
+      "slot_4": {
+        "x": 737,
+        "y": 212
+      },
+      "last_slot": {
+        "x": 715,
+        "y": 470
+      }
+    },
+    "ui": {
+      "settings": {
+        "x": 689,
+        "y": 506
+      },
+      "brightness": {
+        "x": 712,
+        "y": 308
+      },
+      "zoom": {
+        "x": 686,
+        "y": 345
+      },
+      "bank_deposit_all": {
+        "x": 455,
+        "y": 337
+      },
+      "bank_search": {
+        "x": 414,
+        "y": 338
+      },
+      "bank_close": {
+        "x": 497,
+        "y": 51
+      },
+      "ge_collect": {
+        "x": 466,
+        "y": 93
+      }
+    },
+    "minimap": {
+      "green_dragons": {
+        "x": 673,
+        "y": 135
+      }
+    },
+    "world": {
+      "ge_clerk": {
+        "x": 273,
+        "y": 151
+      },
+      "varrock_fountain": {
+        "x": 594,
+        "y": 85
+      },
+      "bank_booth": {
+        "x": 463,
+        "y": 143
+      }
+    },
+    "checks": {
+      "combat_indicator": {
+        "x": 30,
+        "y": 81
+      },
+      "health_bar": {
+        "x": 530,
+        "y": 68,
+        "w": 27,
+        "h": 30
+      }
+    }
+  },
+  "timings": {
+    "short": 0.5,
+    "medium": 1.0,
+    "long": 3.0,
+    "teleport": 12.0
+  },
+  "tolerances": {
+    "color_match": 5,
+    "click_offset": [
+      0,
+      0
+    ]
+  }
+}
