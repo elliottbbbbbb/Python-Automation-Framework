@@ -1,6 +1,7 @@
 import re
 import time
 import pytesseract
+import logging as logger
 from typing import Optional
 from PIL import ImageEnhance, ImageFilter, ImageOps
 
@@ -20,19 +21,25 @@ class GameState:
     def inventory_full(self) -> bool:
         """Check if inventory is full"""
         coord = self.config.get("coordinates", "inventory", "last_slot")
+        if not coord:
+            logger.error("last_slot coordinates not found in config.")
+            return False
         color = self.interface.get_pixel(coord['x'], coord['y'])
         return color != (75, 66, 58)  # Empty slot color
     
     def in_combat(self) -> bool:
         """Check if player is in combat"""
         coord = self.config.get("coordinates", "checks", "combat_indicator")
+        if not coord:
+            logger.error("combat check coordinates were not found in config.")
+            return False
         color = self.interface.get_pixel(coord['x'], coord['y'])
         
         combat_colors = [(7, 139, 54), (99, 21, 19)]
         tolerance = self.config.get("tolerances", "color_match")
         
         return any(
-            all(abs(color[i] - cc[i]) <= tolerance for i in range(3))
+            all(abs(color[i] - cc[i]) <= tolerance for i in range(3)) # type: ignore
             for cc in combat_colors
         )
 
@@ -83,7 +90,7 @@ class GameState:
         screenshot = enhancer.enhance(2.5)
         
         # Apply threshold with lower value to preserve detail
-        screenshot = screenshot.point(lambda p: 255 if p > 100 else 0)
+        screenshot = screenshot.point(lambda p: 255 if p > 100 else 0) # type: ignore
         
         screenshot.save("debug.png")
         
