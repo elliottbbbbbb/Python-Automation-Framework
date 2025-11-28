@@ -1,19 +1,24 @@
 import json
+import logging 
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Any
 
+logger = logging.getLogger(__name__)
 class Config:
     """Centralized configuration for all scripts"""
     
-    def __init__(self, config_file: str = "config.json"):
+    def __init__(self, config_file: str = "config.json") -> None:
         self.config_file = Path(config_file)
         self.data = self._load_config()
     
     def _load_config(self) -> dict:
         """Load config from file or create default"""
         if self.config_file.exists():
-            with open(self.config_file, 'r') as f:
-                return json.load(f)
+            try:
+                with open(self.config_file, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"Failed to load config: {e}")
         return self._default_config()
     
     def _default_config(self) -> dict:
@@ -99,12 +104,17 @@ class Config:
             }
         }
     
-    def save(self):
+    def save(self) -> bool:
         """Save config to file"""
-        with open(self.config_file, 'w') as f:
-            json.dump(self.data, indent=2, fp=f)
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(self.data, indent=2, fp=f)
+            return True
+        except IOError as e:
+            logger.error(f"Failed to save config: {e}")
+            return False
     
-    def get(self, *path, default=None):
+    def get(self, *path, default: Any = None) -> Any:
         """Get config value by path"""
         current = self.data
         try:
