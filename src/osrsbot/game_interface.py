@@ -1,7 +1,7 @@
 import random
 import pyautogui
 import pywinctl as gw
-from typing import Tuple, Optional
+from typing import Tuple, Optional, cast
 
 from osrsbot.config import Config
 
@@ -39,10 +39,11 @@ class GameInterface:
         """Click using coordinate dict"""
         self.click(coord['x'], coord['y'], button)
     
-    def find_color(self, hex_color: str, tolerance: int = None) -> Optional[Tuple[int, int]]:
+    def find_color(self, hex_color: str, tolerance: Optional[int] = None) -> Optional[Tuple[int, int]]:
         """Find first occurrence of color"""
         if tolerance is None:
-            tolerance = self.config.get("tolerances", "color_match")
+            tolerance = cast(int, self.config.get("tolerances", "color_match"))
+            #tolerance = self.config["tolerances"]["color_match"]
         
         target = self._hex_to_rgb(hex_color)
         left, top = self.window.topleft
@@ -51,13 +52,17 @@ class GameInterface:
         screenshot = pyautogui.screenshot(region=(left, top, width, height))
         pixels = screenshot.load()
         
+        if pixels is None:
+            return None
+
         for x in range(screenshot.width):
             for y in range(screenshot.height):
-                if self._color_match(pixels[x, y][:3], target, tolerance):
+                pixel = cast(Tuple[int, int, int, int], pixels[x,y])[:3]
+                if self._color_match(pixel, target, tolerance):
                     return (x, y)
         return None
     
-    def click_color(self, hex_color: str, offset=(0, 0), tolerance: int = None) -> bool:
+    def click_color(self, hex_color: str, offset=(0, 0), tolerance: Optional[int] = None) -> bool:
         """Find and click a color"""
         pos = self.find_color(hex_color, tolerance)
         if pos:
@@ -70,7 +75,7 @@ class GameInterface:
         left, top = self.window.topleft
         return pyautogui.pixel(left + x, top + y)
     
-    def screenshot(self, region: Tuple[int, int, int, int] = None):
+    def screenshot(self, region: Optional[Tuple[int, int, int, int]] = None):
         """Take screenshot of window or region"""
         left, top = self.window.topleft
         if region:
@@ -83,7 +88,10 @@ class GameInterface:
     @staticmethod
     def _hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
         hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (r,g,b)
     
     @staticmethod
     def _color_match(c1: Tuple, c2: Tuple, tolerance: int) -> bool:
