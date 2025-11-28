@@ -1,12 +1,11 @@
 from osrsbot.config import Config
 from osrsbot.calibration import Calibrator
 from osrsbot.runner import ScriptRunner
-from osrsbot.game_state import * 
 from osrsbot.scripts.green_dragons import green_dragons_script
 from osrsbot.scripts.guns import guns_script
 from osrsbot.scripts.test import test
 
-def main():
+def main() -> None:
     print("\n" + "="*60)
     print("OSRS BOT - TASK SCRIPT RUNNER")
     print("="*60)
