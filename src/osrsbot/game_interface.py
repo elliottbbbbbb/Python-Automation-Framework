@@ -15,7 +15,7 @@ class GameInterface:
     def _find_window(self):
         """Find the OSRS client window"""
         title = self.config.get("window_title")
-        title = "RuneLite - 61grouphunt"
+        #title = "RuneLite - 61grouphunt"
         windows = gw.getWindowsWithTitle(title)
         if not windows:
             raise Exception(f"Window '{title}' not found!")
