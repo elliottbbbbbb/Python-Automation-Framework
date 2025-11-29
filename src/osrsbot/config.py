@@ -1,9 +1,12 @@
 import json
-import logging 
+import logging
+import platform
 from pathlib import Path
 from typing import Dict, Tuple, Optional, Any
 
 logger = logging.getLogger(__name__)
+
+
 class Config:
     """Centralized configuration for all scripts"""
     
@@ -12,20 +15,38 @@ class Config:
         self.data = self._load_config()
     
     def _load_config(self) -> dict:
-        """Load config from file or create default"""
         if self.config_file.exists():
             try:
                 with open(self.config_file, 'r') as f:
                     return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"Failed to load config: {e}")
-        return self._default_config()
+
+        logger.info(f"Config file not found, creating default at {self.config_file}")
+        config = self._default_config()
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            logger.info(f"Created default config file: {self.config_file}")
+        except IOError as e:
+            logger.warning(f"Failed to create config file: {e}")
+        return config
     
     def _default_config(self) -> dict:
         """Default configuration template"""
+        # Platform-specific Tesseract defaults
+        system = platform.system()
+        if system == "Windows":
+            tesseract_default = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        elif system == "Darwin":  # macOS
+            tesseract_default = "/opt/homebrew/bin/tesseract"
+        else:  # Linux
+            tesseract_default = "/usr/bin/tesseract"
+
         return {
             "window_title": "RuneLite - ",
-            
+            "tesseract_path": tesseract_default,
+
             "colors": {
                 # Marker
                 "yellow_tile_marker": "#FFFF00",

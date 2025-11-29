@@ -1,8 +1,7 @@
-import time
+import logging
 import mouse
 from typing import Optional
 import pyautogui
-import logging
 import pywinctl as gw
 
 from osrsbot.config import Config
@@ -20,20 +19,31 @@ class Calibrator:
     
     def start(self, window_title: str) -> None:
         """Start interactive calibration."""
-        windows = gw.getWindowsWithTitle(window_title)
+        if not window_title or not window_title.strip():
+            logger.error("Window title cannot be empty")
+            print("âŒ Window title is required")
+            return
+
+        try:
+            windows = gw.getWindowsWithTitle(window_title)
+        except Exception as e:
+            logger.error(f"Error searching for windows: {e}", exc_info=True)
+            print(f"âŒ Failed to search for windows: {e}")
+            return
+
         if not windows:
             logger.error(f"Window {window_title} not found")
-            print(f"❌ Window '{window_title}' not found")
+            print(f"âŒ Window '{window_title}' not found")
             return
-        
+
         self.window = windows[0]
         print("\n" + "="*60)
         print("COLOR & COORDINATE CALIBRATION")
         print("="*60)
         print("\nInstructions:")
-        print("  • LEFT CLICK  - Capture color at cursor")
-        print("  • RIGHT CLICK - Capture coordinates at cursor")
-        print("  • Press 'q'   - Finish and save\n")
+        print("  â€¢ LEFT CLICK  - Capture color at cursor")
+        print("  â€¢ RIGHT CLICK - Capture coordinates at cursor")
+        print("  â€¢ Press 'q'   - Finish and save\n")
         print("Hover over items/UI elements and click to capture!\n")
         
         def on_left_click() -> None:
@@ -48,16 +58,22 @@ class Calibrator:
         
         mouse.on_button(lambda: on_left_click(), buttons=('left',), types=('down',))
         mouse.on_button(lambda: on_right_click(), buttons=('right',), types=('down',))
-        
+
         self.capturing = True
         try:
-            import keyboard
+            try:
+                import keyboard
+            except ImportError as e:
+                logger.error("keyboard module not installed")
+                print("âŒ 'keyboard' module required. Install with: pip install keyboard")
+                return
+
             keyboard.wait('q')
         finally:
             self.capturing = False
             mouse.unhook_all()
             self.config.save()
-            print("\nCalibration saved to config.json")
+            print("\nâœ“ Calibration saved to config.json")
     
     def _capture_color(self) -> None:
         """Capture color at cursor position."""
@@ -80,7 +96,7 @@ class Calibrator:
 
             if name:
                 self.config.data["colors"][name] = hex_color
-                print(f"   ✓ Saved as '{name}'")
+                print(f"   âœ“ Saved as '{name}'")
             
         except Exception as e:
             logger.error(f"Failed to capture color: {e}")
@@ -118,7 +134,7 @@ class Calibrator:
                
             self.config.data["coordinates"][category][name] = {"x": rel_x, "y": rel_y}
             logger.info(f"Saved coordinate: {category}.{name} = ({rel_x}, {rel_y})")
-            print(f"   ✓ Saved as '{category}.{name}'")
+            print(f"   âœ“ Saved as '{category}.{name}'")
 
         except Exception as e:
             logger.error(f"Error capturing coordinate: {e}", exc_info=True)
