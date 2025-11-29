@@ -1,12 +1,11 @@
-import pygetwindow as gw
-from PIL import  ImageOps, ImageFilter, Image
+from PIL import ImageOps, ImageFilter, Image
 import numpy as np
 from collections import deque as _deque
 
 
-
 def preprocess_for_shape_detection(pil_img, size=(140, 140)):
-    """Return a small binary numpy array (foreground=1) tuned for shape heuristics."""
+    """Return a small binary numpy array (foreground=1) tuned for
+    shape heuristics."""
     img = pil_img.convert("L")
     img = ImageOps.invert(img)
     img = img.resize(size, Image.BILINEAR)
@@ -20,17 +19,20 @@ def preprocess_for_shape_detection(pil_img, size=(140, 140)):
     dil = np.zeros_like(bw)
     for dy in (-1, 0, 1):
         for dx in (-1, 0, 1):
-            dil |= padded[1 + dy:1 + dy + bw.shape[0], 1 + dx:1 + dx + bw.shape[1]]
+            dil |= padded[1 + dy:1 + dy + bw.shape[0],
+                          1 + dx:1 + dx + bw.shape[1]]
     padded2 = np.pad(dil, ((1, 1), (1, 1)), mode='constant', constant_values=0)
     ero = np.ones_like(dil)
     for dy in (-1, 0, 1):
         for dx in (-1, 0, 1):
-            ero &= padded2[1 + dy:1 + dy + dil.shape[0], 1 + dx:1 + dx + dil.shape[1]]
+            ero &= padded2[1 + dy:1 + dy + dil.shape[0],
+                           1 + dx:1 + dx + dil.shape[1]]
     return ero.astype(np.uint8)
 
 
 def flood_label_components(inv):
-    """Simple BFS label (inv is binary background=1 inside bbox) -> returns labeled array and count."""
+    """Simple BFS label (inv is binary background=1 inside bbox) ->
+    returns labeled array and count."""
     H, W = inv.shape
     lbl = np.zeros_like(inv, dtype=np.int32)
     label = 0
@@ -43,8 +45,10 @@ def flood_label_components(inv):
                 lbl[iy, ix] = label
                 while dq:
                     cy, cx = dq.popleft()
-                    for ny, nx in ((cy - 1, cx), (cy + 1, cx), (cy, cx - 1), (cy, cx + 1)):
-                        if 0 <= ny < H and 0 <= nx < W and inv[ny, nx] and lbl[ny, nx] == 0:
+                    for ny, nx in ((cy - 1, cx), (cy + 1, cx),
+                                   (cy, cx - 1), (cy, cx + 1)):
+                        if (0 <= ny < H and 0 <= nx < W and
+                                inv[ny, nx] and lbl[ny, nx] == 0):
                             lbl[ny, nx] = label
                             dq.append((ny, nx))
     return lbl, label
@@ -69,7 +73,8 @@ def count_holes_and_tail(binary):
     hole_count = 0
     for lab in range(1, n + 1):
         comp = (lbl == lab)
-        touches_border = comp[0, :].any() or comp[-1, :].any() or comp[:, 0].any() or comp[:, -1].any()
+        touches_border = comp[0, :].any(
+        ) or comp[-1, :].any() or comp[:, 0].any() or comp[:, -1].any()
         if not touches_border:
             hole_count += 1
 

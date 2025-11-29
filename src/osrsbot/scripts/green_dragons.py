@@ -9,11 +9,16 @@ from osrsbot.actions import Actions
 logger = logging.getLogger(__name__)
 
 
-def green_dragons_script(interface: GameInterface, state: GameState,
-                         actions: Actions, config: Config,
-                         bank_location: str = "varrock", runs: int = 10) -> None:
+def green_dragons_script(
+        interface: GameInterface,
+        state: GameState,
+        actions: Actions,
+        config: Config,
+        bank_location: str = "varrock",
+        runs: int = 10) -> None:
     """Green Dragons farming script with combat and banking."""
-    logger.info(f"Starting Green Dragons script: {runs} runs, bank: {bank_location}")
+    logger.info(
+        f"Starting Green Dragons script: {runs} runs, bank: {bank_location}")
     print(f"\nðŸ‰ Green Dragons Script ({runs} runs)")
 
     hp_threshold = config.get("hp_threshold", default=70)
@@ -68,7 +73,8 @@ def green_dragons_script(interface: GameInterface, state: GameState,
                 actions.teleport_ge()
                 actions.wait("long")
 
-                fountain_coord = config.get("coordinates", "world", "varrock_fountain")
+                fountain_coord = config.get(
+                    "coordinates", "world", "varrock_fountain")
                 if fountain_coord:
                     interface.click_coord(fountain_coord)
                 else:
@@ -95,7 +101,8 @@ def green_dragons_script(interface: GameInterface, state: GameState,
 
                 # Withdraw food
                 actions.wait("medium")
-                quantity_coord = config.get("coordinates", "ui", "bank_quantity")
+                quantity_coord = config.get(
+                    "coordinates", "ui", "bank_quantity")
                 if quantity_coord:
                     interface.click_coord(quantity_coord)
 

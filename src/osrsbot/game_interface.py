@@ -36,12 +36,14 @@ class GameInterface:
 
         if not windows:
             logger.error(f"Window not found: '{title}'")
-            raise RuntimeError(f"Window '{title}' not found! Is the game running?")
+            raise RuntimeError(
+                f"Window '{title}' not found! Is the game running?")
 
         logger.debug(f"Found {len(windows)} matching window(s)")
         return windows[0]
 
-    def click(self, x: int, y: int, button: str = 'left', offset: Tuple[int, int] = (0, 0)) -> bool:
+    def click(self, x: int, y: int, button: str = 'left',
+              offset: Tuple[int, int] = (0, 0)) -> bool:
         """Click at window-relative coordinates. Returns False if out of bounds."""
         if not (self.window and hasattr(self.window, 'topleft')):
             raise RuntimeError("Window no longer available")
@@ -75,7 +77,8 @@ class GameInterface:
 
         return self.click(x, y, button)
 
-    def find_color(self, hex_color: str, tolerance: Optional[int] = None) -> Optional[Tuple[int, int]]:
+    def find_color(self, hex_color: str,
+                   tolerance: Optional[int] = None) -> Optional[Tuple[int, int]]:
         """Find first pixel matching hex_color. Returns (x,y) or None."""
         if not hex_color:
             raise ValueError("hex_color is required")
@@ -112,7 +115,8 @@ class GameInterface:
 
         return None
 
-    def click_color(self, hex_color: str, offset: Tuple[int, int] = (0, 0), tolerance: Optional[int] = None) -> bool:
+    def click_color(self, hex_color: str, offset: Tuple[int, int] = (
+            0, 0), tolerance: Optional[int] = None) -> bool:
         """Find and click a color. Returns True if found and clicked."""
         pos = self.find_color(hex_color, tolerance)
         if pos:
@@ -170,10 +174,12 @@ class GameInterface:
         hex_color = hex_color.lstrip('#')
 
         if len(hex_color) != 6:
-            raise ValueError(f"Invalid hex color '{hex_color}': must be 6 chars (RRGGBB)")
+            raise ValueError(
+                f"Invalid hex color '{hex_color}': must be 6 chars (RRGGBB)")
 
         if not all(c in '0123456789ABCDEFabcdef' for c in hex_color):
-            raise ValueError(f"Invalid hex color '{hex_color}': non-hex characters")
+            raise ValueError(
+                f"Invalid hex color '{hex_color}': non-hex characters")
 
         try:
             r = int(hex_color[0:2], 16)
@@ -181,9 +187,11 @@ class GameInterface:
             b = int(hex_color[4:6], 16)
             return (r, g, b)
         except ValueError as e:
-            raise ValueError(f"Failed to parse hex color '{hex_color}': {e}") from e
+            raise ValueError(
+                f"Failed to parse hex color '{hex_color}': {e}") from e
 
     @staticmethod
-    def _color_match(c1: Tuple[int, int, int], c2: Tuple[int, int, int], tolerance: int) -> bool:
+    def _color_match(c1: Tuple[int, int, int],
+                     c2: Tuple[int, int, int], tolerance: int) -> bool:
         """Check if two RGB colors match within tolerance."""
         return all(abs(c1[i] - c2[i]) <= tolerance for i in range(3))

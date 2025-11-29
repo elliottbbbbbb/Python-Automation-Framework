@@ -1,28 +1,28 @@
 import re
 import os
 import logging
-import pytesseract
-
+import time
 import pygetwindow as gw
 import pyautogui
 import pytesseract
-import re
-import time
 from PIL import ImageEnhance, ImageOps
 from collections import Counter, deque
-from collections import deque as _dequ
-from osrsbot.ocr_helpers import preprocess_for_shape_detection, count_holes_and_tail, looks_like_nine
-
 from typing import Optional
-from PIL import ImageEnhance, ImageOps
 
+from osrsbot.ocr_helpers import (preprocess_for_shape_detection,
+                                  count_holes_and_tail,
+                                  looks_like_nine)
 from osrsbot.game_interface import GameInterface
 from osrsbot.config import Config
 
 logger = logging.getLogger(__name__)
 
+
 class HPDetector:
-    def __init__(self, window_getter: Optional[callable] = None, window_size: int = 5):
+    def __init__(
+            self,
+            window_getter: Optional[callable] = None,
+            window_size: int = 5):
         self.hp_history = deque(maxlen=window_size)
         self.last_valid_hp = None
         self._window_getter = window_getter
@@ -40,7 +40,8 @@ class HPDetector:
         windows = gw.getWindowsWithTitle(title)
         for app_window in windows:
             if title in app_window.title:
-                return app_window.left, app_window.top, app_window.width, app_window.height
+                return (app_window.left, app_window.top,
+                        app_window.width, app_window.height)
         return None
 
     def clean_ocr_text(self, text: str) -> str:
@@ -59,8 +60,9 @@ class HPDetector:
         return cleaned
 
     def preprocess_for_9_and_11(self, screenshot):
-        # Multiple preprocessing strategies needed because digits 9 and 11 require
-        # different contrast/threshold combinations to be distinguished from 4 and 1
+        # Multiple preprocessing strategies needed because digits 9 and 11
+        # require different contrast/threshold combinations to be
+        # distinguished from 4 and 1
         strategies = []
 
         img = screenshot.convert('L')
@@ -127,13 +129,18 @@ class HPDetector:
             try:
                 processed_img.save(fname)
             except Exception:
-                logger.debug(f"Failed to save debug image {fname}", exc_info=True)
+                logger.debug(
+                    f"Failed to save debug image {fname}",
+                    exc_info=True)
 
             for config in configs:
                 try:
-                    text = pytesseract.image_to_string(processed_img, config=config)
+                    text = pytesseract.image_to_string(
+                        processed_img, config=config)
                     cleaned_text = self.clean_ocr_text(text)
-                    logger.debug(f"OCR strategy {i} -> raw:'{text.strip()}' cleaned:'{cleaned_text}'")
+                    logger.debug(
+                        f"OCR strategy {i} -> raw:'{text.strip()}' "
+                        f"cleaned:'{cleaned_text}'")
                     hp = re.findall(r'\d+', cleaned_text)
                     if hp:
                         hp_value = int(hp[0])
@@ -154,7 +161,8 @@ class HPDetector:
                 diagnostics = []
                 for idx, proc_img in enumerate(strategies):
                     try:
-                        bw = preprocess_for_shape_detection(proc_img, size=(140, 140))
+                        bw = preprocess_for_shape_detection(
+                            proc_img, size=(140, 140))
                         hc, tf, asp = count_holes_and_tail(bw)
                     except Exception:
                         hc, tf, asp = 0, 0.0, 0.0
@@ -167,10 +175,15 @@ class HPDetector:
                         pass
 
                 if nine_votes > 0 or 9 in all_results:
-                    logger.debug(f"4->9_check: nine_votes={nine_votes}, raw_votes_has9={9 in all_results}, per-strategy={diagnostics}")
+                    logger.debug(
+                        f"4->9_check: nine_votes={nine_votes}, raw_votes_has9={
+                            9 in all_results}, per-strategy={diagnostics}")
 
                 if nine_votes >= 2 or (nine_votes >= 1 and 9 in all_results):
-                    logger.info("ðŸ”§ Correcting OCR 4 -> 9 based on multi-strategy shape heuristic")
+                    logger.info(
+                        "ðŸ"§ Correcting OCR 4 -> 9 based on "
+                        "multi-strategy shape heuristic"
+                    )
                     ocr_consensus = 9
             except Exception:
                 logger.exception("Shape-checking error")
@@ -188,13 +201,20 @@ class HPDetector:
             smoothed_hp, count = counter.most_common(1)[0]
 
             # Reject sudden jumps >30 HP as likely OCR errors
-            if self.last_valid_hp is not None and abs(smoothed_hp - self.last_valid_hp) > 30:
-                logger.warning(f"Suspicious jump: {self.last_valid_hp} -> {smoothed_hp}")
+            if self.last_valid_hp is not None and abs(
+                    smoothed_hp - self.last_valid_hp) > 30:
+                logger.warning(
+                    f"Suspicious jump: {
+                        self.last_valid_hp} -> {smoothed_hp}")
                 return self.last_valid_hp
 
             self.last_valid_hp = smoothed_hp
             confidence = (count / len(self.hp_history)) * 100
-            logger.info(f"HP: {smoothed_hp} (confidence: {confidence:.0f}%, history: {list(self.hp_history)})")
+            logger.info(
+                f"HP: {smoothed_hp} (confidence: {
+                    confidence:.0f}%, history: {
+                    list(
+                        self.hp_history)})")
             return smoothed_hp
         else:
             self.last_valid_hp = raw_hp
@@ -208,12 +228,14 @@ class GameState:
         self.config = config
 
         self.hp_detector = HPDetector()
-        self.hp_detector.get_window_position = self.interface.get_window_position  # type: ignore
+        self.hp_detector.get_window_position = (
+            self.interface.get_window_position)  # type: ignore
 
         self._health_cache: Optional[int] = None
         self._health_time: float = 0.0
 
-        # Cache TTL prevents expensive OCR from running on every call in tight loops
+        # Cache TTL prevents expensive OCR from running on every call in tight
+        # loops
         self._hp_ttl = float(self.config.get("ocr", "hp_ttl", default=0.5))
 
         tesseract_path = self.config.get("tesseract_path")
@@ -222,7 +244,9 @@ class GameState:
             logger.info(f"Using Tesseract from config: {tesseract_path}")
         elif os.getenv("TESSERACT_PATH"):
             pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_PATH")
-            logger.info(f"Using Tesseract from env: {os.getenv('TESSERACT_PATH')}")
+            logger.info(
+                f"Using Tesseract from env: {
+                    os.getenv('TESSERACT_PATH')}")
         else:
             logger.info("Using default Tesseract path (system)")
 
@@ -232,7 +256,9 @@ class GameState:
             logger.error("last_slot coordinates not in config")
             return False
 
-        empty_color = self.config.get("colors", "empty_slot", default=(75, 66, 58))
+        empty_color = self.config.get(
+            "colors", "empty_slot", default=(
+                75, 66, 58))
         color = self.interface.get_pixel(coord['x'], coord['y'])
 
         is_full = color != empty_color
@@ -250,7 +276,8 @@ class GameState:
         tolerance = self.config.get("tolerances", "color_match")
 
         return any(
-            all(abs(color[i] - cc[i]) <= tolerance for i in range(3))  # type: ignore
+            all(abs(color[i] - cc[i]) <=
+                tolerance for i in range(3))  # type: ignore
             for cc in combat_colors
         )
 
@@ -274,21 +301,26 @@ class GameState:
     def get_hp(self, force: bool = False) -> Optional[int]:
         now = time.time()
 
-        if not force and self._health_cache is not None and (now - self._health_time) < self._hp_ttl:
-            logger.debug(f"get_hp: returning cached health {self._health_cache}")
+        if not force and self._health_cache is not None and (
+                now - self._health_time) < self._hp_ttl:
+            logger.debug(
+                f"get_hp: returning cached health {
+                    self._health_cache}")
             return self._health_cache
 
-        if not hasattr(self.hp_detector, "get_window_position") or self.hp_detector.get_window_position is None:
-            self.hp_detector.get_window_position = self.interface.get_window_position  # type: ignore
+        if not hasattr(self.hp_detector, "get_window_position") or (
+                self.hp_detector.get_window_position is None):
+            self.hp_detector.get_window_position = (
+            self.interface.get_window_position)  # type: ignore
 
         hp = self.hp_detector.get_smoothed_hp()
         if hp is None:
-            logger.debug("get_hp: HPDetector returned None (OCR failed). Keeping cache.")
+            logger.debug(
+                "get_hp: HPDetector returned None (OCR failed). "
+                "Keeping cache.")
             return self._health_cache
 
         self._health_cache = int(hp)
         self._health_time = now
         logger.debug(f"get_hp: new cached health {self._health_cache}")
         return self._health_cache
-        
-    

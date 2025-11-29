@@ -1,6 +1,5 @@
 import time
 import logging
-from typing import Optional, Any
 import pyautogui
 
 from osrsbot.game_interface import GameInterface
@@ -11,7 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class Actions:
-    def __init__(self, interface: GameInterface, state: GameState, config: Config) -> None:
+    def __init__(
+            self,
+            interface: GameInterface,
+            state: GameState,
+            config: Config) -> None:
         self.interface = interface
         self.state = state
         self.config = config
@@ -19,13 +22,16 @@ class Actions:
     def wait(self, timing_type: str) -> None:
         delay = self.config.get("timings", timing_type, default=1.0)
         if delay is None or not isinstance(delay, (int, float, str)):
-            logger.warning(f"Invalid timing value for '{timing_type}', using default 1.0s")
+            logger.warning(
+                f"Invalid timing value for '{timing_type}', "
+                f"using default 1.0s")
             delay = 1.0
         time.sleep(float(delay))
 
     def click_slot(self, slot_num: int) -> bool:
         if not 1 <= slot_num <= 28:
-            logger.error(f"Invalid slot number: {slot_num}. Must be between 1 and 28.")
+            logger.error(
+                f"Invalid slot number: {slot_num}. Must be between 1 and 28.")
             return False
 
         coord = self.config.get("coordinates", "inventory", f"slot_{slot_num}")
@@ -84,7 +90,8 @@ class Actions:
             self.interface.click_coord(coord)
             return True
         else:
-            logger.warning(f"No coordinates found for minimap location: {location_name}")
+            logger.warning(
+                f"No coordinates found for minimap location: {location_name}")
             return False
 
     def bank_search(self, item_name: str) -> bool:

@@ -5,14 +5,16 @@ from osrsbot.game_interface import GameInterface
 from osrsbot.actions import Actions
 from osrsbot.game_state import GameState
 from osrsbot.config import Config
-from osrsbot.game_state import HPDetector
 logger = logging.getLogger(__name__)
 
 
 class ScriptRunner:
     """Main script runner that sets up everything"""
 
-    def __init__(self, window_title: str, config_file: str = "config.json") -> None:
+    def __init__(
+            self,
+            window_title: str,
+            config_file: str = "config.json") -> None:
         """Initialize the script runner with all dependencies.
 
         Args:
@@ -38,7 +40,8 @@ class ScriptRunner:
             logger.info("Config loaded successfully")
         except FileNotFoundError as e:
             logger.error(f"Config file not found: {config_file}")
-            raise FileNotFoundError(f"Config file '{config_file}' not found") from e
+            raise FileNotFoundError(
+                f"Config file '{config_file}' not found") from e
         except Exception as e:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             raise
@@ -46,7 +49,8 @@ class ScriptRunner:
         # Update window title if provided
         if window_title:
             self.config.data["window_title"] = window_title
-            logger.debug(f"Updated window title in config to: '{window_title}'")
+            logger.debug(
+                f"Updated window title in config to: '{window_title}'")
 
         try:
             # Initialize game interface
@@ -54,8 +58,11 @@ class ScriptRunner:
             self.interface = GameInterface(self.config)
             logger.info("GameInterface initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize GameInterface: {e}", exc_info=True)
-            raise Exception(f"Could not find or attach to window '{window_title}'") from e
+            logger.error(
+                f"Failed to initialize GameInterface: {e}",
+                exc_info=True)
+            raise Exception(
+                f"Could not find or attach to window '{window_title}'") from e
 
         try:
             # Initialize game state
@@ -87,16 +94,24 @@ class ScriptRunner:
         Raises:
             Exception: If script execution fails
         """
-        script_name = script_func.__name__ if hasattr(script_func, '__name__') else 'unknown'
+        script_name = script_func.__name__ if hasattr(
+            script_func, '__name__') else 'unknown'
         logger.info(f"Starting script: {script_name}")
         logger.debug(f"Script arguments: {kwargs}")
 
         try:
-            script_func(self.interface, self.state, self.actions, self.config, **kwargs)
+            script_func(
+                self.interface,
+                self.state,
+                self.actions,
+                self.config,
+                **kwargs)
             logger.info(f"Script '{script_name}' completed successfully")
         except KeyboardInterrupt:
             logger.warning(f"Script '{script_name}' interrupted by user")
             raise
         except Exception as e:
-            logger.error(f"Script '{script_name}' failed with error: {e}", exc_info=True)
+            logger.error(
+                f"Script '{script_name}' failed with error: {e}",
+                exc_info=True)
             raise Exception(f"Script '{script_name}' failed: {e}") from e

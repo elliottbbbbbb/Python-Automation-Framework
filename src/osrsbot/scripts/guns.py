@@ -27,7 +27,8 @@ def guns_script(interface: GameInterface, state: GameState,
             actions.wait("long")
 
             # Walk to location
-            walk_coord = config.get("coordinates", "minimap", "pickpocket_location")
+            walk_coord = config.get(
+                "coordinates", "minimap", "pickpocket_location")
             if walk_coord:
                 interface.click_coord(walk_coord)
             else:

@@ -8,6 +8,7 @@ from osrsbot.scripts.guns import guns_script
 from osrsbot.scripts.test import test
 logger = logging.getLogger(__name__)
 
+
 def get_valid_int(prompt: str, default: int) -> int:
     """Get valid integer input from user with default fallback."""
     try:
@@ -16,7 +17,9 @@ def get_valid_int(prompt: str, default: int) -> int:
             return default
         value = int(user_input)
         if value <= 0:
-            logger.warning(f"Invalid value {value}, must be positive. Using default: {default}")
+            logger.warning(
+                f"Invalid value {value}, must be positive. "
+                f"Using default: {default}")
             print(f"âš ï¸  Must be positive. Using default: {default}")
             return default
         return value
@@ -47,9 +50,9 @@ def main() -> None:
     )
 
     try:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("OSRS BOT - TASK SCRIPT RUNNER")
-        print("="*60)
+        print("=" * 60)
         print("\n1. Calibrate Colors & Coordinates")
         print("2. Run Green Dragons Script")
         print("3. Run Guns Script (Pickpocketing)")
@@ -80,13 +83,19 @@ def main() -> None:
             logger.info("Starting Green Dragons script")
             try:
                 window_title = get_window_title("Window title: ")
-                runs = get_valid_int("Number of runs [default: 10]: ", default=10)
+                runs = get_valid_int(
+                    "Number of runs [default: 10]: ", default=10)
                 bank = input("Bank location [varrock]: ").strip() or "varrock"
 
                 runner = ScriptRunner(window_title)
-                runner.run_script(green_dragons_script, bank_location=bank, runs=runs)
+                runner.run_script(
+                    green_dragons_script,
+                    bank_location=bank,
+                    runs=runs)
             except Exception as e:
-                logger.error(f"Green Dragons script failed: {e}", exc_info=True)
+                logger.error(
+                    f"Green Dragons script failed: {e}",
+                    exc_info=True)
                 print(f"âŒ Script error: {e}")
                 sys.exit(1)
 
@@ -95,7 +104,8 @@ def main() -> None:
             logger.info("Starting Guns script")
             try:
                 window_title = get_window_title("Window title: ")
-                runs = get_valid_int("Number of runs [default: 10]: ", default=10)
+                runs = get_valid_int(
+                    "Number of runs [default: 10]: ", default=10)
                 bank = input("Bank location [GE]: ").strip() or "GE"
 
                 runner = ScriptRunner(window_title)
@@ -110,7 +120,8 @@ def main() -> None:
             logger.info("Starting Test script")
             try:
                 window_title = get_window_title("Window title: ")
-                runs = get_valid_int("Number of runs [default: 10]: ", default=10)
+                runs = get_valid_int(
+                    "Number of runs [default: 10]: ", default=10)
                 bank = input("Bank location [GE]: ").strip() or "GE"
 
                 runner = ScriptRunner(window_title)
