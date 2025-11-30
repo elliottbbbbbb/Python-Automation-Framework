@@ -1,16 +1,14 @@
 import time
-import pyautogui
 import logging
-from osrsbot.game_interface import GameInterface
-from osrsbot.game_state import GameState
-from osrsbot.config import Config
-from osrsbot.actions import Actions
+from osrsbot.models.state import GameState
+from osrsbot.models.config import Config
+from osrsbot.controllers.actions import GameActions as Actions
 
 logger = logging.getLogger(__name__)
 
 
 def green_dragons_script(
-        interface: GameInterface,
+        interface,
         state: GameState,
         actions: Actions,
         config: Config,
@@ -73,13 +71,7 @@ def green_dragons_script(
                 actions.teleport_ge()
                 actions.wait("long")
 
-                fountain_coord = config.get(
-                    "coordinates", "world", "varrock_fountain")
-                if fountain_coord:
-                    interface.click_coord(fountain_coord)
-                else:
-                    logger.warning("varrock_fountain coord not in config")
-
+                actions.click_coordinate(("world", "varrock_fountain"))
                 actions.wait("teleport")
 
                 for _ in range(2):
@@ -87,34 +79,25 @@ def green_dragons_script(
                 actions.wait("long")
 
                 for _ in range(2):
-                    coord = config.get("coordinates", "world", "bank_booth")
-                    if coord:
-                        interface.click_coord(coord)
+                    actions.click_coordinate(("world", "bank_booth"))
                 actions.wait("long")
 
                 # Deposit loot
                 for _ in range(12):
-                    color = config.get("colors", "purple_item_outline")
-                    if color:
-                        interface.click_color(color)
+                    actions.click_color("purple_item_outline")
                     actions.wait("short")
 
                 # Withdraw food
                 actions.wait("medium")
-                quantity_coord = config.get(
-                    "coordinates", "ui", "bank_quantity")
-                if quantity_coord:
-                    interface.click_coord(quantity_coord)
+                actions.click_coordinate(("ui", "bank_quantity"))
 
                 actions.wait("medium")
                 actions.bank_search("manta ray")
 
-                food_coord = config.get("coordinates", "ui", "bank_food_slot")
-                if food_coord:
-                    interface.click_coord(food_coord)
+                actions.click_coordinate(("ui", "bank_food_slot"))
 
                 actions.wait("long")
-                pyautogui.press('escape')
+                actions.close_interface()
 
         except KeyboardInterrupt:
             logger.warning("Script interrupted by user")

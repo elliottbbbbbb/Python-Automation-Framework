@@ -1,16 +1,13 @@
 import logging
-import time
-import pyautogui
 
-from osrsbot.game_interface import GameInterface
-from osrsbot.game_state import GameState
-from osrsbot.config import Config
-from osrsbot.actions import Actions
+from osrsbot.models.state import GameState
+from osrsbot.models.config import Config
+from osrsbot.controllers.actions import GameActions as Actions
 
 logger = logging.getLogger(__name__)
 
 
-def guns_script(interface: GameInterface, state: GameState,
+def guns_script(interface, state: GameState,
                 actions: Actions, config: Config,
                 bank_location: str = "GE", runs: int = 10) -> None:
     """Pickpocketing script with GE selling."""
@@ -30,7 +27,7 @@ def guns_script(interface: GameInterface, state: GameState,
             walk_coord = config.get(
                 "coordinates", "minimap", "pickpocket_location")
             if walk_coord:
-                interface.click_coord(walk_coord)
+                actions.click_coord(walk_coord)
             else:
                 logger.warning("pickpocket_location coord not in config")
 
@@ -45,7 +42,7 @@ def guns_script(interface: GameInterface, state: GameState,
                     pickpockets += 1
                     if pickpockets % 10 == 0:
                         logger.debug(f"Pickpockets: {pickpockets}")
-                time.sleep(0.8)
+                actions.wait("short")
 
             logger.info(f"Inventory full, pickpockets: {pickpockets}")
 
@@ -62,43 +59,31 @@ def guns_script(interface: GameInterface, state: GameState,
                 actions.wait("long")
 
                 # Click GE clerk
-                coord = config.get("coordinates", "world", "ge_clerk")
                 for _ in range(2):
-                    if coord:
-                        interface.click_coord(coord)
+                    actions.click_coordinate(("world", "ge_clerk"))
                 actions.wait("medium")
 
                 # Collect GP
-                collect_coord = config.get("coordinates", "ui", "ge_collect")
-                if collect_coord:
-                    interface.click_coord(collect_coord)
+                actions.click_coordinate(("ui", "ge_collect"))
                 actions.wait("short")
 
                 # Select items
-                color = config.get("colors", "red_outline")
-                if color:
-                    interface.click_color(color)
+                actions.click_color("red_outline")
                 actions.wait("short")
 
                 # Set quantity
-                qty_coord = config.get("coordinates", "ui", "ge_quantity_all")
-                if qty_coord:
-                    interface.click_coord(qty_coord)
+                actions.click_coordinate(("ui", "ge_quantity_all"))
                 actions.wait("medium")
 
                 # Lower price
-                price_coord = config.get("coordinates", "ui", "ge_lower_price")
-                if price_coord:
-                    interface.click_coord(price_coord)
+                actions.click_coordinate(("ui", "ge_lower_price"))
                 actions.wait("medium")
 
                 # Confirm
-                confirm_coord = config.get("coordinates", "ui", "ge_confirm")
-                if confirm_coord:
-                    interface.click_coord(confirm_coord)
+                actions.click_coordinate(("ui", "ge_confirm"))
                 actions.wait("medium")
 
-                pyautogui.press('escape')
+                actions.close_interface()
                 actions.wait("medium")
 
         except KeyboardInterrupt:

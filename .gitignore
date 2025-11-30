@@ -139,6 +139,19 @@ ocr_debug/
 *.jpg
 *.jpeg
 
+# Bot data and logs
+bot_logs/
+screenshots/
+calibration_data/
+
+# Temporary/backup files
+*.bak
+*.tmp
+*~
+
+# Documentation artifacts (keep source docs, ignore builds)
+misc/*.html
+
 # OS files
 .DS_Store
 Thumbs.db

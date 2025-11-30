@@ -5,7 +5,18 @@
       "Bash(pip install:*)",
       "Bash(python -m pip install:*)",
       "Bash(git checkout:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(mkdir:*)",
+      "Bash(python -m osrsbot.main:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(\".venv/Scripts/osrs-bot.exe\")",
+      "Bash(\".venv/Scripts/python.exe\":*)",
+      "Bash(\".venv/Scripts/python.exe\" -c \"from osrsbot.services.mouse_service import MouseService; from osrsbot.services.screen_service import ScreenService; from osrsbot.actions import Actions; from osrsbot.core import GameInterface; print(''All imports successful'')\")",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(tree:*)",
+      "Bash(copy \"controllers\\actions.py\" \"domain\\actions.py\")",
+      "Bash(copy \"controllers\\runner.py\" \"app\\runner.py\")",
+      "Bash(timeout 3 .venv/Scripts/python.exe:*)"
     ],
     "deny": [],
     "ask": []
