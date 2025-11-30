@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "osrsbot"
+version = "0.1.0"
+description = "OSRS automation toolkit with calibration, scripts, and CLI runner."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Elliott" }]
+
+# runtime deps
+dependencies = [
+  "pyautogui>=0.9.54",
+  "PyWinCtl>=0.4; platform_system=='Windows'",
+  "mouse>=0.7.1; platform_system=='Windows'",
+  "keyboard>=0.13.5; platform_system=='Windows'",
+  "pytesseract>=0.3.10",
+  "Pillow>=10.0",
+]
+
+# command users will run: `osrs-bot`
+[project.scripts]
+osrs-bot = "osrsbot.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/osrsbot"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
