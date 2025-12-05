@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Union, TYPE_CHECKING
 
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MouseConfig
@@ -7,6 +7,9 @@ from osrsbot.services.screen_service import ScreenService
 from osrsbot.models.state import GameState
 from osrsbot.controllers.actions import GameActions
 from osrsbot.models.config import Config
+
+if TYPE_CHECKING:
+    from osrsbot.core.base_bot import Bot
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +21,7 @@ class ScriptRunner:
             self,
             window_title: str,
             config_file: str = "config.json") -> None:
-        """Initialize the script runner with all dependencies.
-
+        """
         Args:
             window_title: Title of the game window to attach to
             config_file: Path to config JSON file
@@ -113,6 +115,7 @@ class ScriptRunner:
             self.actions = GameActions(
                 self.mouse,
                 self.screen,
+                self.interface,
                 self.config
             )
             logger.info("GameActions initialized successfully")
@@ -122,34 +125,91 @@ class ScriptRunner:
 
         logger.info("ScriptRunner initialization complete")
 
-    def run_script(self, script_func: Callable, **kwargs: Any) -> None:
-        """Run a script function with all dependencies.
+    def run_script(
+            self,
+            script: Union[Callable, type, "Bot"],
+            **kwargs: Any) -> None:
+        """
+        Run a script, supporting both function-based and class-based bots.
 
         Args:
-            script_func: The script function to execute
+            script: Either a function (legacy) or a Bot class/instance
             **kwargs: Additional arguments to pass to the script
 
         Raises:
             Exception: If script execution fails
         """
-        script_name = script_func.__name__ if hasattr(
-            script_func, '__name__') else 'unknown'
-        logger.info(f"Starting script: {script_name}")
-        logger.debug(f"Script arguments: {kwargs}")
+        from osrsbot.core.base_bot import Bot
 
-        try:
-            script_func(
-                self.interface,
-                self.state,
-                self.actions,
-                self.config,
-                **kwargs)
-            logger.info(f"Script '{script_name}' completed successfully")
-        except KeyboardInterrupt:
-            logger.warning(f"Script '{script_name}' interrupted by user")
-            raise
-        except Exception as e:
-            logger.error(
-                f"Script '{script_name}' failed with error: {e}",
-                exc_info=True)
-            raise Exception(f"Script '{script_name}' failed: {e}") from e
+        # Determine if it's a bot class/instance or a function
+        if isinstance(script, type) and issubclass(script, Bot):
+            # It's a Bot class - instantiate it
+            script_name = script.__name__
+            logger.info(f"Starting bot class: {script_name}")
+            logger.debug(f"Bot arguments: {kwargs}")
+
+            try:
+                bot_instance = script(
+                    interface=self.interface,
+                    state=self.state,
+                    actions=self.actions,
+                    config=self.config
+                )
+                bot_instance.run(**kwargs)
+                logger.info(f"Bot '{script_name}' completed successfully")
+            except KeyboardInterrupt:
+                logger.warning(f"Bot '{script_name}' interrupted by user")
+                raise
+            except Exception as e:
+                logger.error(
+                    f"Bot '{script_name}' failed with error: {e}",
+                    exc_info=True)
+                raise Exception(f"Bot '{script_name}' failed: {e}") from e
+
+        elif isinstance(script, Bot):
+            # It's already a Bot instance
+            script_name = script.script_name
+            logger.info(f"Starting bot instance: {script_name}")
+            logger.debug(f"Bot arguments: {kwargs}")
+
+            try:
+                script.run(**kwargs)
+                logger.info(f"Bot '{script_name}' completed successfully")
+            except KeyboardInterrupt:
+                logger.warning(f"Bot '{script_name}' interrupted by user")
+                raise
+            except Exception as e:
+                logger.error(
+                    f"Bot '{script_name}' failed with error: {e}",
+                    exc_info=True)
+                raise Exception(f"Bot '{script_name}' failed: {e}") from e
+
+        elif callable(script):
+            # It's a function (legacy support)
+            script_name = script.__name__ if hasattr(
+                script, '__name__') else 'unknown'
+            logger.info(f"Starting script function: {script_name}")
+            logger.debug(f"Script arguments: {kwargs}")
+
+            try:
+                script(
+                    self.interface,
+                    self.state,
+                    self.actions,
+                    self.config,
+                    **kwargs)
+                logger.info(f"Script '{script_name}' completed successfully")
+            except KeyboardInterrupt:
+                logger.warning(f"Script '{script_name}' interrupted by user")
+                raise
+            except Exception as e:
+                logger.error(
+                    f"Script '{script_name}' failed with error: {e}",
+                    exc_info=True)
+                raise Exception(f"Script '{script_name}' failed: {e}") from e
+
+        else:
+            raise TypeError(
+                f"script must be a Bot class, Bot instance, or callable function, "
+                f"got {type(script)}"
+            )

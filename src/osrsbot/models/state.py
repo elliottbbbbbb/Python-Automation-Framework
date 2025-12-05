@@ -47,8 +47,17 @@ class GameState:
         self._hp_ttl = float(self.config.get("ocr", "hp_ttl", default=0.5))
         self._ocr_window_size = self.config.get("ocr", "window_size", default=5)
 
+    def _refresh_window_bounds(self) -> None:
+        """Refresh window bounds to handle window movement."""
+        if self.screen and self.interface:
+            try:
+                bounds = self.interface.get_window_position()
+                if bounds:
+                    self.screen.set_window_bounds(*bounds)
+            except Exception as e:
+                logger.warning(f"Failed to refresh window bounds: {e}")
+
     def inventory_full(self) -> bool:
-        """Check if inventory is full by checking the last slot color."""
         coord = self.config.get("coordinates", "inventory", "last_slot")
         if not coord:
             logger.error("last_slot coordinates not in config")
@@ -62,6 +71,9 @@ class GameState:
             logger.warning("empty_inventory_slot color not in config, using fallback")
             empty_color = (75, 66, 58)
 
+        # Refresh window bounds before checking pixel
+        self._refresh_window_bounds()
+
         # Use ScreenService if available, otherwise fall back to interface
         if self.screen:
             color = self.screen.get_pixel_color(coord['x'], coord['y'], relative=True)
@@ -73,11 +85,13 @@ class GameState:
         return is_full
 
     def in_combat(self) -> bool:
-        """Check if player is in combat by checking combat indicator color."""
         coord = self.config.get("coordinates", "checks", "combat_indicator")
         if not coord:
             logger.error("combat check coordinates were not found in config.")
             return False
+
+        # Refresh window bounds before checking pixel
+        self._refresh_window_bounds()
 
         # Use ScreenService if available, otherwise fall back to interface
         if self.screen:
@@ -107,8 +121,6 @@ class GameState:
 
     def get_hp(self, force: bool = False) -> Optional[int]:
         """
-        Get current HP using OCR.
-
         Args:
             force: If True, bypass cache and force new OCR reading
 
@@ -153,8 +165,6 @@ class GameState:
 
     def get_prayer(self, force: bool = False) -> Optional[int]:
         """
-        Get current prayer points using OCR.
-
         Args:
             force: If True, bypass cache and force new OCR reading
 
@@ -195,8 +205,6 @@ class GameState:
 
     def get_run_energy(self, force: bool = False) -> Optional[int]:
         """
-        Get current run energy using OCR.
-
         Args:
             force: If True, bypass cache and force new OCR reading
 
@@ -237,6 +245,5 @@ class GameState:
 
     @staticmethod
     def _hex_to_rgb(hex_color: str) -> tuple:
-        """Convert hex color to RGB tuple."""
         hex_color = hex_color.lstrip('#')
         return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))

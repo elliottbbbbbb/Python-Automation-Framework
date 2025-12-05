@@ -12,10 +12,11 @@ Each action uses the appropriate services (MouseService, ScreenService, etc.)
 import time
 import logging
 import pyautogui
-from typing import Dict, Any, Optional, Tuple
+from typing import Optional, Tuple
 
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
+from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class GameActions:
         self,
         mouse: MouseService,
         screen: ScreenService,
+        interface: GameInterface,
         config: Config
     ):
         """
@@ -46,19 +48,15 @@ class GameActions:
         Args:
             mouse: MouseService instance
             screen: ScreenService instance
+            interface: GameInterface for window bounds
             config: Configuration instance
         """
         self.mouse = mouse
         self.screen = screen
+        self.interface = interface
         self.config = config
 
     def wait(self, timing_type: str) -> None:
-        """
-        Wait for configured duration.
-
-        Args:
-            timing_type: Key from config["timings"]
-        """
         delay = self.config.get("timings", timing_type, default=1.0)
 
         if not isinstance(delay, (int, float)):
@@ -67,38 +65,27 @@ class GameActions:
 
         time.sleep(float(delay))
 
-    def click_slot(
-        self,
-        slot_num: int,
-        move_style: MovementStyle = "curved"
-    ) -> bool:
+    def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
         """
-        Click an inventory slot (backward compatible with old API).
+        Convert relative coords to absolute, refreshing window bounds first.
 
         Args:
-            slot_num: Slot number (1-28)
-            move_style: How to move mouse to slot
+            x: X coordinate relative to window
+            y: Y coordinate relative to window
 
         Returns:
-            True if successful
+            (abs_x, abs_y) absolute screen coordinates
         """
-        return self.click_inventory_slot(slot_num, move_style)
+        # Refresh bounds from interface and update screen service
+        bounds = self.interface.get_bounds()
+        self.screen.set_window_bounds(*bounds)
+        return self.screen.relative_to_absolute(x, y)
 
     def click_inventory_slot(
         self,
         slot_num: int,
         move_style: MovementStyle = "curved"
     ) -> bool:
-        """
-        Click an inventory slot.
-
-        Args:
-            slot_num: Slot number (1-28)
-            move_style: How to move mouse to slot
-
-        Returns:
-            True if successful
-        """
         if not 1 <= slot_num <= 28:
             logger.error(f"Invalid slot: {slot_num}, must be 1-28")
             return False
@@ -110,9 +97,10 @@ class GameActions:
             return False
 
         x, y = coord["x"], coord["y"]
+        abs_x, abs_y = self._to_absolute(x, y)
 
-        logger.debug(f"Clicking inventory slot {slot_num} at ({x}, {y})")
-        return self.mouse.click_at(x, y, move_style=move_style)
+        logger.debug(f"Clicking inventory slot {slot_num} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def click_color(
         self,
@@ -121,18 +109,6 @@ class GameActions:
         tolerance: Optional[int] = None,
         region: Optional[Tuple[int, int, int, int]] = None
     ) -> bool:
-        """
-        Find and click a color from config.
-
-        Args:
-            color_name: Name of color in config["colors"]
-            move_style: How to move to target
-            tolerance: Color match tolerance (uses config default if None)
-            region: Optional region to search in
-
-        Returns:
-            True if color found and clicked
-        """
         hex_color = self.config.get("colors", color_name)
 
         if not hex_color:
@@ -142,30 +118,26 @@ class GameActions:
         if tolerance is None:
             tolerance = self.config.get("tolerances", "color_match", default=10)
 
-        match = self.screen.find_color(hex_color, tolerance, region)
+        # Refresh window bounds BEFORE taking screenshot
+        bounds = self.interface.get_bounds()
+        self.screen.set_window_bounds(*bounds)
 
+        match = self.screen.find_color(hex_color, tolerance, region)
+        logger.debug(f"Found match: {match}")
         if not match:
             logger.debug(f"Color '{color_name}' ({hex_color}) not found")
             return False
-
-        logger.debug(f"Found '{color_name}' at ({match.x}, {match.y})")
-        return self.mouse.click_at(match.x, match.y, move_style=move_style)
+        # This is where we go from relative coordinates to click -> absolute coordinates
+        # Otherwise we click out of bounds. The position of the OSRS window is updated for each new click.
+        abs_x, abs_y = self._to_absolute(match.x, match.y)
+        logger.debug(f"Found '{color_name}' at relative ({match.x}, {match.y}) -> absolute ({abs_x}, {abs_y})")
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def click_coordinate(
         self,
         coord_path: Tuple[str, ...],
         move_style: MovementStyle = "curved"
     ) -> bool:
-        """
-        Click a coordinate from config.
-
-        Args:
-            coord_path: Path to coordinate (e.g., ("ui", "bank_deposit_all"))
-            move_style: How to move to target
-
-        Returns:
-            True if successful
-        """
         current = self.config.get("coordinates")
 
         if not current:
@@ -183,113 +155,25 @@ class GameActions:
             return False
 
         x, y = current["x"], current["y"]
-        return self.mouse.click_at(x, y, move_style=move_style)
-
-    def click_coord(self, coord: dict, button: str = 'left') -> bool:
-        """
-        Click using config coordinate dict (backward compatible).
-
-        Args:
-            coord: Dictionary with 'x' and 'y' keys
-            button: Mouse button to use
-
-        Returns:
-            True if successful
-        """
-        if not coord or "x" not in coord or "y" not in coord:
-            logger.error("Invalid coordinate dict")
-            return False
-
-        x, y = coord["x"], coord["y"]
-        return self.mouse.click_at(x, y, button=button)
+        abs_x, abs_y = self._to_absolute(x, y)
+        logger.debug(f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def use_item(self, item_color_name: str) -> bool:
-        """
-        Click an item in inventory by its outline color.
-
-        Args:
-            item_color_name: Name of item color in config
-
-        Returns:
-            True if item found and clicked
-        """
         return self.click_color(item_color_name)
 
-    def attack(self, npc_color_name: str) -> bool:
-        """
-        Attack an NPC by its outline color (backward compatible).
-
-        Args:
-            npc_color_name: Name of NPC color in config
-
-        Returns:
-            True if NPC found and clicked
-        """
-        return self.attack_npc(npc_color_name)
-
     def attack_npc(self, npc_color_name: str) -> bool:
-        """
-        Attack an NPC by its outline color.
-
-        Args:
-            npc_color_name: Name of NPC color in config
-
-        Returns:
-            True if NPC found and clicked
-        """
         logger.debug(f"Attacking NPC: {npc_color_name}")
         return self.click_color(npc_color_name)
 
-    def walk_marker(self, marker_color_name: str) -> bool:
-        """
-        Walk to a tile marker (backward compatible).
-
-        Args:
-            marker_color_name: Name of marker color in config
-
-        Returns:
-            True if marker found and clicked
-        """
-        return self.walk_to_marker(marker_color_name)
-
     def walk_to_marker(self, marker_color_name: str) -> bool:
-        """
-        Walk to a tile marker.
-
-        Args:
-            marker_color_name: Name of marker color in config
-
-        Returns:
-            True if marker found and clicked
-        """
         return self.click_color(marker_color_name)
 
     def click_minimap(self, location_name: str) -> bool:
-        """
-        Click a location on minimap from config.
-
-        Args:
-            location_name: Name of minimap location
-
-        Returns:
-            True if successful
-        """
         return self.click_coordinate(("minimap", location_name))
 
-    def teleport_ge(self) -> bool:
-        """
-        Use Varrock teleport tab (backward compatible).
-
-        Double-clicks to handle RuneLite menu behavior.
-        """
-        return self.teleport_varrock()
-
     def teleport_varrock(self) -> bool:
-        """
-        Use Varrock teleport tab (slot 2).
-
-        Double-clicks to handle RuneLite menu behavior.
-        """
+        """Double-clicks to handle RuneLite menu behavior."""
         for _ in range(2):
             if not self.click_inventory_slot(2):
                 logger.error("Failed to click Varrock teleport")
@@ -300,15 +184,6 @@ class GameActions:
         return True
 
     def teleport_item(self, item_color_name: str) -> bool:
-        """
-        Teleport using an item (like mythical cape, ardy cloak).
-
-        Args:
-            item_color_name: Color name of teleport item
-
-        Returns:
-            True if successful
-        """
         for _ in range(2):
             if not self.use_item(item_color_name):
                 logger.error(f"Failed to use {item_color_name}")
@@ -318,22 +193,7 @@ class GameActions:
         self.wait("teleport")
         return True
 
-    def teleport_myth_cape(self) -> bool:
-        """Teleport using mythical cape (backward compatible)."""
-        return self.teleport_item("mythical_cape")
-
-    def teleport_ardy(self) -> bool:
-        """Teleport using Ardougne cloak (backward compatible)."""
-        return self.teleport_item("ardy_cloak")
-
-    def deposit_all(self) -> bool:
-        """
-        Click the 'Deposit All' button in bank (backward compatible).
-        """
-        return self.bank_deposit_all()
-
     def bank_deposit_all(self) -> bool:
-        """Click the 'Deposit All' button in bank."""
         if not self.click_coordinate(("ui", "bank_deposit_all")):
             logger.error("Failed to click deposit all")
             return False
@@ -342,15 +202,6 @@ class GameActions:
         return True
 
     def bank_search(self, item_name: str) -> bool:
-        """
-        Search for an item in bank.
-
-        Args:
-            item_name: Name to type in search box
-
-        Returns:
-            True if successful
-        """
         if not item_name:
             logger.error("Item name cannot be empty")
             return False
@@ -366,46 +217,15 @@ class GameActions:
 
         return True
 
-    def eat(self, food_color_name: str) -> bool:
-        """
-        Eat food from inventory (backward compatible).
-
-        Args:
-            food_color_name: Color name of food item
-
-        Returns:
-            True if food found and eaten
-        """
-        return self.eat_food(food_color_name)
-
     def eat_food(self, food_color_name: str) -> bool:
-        """
-        Eat food from inventory.
-
-        Args:
-            food_color_name: Color name of food item
-
-        Returns:
-            True if food found and eaten
-        """
         logger.info("Eating food")
         return self.use_item(food_color_name)
 
     def drink_potion(self, potion_color_name: str) -> bool:
-        """
-        Drink a potion from inventory.
-
-        Args:
-            potion_color_name: Color name of potion
-
-        Returns:
-            True if potion found and drunk
-        """
         logger.info(f"Drinking potion: {potion_color_name}")
         return self.use_item(potion_color_name)
 
     def close_interface(self) -> bool:
-        """Close current interface with ESC key."""
         pyautogui.press('escape')
         self.wait("short")
         return True
@@ -416,17 +236,6 @@ class GameActions:
         timeout: float = 10.0,
         check_interval: float = 0.5
     ) -> bool:
-        """
-        Wait for a color to appear.
-
-        Args:
-            color_name: Name of color in config
-            timeout: Maximum seconds to wait
-            check_interval: Seconds between checks
-
-        Returns:
-            True if color appeared
-        """
         hex_color = self.config.get("colors", color_name)
 
         if not hex_color:
