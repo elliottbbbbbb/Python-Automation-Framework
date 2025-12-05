@@ -1,110 +1,86 @@
-import time
 import logging
-from osrsbot.models.state import GameState
-from osrsbot.models.config import Config
-from osrsbot.controllers.actions import GameActions as Actions
+import time
+from osrsbot.core.base_bot import Bot
 
 logger = logging.getLogger(__name__)
 
 
-def green_dragons_script(
-        interface,
-        state: GameState,
-        actions: Actions,
-        config: Config,
-        bank_location: str = "varrock",
-        runs: int = 10) -> None:
-    """Green Dragons farming script with combat and banking."""
-    logger.info(
-        f"Starting Green Dragons script: {runs} runs, bank: {bank_location}")
-    print(f"\nðŸ‰ Green Dragons Script ({runs} runs)")
+class GreenDragonsBot(Bot):
+    """
+    Script-specific bot for Green Dragons, inheriting core logic from Bot.
+    """
 
-    hp_threshold = config.get("hp_threshold", default=70)
+    def __init__(self, *args, **kwargs):
+        """Initializes the GreenDragonsBot, passing dependencies to the parent."""
+        super().__init__(*args, **kwargs, script_name="Green Dragons Bot")
+        self.hp_threshold = self.config.get("hp_threshold", default=70)
 
-    for run in range(runs):
-        try:
-            logger.info(f"Run {run + 1}/{runs} starting")
-            print(f"\n=== Run {run + 1}/{runs} ===")
+    def _navigation_and_potions(self) -> None:
+        """Handles the initial movement and potion usage phase."""
+        actions = self.actions
 
-            # Setup
-            logger.debug("Teleporting and navigating to dragons")
-            actions.click_slot(1)
-            actions.wait("long")
+        logger.debug("Teleporting and navigating to dragons")
+        actions.click_inventory_slot(1)
 
-            for _ in range(2):
-                actions.walk_marker("yellow_tile_marker")
-            actions.wait("long")
+        actions.wait("long")
 
-            actions.click_minimap("green_dragons")
-            actions.wait("medium")
+        # ADDED FOR TESTING REMEMBER TO REMOVE
+        actions.click_inventory_slot(1)
+        logger.info("Clicking at inventory slot 1")
+        actions.wait("long")
+        logger.info("Clicking at inventory slot 3")
+        actions.click_inventory_slot(3)
 
-            # Use potions
-            actions.use_item("extended_antifire")
-            actions.wait("medium")
-            actions.use_item("super_combat")
-            actions.wait("long")
+        for _ in range(2):
+            logger.info("Walking to yellow tile marker")
+           #actions.walk_to_marker("yellow_tile_marker")
+            actions.click_color("yellow_tile_marker")
+        actions.wait("long")
 
-            # Combat loop
-            logger.debug("Starting combat loop")
-            kills = 0
+        actions.click_minimap("green_dragons")
+        actions.wait("medium")
 
-            while not state.inventory_full():
-                hp = state.get_health()
-                if hp and hp < hp_threshold:
-                    logger.info(f"HP low: {hp}, eating")
-                    actions.eat("manta_ray")
-                    actions.wait("medium")
+        # Use potions
+        actions.use_item("extended_antifire")
+        actions.wait("medium")
+        actions.use_item("super_combat")
+        actions.wait("long")
 
-                if not state.in_combat():
-                    if actions.attack("green_dragon"):
-                        kills += 1
-                        if kills % 5 == 0:
-                            logger.debug(f"Kills: {kills}")
+    def _combat_loop_phase(self) -> None:
+        """Handles the combat loop until the inventory is full."""
+        state = self.state
+        actions = self.actions
 
-                time.sleep(1)
+        logger.debug("Starting combat loop")
+        kills = 0
 
-            logger.info(f"Inventory full, kills: {kills}")
-
-            # Banking
-            if bank_location == "varrock":
-                logger.debug("Banking at Varrock")
-                actions.teleport_ge()
-                actions.wait("long")
-
-                actions.click_coordinate(("world", "varrock_fountain"))
-                actions.wait("teleport")
-
-                for _ in range(2):
-                    actions.walk_marker("yellow_tile_marker")
-                actions.wait("long")
-
-                for _ in range(2):
-                    actions.click_coordinate(("world", "bank_booth"))
-                actions.wait("long")
-
-                # Deposit loot
-                for _ in range(12):
-                    actions.click_color("purple_item_outline")
-                    actions.wait("short")
-
-                # Withdraw food
+        while not state.inventory_full():
+            hp = state.get_health()
+            if hp and hp < self.hp_threshold:
+                logger.info(f"HP low: {hp}, eating")
+                actions.eat("manta_ray")
                 actions.wait("medium")
-                actions.click_coordinate(("ui", "bank_quantity"))
 
-                actions.wait("medium")
-                actions.bank_search("manta ray")
+            if not state.in_combat():
+                if actions.attack_npc("green_dragon"):
+                    kills += 1
+                    if kills % 5 == 0:
+                        logger.debug(f"Kills: {kills}")
 
-                actions.click_coordinate(("ui", "bank_food_slot"))
+            time.sleep(1)
 
-                actions.wait("long")
-                actions.close_interface()
+        logger.info(f"Inventory full, kills: {kills}")
 
-        except KeyboardInterrupt:
-            logger.warning("Script interrupted by user")
-            raise
-        except Exception as e:
-            logger.error(f"Run {run + 1} failed: {e}", exc_info=True)
-            print(f"âŒ Run {run + 1} failed: {e}")
+    def run_cycle(self, bank_location: str, run_number: int) -> None:
+        """
+        Implements the main logic for a single run cycle.
+        This is the method required by the parent Bot class.
+        """
+        # 1. Setup and Navigation State
+        self._navigation_and_potions()
 
-    logger.info("Green Dragons script complete")
-    print("\nâœ… Script complete!")
+        # 2. Combat Loop State
+        self._combat_loop_phase()
+
+        # 3. Banking State
+        self._teleport_and_bank(bank_location)

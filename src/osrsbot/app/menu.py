@@ -3,14 +3,13 @@ import sys
 from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
 from osrsbot.controllers.runner import ScriptRunner
-from osrsbot.scripts.green_dragons import green_dragons_script
+from osrsbot.scripts.green_dragons import GreenDragonsBot
 from osrsbot.scripts.guns import guns_script
-from osrsbot.scripts.test import test
+from osrsbot.scripts.test import test_script 
 logger = logging.getLogger(__name__)
 
 
 def get_valid_int(prompt: str, default: int) -> int:
-    """Get valid integer input from user with default fallback."""
     try:
         user_input = input(prompt).strip()
         if not user_input:
@@ -29,30 +28,7 @@ def get_valid_int(prompt: str, default: int) -> int:
         return default
 
 
-def get_window_title(prompt: str, default: str = "") -> str:
-    """Get window title from user with validation.
-
-    Automatically adds 'RuneLite - ' prefix if not present.
-    """
-    title = input(prompt).strip()
-    if not title and default:
-        return default
-    if not title:
-        logger.error("Window title cannot be empty")
-        print("❌ Window title is required!")
-        sys.exit(1)
-
-    # Auto-add "RuneLite - " prefix if not already present
-    if not title.startswith("RuneLite"):
-        title = f"RuneLite - {title}"
-        logger.info(f"Added RuneLite prefix: {title}")
-        print(f"  Using window title: {title}")
-
-    return title
-
-
 def main() -> None:
-    """Main entry point for OSRS Bot."""
     # Set up basic logging
     logging.basicConfig(
         level=logging.INFO,
@@ -77,6 +53,7 @@ def main() -> None:
             try:
                 config = Config()
                 calibrator = Calibrator(config)
+                # I'm gonna end up removing this, it's pointless and im just goign to have the user add their name to config.json
                 title = input("Window title [default: RuneLite -]: ").strip()
                 calibrator.start(title or "RuneLite - ")
             except FileNotFoundError as e:
@@ -92,14 +69,15 @@ def main() -> None:
             # Green Dragons
             logger.info("Starting Green Dragons script")
             try:
-                window_title = get_window_title("Window title: ")
+                config = Config()
+                window_title = config.get_window_title()
                 runs = get_valid_int(
                     "Number of runs [default: 10]: ", default=10)
                 bank = input("Bank location [varrock]: ").strip() or "varrock"
 
                 runner = ScriptRunner(window_title)
                 runner.run_script(
-                    green_dragons_script,
+                    GreenDragonsBot,
                     bank_location=bank,
                     runs=runs)
             except Exception as e:
@@ -113,7 +91,8 @@ def main() -> None:
             # Guns
             logger.info("Starting Guns script")
             try:
-                window_title = get_window_title("Window title: ")
+                config = Config()
+                window_title = config.get_window_title()
                 runs = get_valid_int(
                     "Number of runs [default: 10]: ", default=10)
                 bank = input("Bank location [GE]: ").strip() or "GE"
@@ -129,13 +108,14 @@ def main() -> None:
             # Test Script
             logger.info("Starting Test script")
             try:
-                window_title = get_window_title("Window title: ")
+                config = Config()
+                window_title = config.get_window_title()
                 runs = get_valid_int(
                     "Number of runs [default: 10]: ", default=10)
                 bank = input("Bank location [GE]: ").strip() or "GE"
 
                 runner = ScriptRunner(window_title)
-                runner.run_script(test, bank_location=bank, runs=runs)
+                runner.run_script(test_script, bank_location=bank, runs=runs)
             except Exception as e:
                 logger.error(f"Test script failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
@@ -145,18 +125,13 @@ def main() -> None:
             # Dev Mode
             logger.info("Starting Dev mode")
             try:
-                # Read window title from environment variable or prompt
-                import os
-                window_title = os.getenv("OSRS_WINDOW_TITLE")
-                if not window_title:
-                    window_title = get_window_title(
-                        "Window title [required for dev mode]: "
-                    )
+                config = Config()
+                window_title = config.get_window_title()
                 runs = 500
                 bank = "GE"
 
                 runner = ScriptRunner(window_title)
-                runner.run_script(test, bank_location=bank, runs=runs)
+                runner.run_script(test_script, bank_location=bank, runs=runs)
             except Exception as e:
                 logger.error(f"Dev mode failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")

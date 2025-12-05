@@ -46,6 +46,7 @@ class Config:
             tesseract_default = "/usr/bin/tesseract"
 
         return {
+            "account_name": "YourAccountName",
             "window_title": "RuneLite - ",
             "tesseract_path": tesseract_default,
 
@@ -153,7 +154,6 @@ class Config:
         }
 
     def save(self) -> bool:
-        """Save config to file"""
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.data, indent=2, fp=f)
@@ -163,7 +163,6 @@ class Config:
             return False
 
     def get(self, *path, default: Any = None) -> Any:
-        """Get config value by path"""
         current = self.data
         try:
             for key in path:
@@ -171,3 +170,14 @@ class Config:
             return current
         except (KeyError, TypeError):
             return default
+
+    def get_window_title(self) -> str:
+        """Constructs window title from account name"""
+        account_name = self.get("account_name", default="")
+        if not account_name or account_name == "YourAccountName":
+            logger.warning(
+                "No account_name set in config.json. "
+                "Please set 'account_name' field."
+            )
+            return "RuneLite - "
+        return f"RuneLite - {account_name}"
