@@ -1,5 +1,8 @@
 import logging
+import os
 from typing import Any, Callable, Union, TYPE_CHECKING
+
+import pytesseract
 
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MouseConfig
@@ -9,8 +12,6 @@ from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.models.state import GameState
 from osrsbot.controllers.actions import GameActions
 from osrsbot.models.config import Config
-import pytesseract
-import os
 
 if TYPE_CHECKING:
     from osrsbot.core.base_bot import Bot

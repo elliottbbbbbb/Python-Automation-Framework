@@ -1,6 +1,7 @@
 import logging
-import mouse
 from typing import Optional
+
+import mouse
 import pyautogui
 import pywinctl as gw
 

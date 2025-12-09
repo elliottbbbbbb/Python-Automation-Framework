@@ -3,6 +3,7 @@ import logging
 from osrsbot.models.state import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
+from osrsbot.constants import GAME_TIMING
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def guns_script(interface, state: GameState,
                 actions.walk_to_marker("yellow_tile_marker")
                 actions.wait("long")
 
-                for _ in range(2):
+                for _ in range(GAME_TIMING.teleport_double_click_count):
                     actions.click_coordinate(("world", "ge_clerk"))
                 actions.wait("medium")
 

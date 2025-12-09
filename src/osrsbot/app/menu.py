@@ -1,5 +1,6 @@
 import logging
 import sys
+
 from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
 from osrsbot.controllers.runner import ScriptRunner

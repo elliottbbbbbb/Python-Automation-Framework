@@ -1,6 +1,7 @@
 import time
 import logging
 from typing import Callable, Optional
+
 from osrsbot.models.state import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
@@ -67,7 +68,7 @@ class Bot:
         logger.info(f"{self.script_name} complete")
         print("\nâœ… Script complete!")
 
-# --- Common Reusable Methods (optional, but good practice) ---
+    # ==================== Common Reusable Methods ====================
 
     def _teleport_and_bank(self, bank_location: str) -> None:
         """Centralized banking logic to reduce duplication across scripts."""
