@@ -1,13 +1,13 @@
 # osrsbot/services/screen_service.py
 from __future__ import annotations
 import logging
-import pyautogui
+from dataclasses import dataclass
+from typing import Tuple, Optional, List, Union, Dict, Any, Callable
+
 import cv2 as cv
 import numpy as np
-from typing import Tuple, Optional, List, Union, Dict, Any, Callable
+import pyautogui
 from PIL import Image
-from dataclasses import dataclass
-from pathlib import Path
 
 from osrsbot.constants import COLOR_DETECTION
 
@@ -45,7 +45,7 @@ class ScreenService:
         self.window_getter = window_getter
         self.vision = vision
 
-    # ---------------- bounds helpers ----------------
+    # ==================== Bounds Helpers ====================
     def _get_bounds(self) -> Optional[Tuple[int, int, int, int]]:
         """Get fresh window bounds from GameInterface."""
         if self.window_getter is None:
@@ -67,7 +67,7 @@ class ScreenService:
             return (left + x, top + y)
         return (x, y)
 
-    # ---------------- capture helpers ----------------
+    # ==================== Capture Helpers ====================
     def capture(
         self,
         region: Optional[Tuple[int, int, int, int]] = None,
@@ -111,7 +111,7 @@ class ScreenService:
             logger.exception("Failed to capture grayscale image")
             return None
 
-    # ---------------- color helpers ----------------
+    # ==================== Color Helpers ====================
     def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         hex_color = hex_color.lstrip("#")
         chunk_size = COLOR_DETECTION.hex_chunk_size
@@ -167,7 +167,7 @@ class ScreenService:
             abs_x, abs_y = x, y
         return pyautogui.pixel(abs_x, abs_y)
 
-    # ---------------- image helpers ----------------
+    # ==================== Image Helpers ====================
     def find_image(
         self,
         template_path: str,
@@ -186,7 +186,7 @@ class ScreenService:
             logger.exception("find_image failed")
             return None
 
-    # ---------------- vision wrappers ----------------
+    # ==================== Vision Wrappers ====================
     def detect_inventory(self, force: bool = False) -> bool:
         """
         Capture current window and forward to vision.detect_inventory.
