@@ -63,8 +63,9 @@ def test_script(
                 print(f" ❌ Error: {e}")
 
         if run < runs - 1:
-            print(f"\n⏸️  Run {run + 1} complete. Next run in {GAME_TIMING.test_run_delay} seconds...")
-            time.sleep(GAME_TIMING.test_run_delay)
+            delay = GAME_TIMING.test_run_delay
+            print(f"\n⏸️  Run {run + 1} complete. Next run in {delay} seconds...")
+            time.sleep(delay)
 
     print(f"\n{'='*60}")
     print("✅ TEST COMPLETE!")
