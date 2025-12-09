@@ -1,9 +1,14 @@
-from PIL import ImageOps, ImageFilter, Image
+from typing import Tuple
+
 import numpy as np
 from collections import deque as _deque
+from PIL import ImageOps, ImageFilter, Image
 
 
-def preprocess_for_shape_detection(pil_img, size=(140, 140)):
+def preprocess_for_shape_detection(
+    pil_img: Image.Image,
+    size: Tuple[int, int] = (140, 140)
+) -> np.ndarray:
     """Return a small binary numpy array (foreground=1) tuned for
     shape heuristics."""
     img = pil_img.convert("L")
@@ -30,7 +35,7 @@ def preprocess_for_shape_detection(pil_img, size=(140, 140)):
     return ero.astype(np.uint8)
 
 
-def flood_label_components(inv):
+def flood_label_components(inv: np.ndarray) -> Tuple[np.ndarray, int]:
     """Simple BFS label (inv is binary background=1 inside bbox) ->
     returns labeled array and count."""
     H, W = inv.shape
@@ -54,7 +59,7 @@ def flood_label_components(inv):
     return lbl, label
 
 
-def count_holes_and_tail(binary):
+def count_holes_and_tail(binary: np.ndarray) -> Tuple[int, float, float]:
     """
     binary: numpy foreground=1 background=0
     Returns (hole_count, tail_frac, aspect)
@@ -91,7 +96,7 @@ def count_holes_and_tail(binary):
     return hole_count, tail_frac, aspect
 
 
-def looks_like_nine(pil_img):
+def looks_like_nine(pil_img: Image.Image) -> bool:
     """Return True if the glyph looks like a '9' (closed loop + tail).
     Stricter thresholds to avoid false positives converting 4->9.
     """

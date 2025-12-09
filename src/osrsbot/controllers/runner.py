@@ -89,7 +89,8 @@ class ScriptRunner:
             self.mouse = MouseService(mouse_config)
             logger.info("MouseService initialized successfully")
 
-            # ScreenService uses GameInterface.get_bounds as single source of truth for window position
+            # ScreenService uses GameInterface.get_bounds as single source
+            # of truth for window position
             logger.debug("Initializing ScreenService")
             self.screen = ScreenService(window_getter=self.interface.get_bounds)
             logger.info("ScreenService initialized successfully")

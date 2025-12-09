@@ -53,7 +53,7 @@ def main() -> None:
             try:
                 config = Config()
                 calibrator = Calibrator(config)
-                # I'm gonna end up removing this, it's pointless and im just goign to have the user add their name to config.json
+                # TODO: Remove this prompt - users should add window title to config.json
                 title = input("Window title [default: RuneLite -]: ").strip()
                 calibrator.start(title or "RuneLite - ")
             except FileNotFoundError as e:

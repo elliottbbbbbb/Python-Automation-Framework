@@ -6,9 +6,10 @@ Inspired by OSBC's Bezier curve implementation but with added flexibility.
 import time
 import random
 import logging
-import pyautogui
-from typing import Tuple, Optional, Literal
 from dataclasses import dataclass
+from typing import Tuple, Optional, Literal
+
+import pyautogui
 
 from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT
 
@@ -160,7 +161,10 @@ class MouseService:
         variance: bool = True
     ) -> bool:
         """
-        This function must be passed absolute coordinates otherwise the click may end up out of bounds.
+        Move and click at absolute coordinates.
+
+        This function must be passed absolute coordinates otherwise
+        the click may end up out of bounds.
 
         Args:
             x: Target X coordinate
