@@ -1,105 +1,84 @@
+import logging
 import time
-import pyautogui
+from osrsbot.core.base_bot import Bot
 
-from osrsbot.game_interface import GameInterface
-from osrsbot.game_state import GameState
-from osrsbot.config  import Config
-from osrsbot.actions import Actions
+logger = logging.getLogger(__name__)
 
-def green_dragons_script(interface: GameInterface, state: GameState, 
-                         actions: Actions, config: Config, 
-                         bank_location: str = "varrock", runs: int = 10):
+
+class GreenDragonsBot(Bot):
     """
-    Green Dragons task script:
-    1. Teleport to location
-    2. Use potions
-    3. Kill dragons until inventory full
-    4. Bank loot
-    5. Repeat
+    Script-specific bot for Green Dragons, inheriting core logic from Bot.
     """
-    
-    print(f"\n🐉 Starting Green Dragons Script ({runs} runs)")
-    
-    for run in range(runs):
-        print(f"\n=== Run {run + 1}/{runs} ===")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, script_name="Green Dragons Bot")
+        self.hp_threshold = self.config.get("hp_threshold", default=70)
+
+    def _navigation_and_potions(self) -> None:
+        """Handles the initial movement and potion usage phase."""
+        actions = self.actions
         
-        # === SETUP ===
-        print("Setting up...")
-        actions.click_slot(1)  # Mythical cape
+        logger.debug("Teleporting and navigating to dragons")
+        actions.click_inventory_slot(28)
+
         actions.wait("long")
-        
-        # Walk to marker
+
+        # ADDED FOR TESTING REMEMBER TO REMOVE
+        actions.click_inventory_slot(1)
+        logger.info("Clicking at inventory slot 1")
+        actions.wait("long")
+        logger.info("Clicking at inventory slot 3")
+        actions.click_inventory_slot(3)
+
         for _ in range(2):
-            actions.walk_marker("yellow_tile_marker")
+            logger.info("Walking to yellow tile marker")
+           # actions.walk_to_marker("yellow_tile_marker")
+            actions.click_color("yellow_tile_marker")
         actions.wait("long")
-        
-        # Navigate to dragons
+
         actions.click_minimap("green_dragons")
         actions.wait("medium")
-        
-        # Use potions
+
         actions.use_item("extended_antifire")
         actions.wait("medium")
         actions.use_item("super_combat")
         actions.wait("long")
-        
-        # === COMBAT LOOP ===
-        print("Fighting dragons...")
+
+    def _combat_loop_phase(self) -> None:
+        """Handles the combat loop until the inventory is full."""
+        state = self.state
+        actions = self.actions
+
+        logger.debug("Starting combat loop")
         kills = 0
-        
+
         while not state.inventory_full():
-            # Health check
             hp = state.get_health()
-            if hp and hp < 70:
-                print(f"HP low ({hp}), eating...")
+            if hp and hp < self.hp_threshold:
+                logger.info(f"HP low: {hp}, eating")
                 actions.eat("manta_ray")
                 actions.wait("medium")
-            
-            # Attack if not in combat
+
             if not state.in_combat():
-                if actions.attack("green_dragon"):
+                if actions.attack_npc("green_dragon"):
                     kills += 1
-                    print(f"  Kill #{kills}")
-            
+                    if kills % 5 == 0:
+                        logger.debug(f"Kills: {kills}")
+
             time.sleep(1)
-        
-        print(f"✓ Inventory full! ({kills} kills)")
-        
-        # === BANKING ===
-        print("Banking...")
-        
-        if bank_location == "varrock":
-            # Teleport to Varrock
-            actions.teleport_ge()
-            actions.wait("long")
-            
-            interface.click(594, 85)  # Fountain
-            actions.wait("teleport")
-            
-            # Walk to bank
-            for _ in range(2):
-                actions.walk_marker("yellow_tile_marker")
-            actions.wait("long")
-            
-            # Open bank
-            for _ in range(2):
-                coord = config.get("coordinates", "world", "bank_booth")
-                interface.click_coord(coord)
-            actions.wait("long")
-            
-            # Deposit loot
-            for _ in range(12):
-                color = config.get("colors", "purple_item_outline")
-                interface.click_color(color)
-                actions.wait("short")
-            
-            # Withdraw food
-            actions.wait("medium")
-            interface.click(248, 346)  # Quantity
-            actions.wait("medium")
-            actions.bank_search("manta ray")
-            interface.click(104, 231)  # Click food
-            actions.wait("long")
-            pyautogui.press('escape')
-    
-    print("\n✅ Green Dragons script complete!")
+
+        logger.info(f"Inventory full, kills: {kills}")
+
+    def run_cycle(self, bank_location: str, run_number: int) -> None:
+        """
+        Implements the main logic for a single run cycle.
+        This is the method required by the parent Bot class.
+        """
+        # 1. Setup and Navigation State
+        self._navigation_and_potions()
+
+        # 2. Combat Loop State
+        self._combat_loop_phase()
+
+        # 3. Banking State
+        self._teleport_and_bank(bank_location)
