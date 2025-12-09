@@ -24,16 +24,8 @@ class GreenDragonsBot(Bot):
 
         actions.wait("long")
 
-        # ADDED FOR TESTING REMEMBER TO REMOVE
-        actions.click_inventory_slot(1)
-        logger.info("Clicking at inventory slot 1")
-        actions.wait("long")
-        logger.info("Clicking at inventory slot 3")
-        actions.click_inventory_slot(3)
-
         for _ in range(GAME_TIMING.teleport_double_click_count):
             logger.info("Walking to yellow tile marker")
-           # actions.walk_to_marker("yellow_tile_marker")
             actions.click_color("yellow_tile_marker")
         actions.wait("long")
 
