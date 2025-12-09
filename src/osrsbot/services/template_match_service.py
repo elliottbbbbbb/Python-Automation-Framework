@@ -21,6 +21,7 @@ import cv2 as cv
 import numpy as np
 
 from osrsbot.models.config import Config
+from osrsbot.constants import TEMPLATE_MATCHING
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +90,10 @@ class UIElementGrid:
         template_path: str,
         num_rows: int,
         num_cols: int,
-        threshold: float = 0.68,
+        threshold: float = TEMPLATE_MATCHING.default_threshold,
         sticky: bool = True,
-        ttl_seconds: float = 5.0,
-        padding: int = 4
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
+        padding: int = TEMPLATE_MATCHING.default_padding
     ):
         """
         Initialize grid template.
@@ -324,9 +325,9 @@ class UIButton:
         self,
         name: str,
         template_path: str,
-        threshold: float = 0.68,
+        threshold: float = TEMPLATE_MATCHING.default_threshold,
         sticky: bool = False,
-        ttl_seconds: float = 5.0
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds
     ):
         """
         Initialize button template.
@@ -511,10 +512,10 @@ class TemplateMatchService:
         template_path: str,
         num_rows: int,
         num_cols: int,
-        threshold: float = 0.68,
+        threshold: float = TEMPLATE_MATCHING.default_threshold,
         sticky: bool = True,
-        ttl_seconds: float = 5.0,
-        padding: int = 4
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
+        padding: int = TEMPLATE_MATCHING.default_padding
     ) -> None:
         """
         Register a grid template (inventory, prayer, equipment).
@@ -555,9 +556,9 @@ class TemplateMatchService:
         self,
         name: str,
         template_path: str,
-        threshold: float = 0.68,
+        threshold: float = TEMPLATE_MATCHING.default_threshold,
         sticky: bool = False,
-        ttl_seconds: float = 5.0
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds
     ) -> None:
         """
         Register a button template.
@@ -591,7 +592,7 @@ class TemplateMatchService:
                         "path": "templates/inventory_grid.png",
                         "rows": 7,
                         "cols": 4,
-                        "threshold": 0.68,
+                        "threshold": TEMPLATE_MATCHING.default_threshold,
                         "sticky": true
                     }
                 },
@@ -612,7 +613,7 @@ class TemplateMatchService:
                 template_path=grid_config["path"],
                 num_rows=grid_config.get("rows", 1),
                 num_cols=grid_config.get("cols", 1),
-                threshold=grid_config.get("threshold", 0.68),
+                threshold=grid_config.get("threshold", TEMPLATE_MATCHING.default_threshold),
                 sticky=grid_config.get("sticky", True),
                 ttl_seconds=grid_config.get("ttl_seconds", 5.0),
                 padding=grid_config.get("padding", 4)
@@ -624,7 +625,7 @@ class TemplateMatchService:
             self.register_button(
                 name=btn_name,
                 template_path=btn_config["path"],
-                threshold=btn_config.get("threshold", 0.68),
+                threshold=btn_config.get("threshold", TEMPLATE_MATCHING.default_threshold),
                 sticky=btn_config.get("sticky", False),
                 ttl_seconds=btn_config.get("ttl_seconds", 5.0)
             )

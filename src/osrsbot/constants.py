@@ -346,6 +346,14 @@ class GameTimingConfig:
     default_menu_runs: int = 10           # Default runs if user doesn't specify
     dev_mode_runs: int = 500              # Runs for dev/testing mode
 
+    # Combat & script loop delays
+    combat_tick: float = 0.6              # OSRS game tick is 0.6s, use 1.0 for safety margin
+    kill_log_frequency: int = 5           # Log every N kills to reduce spam
+
+    # Test script delays
+    test_click_delay: float = 0.1         # Small delay between test clicks
+    test_run_delay: float = 2.0           # Delay between test runs
+
 
 # Global game timing configuration
 GAME_TIMING = GameTimingConfig()
