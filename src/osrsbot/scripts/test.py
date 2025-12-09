@@ -3,6 +3,7 @@ import logging
 from osrsbot.models.state import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
+from osrsbot.constants import GAME_TIMING
 
 logger = logging.getLogger(__name__)
 
@@ -55,15 +56,15 @@ def test_script(
                     print(" ❌ (detection failed)")
                     logger.warning(f"Failed to click slot {slot}")
 
-                time.sleep(0.1)  # Small delay between clicks
+                time.sleep(GAME_TIMING.test_click_delay)
 
             except Exception as e:
                 logger.error(f"Error clicking slot {slot}: {e}", exc_info=True)
                 print(f" ❌ Error: {e}")
 
         if run < runs - 1:
-            print(f"\n⏸️  Run {run + 1} complete. Next run in 2 seconds...")
-            time.sleep(2)
+            print(f"\n⏸️  Run {run + 1} complete. Next run in {GAME_TIMING.test_run_delay} seconds...")
+            time.sleep(GAME_TIMING.test_run_delay)
 
     print(f"\n{'='*60}")
     print("✅ TEST COMPLETE!")

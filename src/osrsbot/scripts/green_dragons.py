@@ -1,6 +1,7 @@
 import logging
 import time
 from osrsbot.core.base_bot import Bot
+from osrsbot.constants import GAME_TIMING
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class GreenDragonsBot(Bot):
         logger.info("Clicking at inventory slot 3")
         actions.click_inventory_slot(3)
 
-        for _ in range(2):
+        for _ in range(GAME_TIMING.teleport_double_click_count):
             logger.info("Walking to yellow tile marker")
            # actions.walk_to_marker("yellow_tile_marker")
             actions.click_color("yellow_tile_marker")
@@ -62,10 +63,10 @@ class GreenDragonsBot(Bot):
             if not state.in_combat():
                 if actions.attack_npc("green_dragon"):
                     kills += 1
-                    if kills % 5 == 0:
+                    if kills % GAME_TIMING.kill_log_frequency == 0:
                         logger.debug(f"Kills: {kills}")
 
-            time.sleep(1)
+            time.sleep(GAME_TIMING.combat_tick)
 
         logger.info(f"Inventory full, kills: {kills}")
 
