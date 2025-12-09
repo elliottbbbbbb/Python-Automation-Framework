@@ -12,7 +12,7 @@ Each action uses the appropriate services (MouseService, ScreenService, etc.)
 import time
 import logging
 import pyautogui
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, TYPE_CHECKING
 
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
@@ -20,6 +20,9 @@ from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
 from osrsbot.constants import COLOR_DETECTION, GAME_TIMING
+
+if TYPE_CHECKING:
+    from osrsbot.models.state import GameState
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,7 @@ class GameActions:
         screen: ScreenService,
         interface: GameInterface,
         config: Config,
-        state: Optional[Any] = None,
+        state: Optional["GameState"] = None,
         template_service: Optional[TemplateMatchService] = None
     ):
         """
@@ -321,7 +324,9 @@ class GameActions:
 
         abs_x, abs_y = self._to_absolute(match.x, match.y)
         logger.debug(
-            f"Found '{color_name}' at relative ({match.x}, {match.y}) -> absolute ({abs_x}, {abs_y})")
+            f"Found '{color_name}' at relative ({match.x}, {match.y}) -> "
+            f"absolute ({abs_x}, {abs_y})"
+        )
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def click_coordinate(
@@ -348,7 +353,9 @@ class GameActions:
         x, y = current["x"], current["y"]
         abs_x, abs_y = self._to_absolute(x, y)
         logger.debug(
-            f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
+            f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> "
+            f"absolute ({abs_x}, {abs_y})"
+        )
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def use_item(self, item_color_name: str) -> bool:

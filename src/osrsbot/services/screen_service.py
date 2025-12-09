@@ -1,5 +1,6 @@
 # osrsbot/services/screen_service.py
 from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from typing import Tuple, Optional, List, Union, Dict, Any, Callable
@@ -115,14 +116,28 @@ class ScreenService:
     def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         hex_color = hex_color.lstrip("#")
         chunk_size = COLOR_DETECTION.hex_chunk_size
-        return tuple(int(hex_color[i : i + chunk_size], COLOR_DETECTION.hex_base) for i in (0, 2, 4))
+        r = int(hex_color[0:chunk_size], COLOR_DETECTION.hex_base)
+        g = int(hex_color[2:2 + chunk_size], COLOR_DETECTION.hex_base)
+        b = int(hex_color[4:4 + chunk_size], COLOR_DETECTION.hex_base)
+        return (r, g, b)
 
-    def _color_matches(self, color1: Tuple[int, int, int], color2: Tuple[int, int, int], tolerance: int) -> bool:
+    def _color_matches(
+        self,
+        color1: Tuple[int, int, int],
+        color2: Tuple[int, int, int],
+        tolerance: int
+    ) -> bool:
         return all(abs(c1 - c2) <= tolerance for c1, c2 in zip(color1, color2))
 
-    def _color_similarity(self, color1: Tuple[int, int, int], color2: Tuple[int, int, int]) -> float:
+    def _color_similarity(
+        self,
+        color1: Tuple[int, int, int],
+        color2: Tuple[int, int, int]
+    ) -> float:
         distance = sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)) ** 0.5
-        max_distance = (COLOR_DETECTION.max_rgb_value ** 2 * COLOR_DETECTION.rgb_channels) ** 0.5
+        max_distance = (
+            COLOR_DETECTION.max_rgb_value ** 2 * COLOR_DETECTION.rgb_channels
+        ) ** 0.5
         return COLOR_DETECTION.perfect_match - (distance / max_distance)
 
     def find_color(
@@ -145,8 +160,16 @@ class ScreenService:
             for x in range(screenshot.width):
                 for y in range(screenshot.height):
                     pixel = pixels[x, y][:3]  # type: ignore
-                    if self._color_matches(pixel, target, tolerance):
-                        cm = ColorMatch(x=x, y=y, confidence=self._color_similarity(pixel, target), color=pixel)  # type: ignore
+                    pixel_rgb: Tuple[int, int, int] = (
+                        pixel[0], pixel[1], pixel[2]  # type: ignore
+                    )
+                    if self._color_matches(pixel_rgb, target, tolerance):
+                        cm = ColorMatch(
+                            x=x,
+                            y=y,
+                            confidence=self._color_similarity(pixel_rgb, target),
+                            color=pixel_rgb
+                        )
                         if not find_all:
                             return cm
                         matches.append(cm)
@@ -178,7 +201,12 @@ class ScreenService:
         """Small wrapper around pyautogui.locate that accepts relative regions."""
         try:
             needle_screenshot = self.capture(region=region)
-            location = pyautogui.locate(template_path, needle_screenshot, confidence=confidence, grayscale=grayscale)
+            location = pyautogui.locate(
+                template_path,
+                needle_screenshot,
+                confidence=confidence,
+                grayscale=grayscale
+            )
             if location:
                 return (location.left, location.top, location.width, location.height)
             return None
@@ -201,7 +229,11 @@ class ScreenService:
         return self.vision.detect_inventory(frame, force=force)
 
     def detect_items(self) -> Dict[Tuple[int, int], str]:
-        """Capture frame and forward to vision.detect_items; returns empty dict if no vision or capture fail."""
+        """
+        Capture frame and forward to vision.detect_items.
+
+        Returns empty dict if no vision or capture fails.
+        """
         if self.vision is None:
             return {}
         frame = self.capture_grayscale()

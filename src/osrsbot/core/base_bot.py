@@ -74,8 +74,6 @@ class Bot:
         """Centralized banking logic to reduce duplication across scripts."""
         if bank_location == "varrock":
             self._bank_at_varrock()
-        # elif bank_location == "falador":
-        #     self._bank_at_falador()
         else:
             logger.error(f"Unknown bank location: {bank_location}")
 
