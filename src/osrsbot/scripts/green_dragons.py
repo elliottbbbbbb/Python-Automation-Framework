@@ -11,16 +11,15 @@ class GreenDragonsBot(Bot):
     """
 
     def __init__(self, *args, **kwargs):
-        """Initializes the GreenDragonsBot, passing dependencies to the parent."""
         super().__init__(*args, **kwargs, script_name="Green Dragons Bot")
         self.hp_threshold = self.config.get("hp_threshold", default=70)
 
     def _navigation_and_potions(self) -> None:
         """Handles the initial movement and potion usage phase."""
         actions = self.actions
-
+        
         logger.debug("Teleporting and navigating to dragons")
-        actions.click_inventory_slot(1)
+        actions.click_inventory_slot(28)
 
         actions.wait("long")
 
@@ -33,14 +32,13 @@ class GreenDragonsBot(Bot):
 
         for _ in range(2):
             logger.info("Walking to yellow tile marker")
-           #actions.walk_to_marker("yellow_tile_marker")
+           # actions.walk_to_marker("yellow_tile_marker")
             actions.click_color("yellow_tile_marker")
         actions.wait("long")
 
         actions.click_minimap("green_dragons")
         actions.wait("medium")
 
-        # Use potions
         actions.use_item("extended_antifire")
         actions.wait("medium")
         actions.use_item("super_combat")

@@ -148,10 +148,15 @@ calibration_data/
 *.bak
 *.tmp
 *~
+NUL
 
-# Documentation artifacts (keep source docs, ignore builds)
-misc/*.html
+# Template images (users should provide their own)
+templates/*.png
+templates/*.jpg
+templates/*.jpeg
+!templates/.gitkeep
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini

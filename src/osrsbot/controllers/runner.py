@@ -4,9 +4,13 @@ from typing import Any, Callable, Union, TYPE_CHECKING
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MouseConfig
 from osrsbot.services.screen_service import ScreenService
+from osrsbot.services.ocr_service import OCRService
+from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.models.state import GameState
 from osrsbot.controllers.actions import GameActions
 from osrsbot.models.config import Config
+import pytesseract
+import os
 
 if TYPE_CHECKING:
     from osrsbot.core.base_bot import Bot
@@ -31,7 +35,6 @@ class ScriptRunner:
             FileNotFoundError: If config file doesn't exist
             Exception: If game window not found or initialization fails
         """
-        # Validate window title
         if not window_title or not window_title.strip():
             logger.error("Window title cannot be empty")
             raise ValueError("Window title is required and cannot be empty")
@@ -39,7 +42,6 @@ class ScriptRunner:
         logger.info(f"Initializing ScriptRunner for window: '{window_title}'")
 
         try:
-            # Load configuration
             logger.debug(f"Loading config from: {config_file}")
             self.config = Config(config_file)
             logger.info("Config loaded successfully")
@@ -51,14 +53,12 @@ class ScriptRunner:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             raise
 
-        # Update window title if provided
         if window_title:
             self.config.data["window_title"] = window_title
             logger.debug(
                 f"Updated window title in config to: '{window_title}'")
 
         try:
-            # Initialize game interface (window management only)
             logger.debug("Initializing GameInterface")
             self.interface = GameInterface(self.config)
             logger.info("GameInterface initialized successfully")
@@ -70,18 +70,15 @@ class ScriptRunner:
                 f"Could not find or attach to window '{window_title}'") from e
 
         try:
-            # Get window bounds for services
-            bounds = self.interface.get_bounds()
-            logger.debug(f"Window bounds: {bounds}")
-
-            # Initialize MouseService
             logger.debug("Initializing MouseService")
             mouse_config_dict = self.config.get("mouse", default={})
             mouse_config = MouseConfig(
                 min_speed=mouse_config_dict.get("min_speed", 0.2),
                 max_speed=mouse_config_dict.get("max_speed", 0.6),
-                overshoot_chance=mouse_config_dict.get("overshoot_chance", 0.15),
-                overshoot_distance=mouse_config_dict.get("overshoot_distance", 20),
+                overshoot_chance=mouse_config_dict.get(
+                    "overshoot_chance", 0.15),
+                overshoot_distance=mouse_config_dict.get(
+                    "overshoot_distance", 20),
                 click_variance=mouse_config_dict.get("click_variance", 3),
                 post_click_delay=(
                     mouse_config_dict.get("post_click_delay_min", 0.05),
@@ -91,36 +88,68 @@ class ScriptRunner:
             self.mouse = MouseService(mouse_config)
             logger.info("MouseService initialized successfully")
 
-            # Initialize ScreenService
+            # ScreenService uses GameInterface.get_bounds as single source of truth for window position
             logger.debug("Initializing ScreenService")
-            self.screen = ScreenService(window_bounds=bounds)
+            self.screen = ScreenService(window_getter=self.interface.get_bounds)
             logger.info("ScreenService initialized successfully")
+
+            logger.debug("Initializing TemplateMatchService")
+            self.template_service = TemplateMatchService()
+
+            try:
+                self.template_service.register_from_config(self.config)
+                logger.info("TemplateMatchService initialized and templates registered")
+            except Exception as e:
+                logger.warning(
+                    f"TemplateMatchService initialized but template registration failed: {e}. "
+                    "Template matching features will not be available."
+                )
+                self.template_service = None
+
+            tesseract_path = self.config.get("tesseract_path")
+            if tesseract_path:
+                pytesseract.pytesseract.tesseract_cmd = tesseract_path
+                logger.info(f"Using Tesseract from config: {tesseract_path}")
+            elif os.getenv("TESSERACT_PATH"):
+                pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_PATH")
+                logger.info(f"Using Tesseract from env: {os.getenv('TESSERACT_PATH')}")
+            else:
+                logger.info("Using default Tesseract path (system)")
+
+            self.ocr = OCRService(window_getter=self.interface.get_window_position,
+                                          tesseract_path=tesseract_path,
+                                          debug=True)
+
+            logger.info("OCR Service initialized successfully")
+
 
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}", exc_info=True)
             raise
+        
 
         try:
-            # Initialize game state
             logger.debug("Initializing GameState")
-            self.state = GameState(self.interface, self.config, self.screen)
+            self.state = GameState(self.interface, self.config, self.ocr, self.screen)
             logger.info("GameState initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize GameState: {e}", exc_info=True)
             raise
 
         try:
-            # Initialize actions (Commands - change game state)
             logger.debug("Initializing GameActions")
             self.actions = GameActions(
                 self.mouse,
                 self.screen,
                 self.interface,
-                self.config
+                self.config,
+                self.state,
+                self.template_service
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize GameActions: {e}", exc_info=True)
+            logger.error(
+                f"Failed to initialize GameActions: {e}", exc_info=True)
             raise
 
         logger.info("ScriptRunner initialization complete")

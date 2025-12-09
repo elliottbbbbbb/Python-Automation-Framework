@@ -16,7 +16,17 @@
       "Bash(tree:*)",
       "Bash(copy \"controllers\\actions.py\" \"domain\\actions.py\")",
       "Bash(copy \"controllers\\runner.py\" \"app\\runner.py\")",
-      "Bash(timeout 3 .venv/Scripts/python.exe:*)"
+      "Bash(timeout 3 .venv/Scripts/python.exe:*)",
+      "Bash(git push:*)",
+      "Bash(python:*)",
+      "Bash(copy:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git pull:*)",
+      "Bash(dir:*)",
+      "Bash(git rm:*)",
+      "Bash(del:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
