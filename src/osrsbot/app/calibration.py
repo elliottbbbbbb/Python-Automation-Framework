@@ -18,7 +18,6 @@ class Calibrator:
         self.capturing: bool = False
 
     def start(self, window_title: str) -> None:
-        """Start interactive calibration."""
         if not window_title or not window_title.strip():
             logger.error("Window title cannot be empty")
             print("❌ Window title is required")
@@ -83,7 +82,6 @@ class Calibrator:
             print("\n✅ Calibration saved to config.json")
 
     def _capture_color(self) -> None:
-        """Capture color at cursor position."""
         if not self.window:
             logger.error("Window reference missing during color capture")
             print("Invalid window reference")
@@ -110,7 +108,6 @@ class Calibrator:
             print(f"    ❌ Failed to capture color")
 
     def _capture_coordinate(self) -> None:
-        """Capture coordinates at cursor position."""
         if not self.window:
             logger.error("Window reference missing during coordinate capture")
             print("Invalid window reference")

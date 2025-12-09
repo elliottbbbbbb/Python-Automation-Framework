@@ -16,6 +16,7 @@ import pywinctl as gw
 from typing import Tuple, Optional
 
 from osrsbot.models.config import Config
+from osrsbot.constants import COORDINATES
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +32,6 @@ class GameInterface:
     """
 
     def __init__(self, config: Config):
-        """
-        Initialize game interface.
-
-        Args:
-            config: Configuration instance
-
-        Raises:
-            RuntimeError: If window not found
-        """
         self.config = config
         window_title = config.get("window_title")
 
@@ -52,7 +44,6 @@ class GameInterface:
         logger.info(f"Successfully attached to window: {self.window.title}")
 
     def _find_window(self) -> gw.Window:
-        """Find the game window by title."""
         if not self.window_title:
             raise ValueError("Window title cannot be empty")
 
@@ -70,7 +61,7 @@ class GameInterface:
             )
 
         logger.debug(f"Found {len(windows)} matching window(s)")
-        return windows[0]
+        return windows[COORDINATES.first_window_index]
 
     def refresh_window(self) -> bool:
         """
@@ -87,12 +78,6 @@ class GameInterface:
             return False
 
     def get_bounds(self) -> Tuple[int, int, int, int]:
-        """
-        Get window bounds.
-
-        Returns:
-            (left, top, width, height) tuple
-        """
         if not self.window or not hasattr(self.window, 'topleft'):
             raise RuntimeError("Window no longer available")
 
@@ -114,60 +99,26 @@ class GameInterface:
             return None
 
     def relative_to_absolute(self, x: int, y: int) -> Tuple[int, int]:
-        """
-        Convert window-relative coordinates to absolute screen coordinates.
-
-        Args:
-            x: Relative X coordinate
-            y: Relative Y coordinate
-
-        Returns:
-            (absolute_x, absolute_y) tuple
-        """
         left, top, _, _ = self.get_bounds()
         return (left + x, top + y)
 
     def absolute_to_relative(self, x: int, y: int) -> Tuple[int, int]:
-        """
-        Convert absolute screen coordinates to window-relative coordinates.
-
-        Args:
-            x: Absolute X coordinate
-            y: Absolute Y coordinate
-
-        Returns:
-            (relative_x, relative_y) tuple
-        """
         left, top, _, _ = self.get_bounds()
         return (x - left, y - top)
 
     def is_in_bounds(self, x: int, y: int, relative: bool = True) -> bool:
-        """
-        Check if coordinates are within window bounds.
-
-        Args:
-            x: X coordinate
-            y: Y coordinate
-            relative: If True, coordinates are relative to window
-
-        Returns:
-            True if coordinates are within window
-        """
         _, _, width, height = self.get_bounds()
 
         if relative:
-            return 0 <= x < width and 0 <= y < height
+            return (
+                COORDINATES.origin_x <= x < width and
+                COORDINATES.origin_y <= y < height
+            )
         else:
             left, top, width, height = self.get_bounds()
             return left <= x < left + width and top <= y < top + height
 
     def activate(self) -> bool:
-        """
-        Bring game window to foreground.
-
-        Returns:
-            True if successful
-        """
         try:
             if hasattr(self.window, 'activate'):
                 self.window.activate()
@@ -178,12 +129,6 @@ class GameInterface:
             return False
 
     def is_active(self) -> bool:
-        """
-        Check if game window is currently active/focused.
-
-        Returns:
-            True if window is active
-        """
         try:
             if hasattr(self.window, 'isActive'):
                 return self.window.isActive
@@ -192,19 +137,12 @@ class GameInterface:
             return False
 
     def get_title(self) -> str:
-        """Get current window title."""
         try:
             return self.window.title if hasattr(self.window, 'title') else ""
         except Exception:
             return ""
 
     def exists(self) -> bool:
-        """
-        Check if window still exists.
-
-        Returns:
-            True if window exists
-        """
         try:
             _ = self.window.title
             return True

@@ -4,8 +4,10 @@ from typing import Callable, Optional
 from osrsbot.models.state import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
+from osrsbot.constants import GAME_TIMING
 
 logger = logging.getLogger(__name__)
+
 
 class Bot:
     """
@@ -15,13 +17,12 @@ class Bot:
 
     def __init__(
         self,
-        interface: object, # Assuming interface is an object for window management
+        interface: object,  # Assuming interface is an object for window management
         state: GameState,
         actions: Actions,
         config: Config,
         script_name: str = "Base Bot"
     ):
-        """Initializes the bot with all necessary dependencies."""
         self.interface = interface
         self.state = state
         self.actions = actions
@@ -37,7 +38,7 @@ class Bot:
             "The 'run_cycle' method must be implemented by the child script class."
         )
 
-    def run(self, bank_location: str = "varrock", runs: int = 10) -> None:
+    def run(self, bank_location: str = "varrock", runs: int = GAME_TIMING.default_runs) -> None:
         """
         The main execution loop, handling iterations, logging, and error control.
         """
@@ -76,8 +77,8 @@ class Bot:
         #     self._bank_at_falador()
         else:
             logger.error(f"Unknown bank location: {bank_location}")
-            
-    def _bank_at_varrock(self):
+
+    def _bank_at_varrock(self) -> None:
         """Handles the specific steps for Varrock banking."""
         actions = self.actions
         actions.teleport_varrock()
@@ -86,16 +87,15 @@ class Bot:
         actions.click_coordinate(("world", "varrock_fountain"))
         actions.wait("teleport")
 
-        for _ in range(2):
+        for _ in range(GAME_TIMING.walk_to_marker_attempts):
             actions.walk_to_marker("yellow_tile_marker")
         actions.wait("long")
 
-        for _ in range(2):
+        for _ in range(GAME_TIMING.bank_click_attempts):
             actions.click_coordinate(("world", "bank_booth"))
         actions.wait("long")
 
-        # Deposit loot
-        for _ in range(12):
+        for _ in range(GAME_TIMING.deposit_items_max_attempts):
             actions.click_color("purple_item_outline")
             actions.wait("short")
 

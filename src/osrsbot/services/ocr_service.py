@@ -19,6 +19,13 @@ from osrsbot.utils.ocr_helpers import (
     count_holes_and_tail,
     looks_like_nine
 )
+from osrsbot.constants import (
+    OCR_PREPROCESSING,
+    SHAPE_DETECTION,
+    OCR_SMOOTHING,
+    TESSERACT_CONFIG,
+    OCR_CHAR_REPLACEMENTS
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,29 +63,18 @@ class OCRService:
         tesseract_path: Optional[str] = None,
         debug: bool = True
     ):
-        """
-        Initialize OCR service.
-
-        Args:
-            window_getter: Function that returns (x, y, width, height) of game window
-            tesseract_path: Path to tesseract executable
-            debug: Whether to save debug images
-        """
         self._window_getter = window_getter
         self.debug = debug
 
-        # Set up Tesseract
         if tesseract_path:
             pytesseract.pytesseract.tesseract_cmd = tesseract_path
             logger.info(f"Using Tesseract from: {tesseract_path}")
 
-        # Cache for smoothing results
         self._caches = {}  # region_name -> deque of readings
         self._last_valid = {}  # region_name -> last valid value
         self._last_read_time = {}  # region_name -> timestamp
 
     def get_window_position(self) -> Optional[Tuple[int, int, int, int]]:
-        """Get current game window position."""
         if self._window_getter is not None:
             try:
                 pos = self._window_getter()
@@ -96,8 +92,8 @@ class OCRService:
         min_value: int = 1,
         max_value: int = 99,
         smooth: bool = True,
-        window_size: int = 5,
-        ttl: float = 0.5
+        window_size: Optional[int] = None,
+        ttl: Optional[float] = None
     ) -> Optional[int]:
         """
         Read a numeric value from a screen region.
@@ -108,12 +104,18 @@ class OCRService:
             max_value: Maximum valid value
             smooth: Whether to smooth results over time
             window_size: Number of readings to keep for smoothing
+                        (defaults to OCR_SMOOTHING.default_window_size)
             ttl: Cache time-to-live in seconds
+                (defaults to OCR_SMOOTHING.default_ttl_seconds)
 
         Returns:
             Numeric value or None if OCR failed
         """
-        # Check cache if smoothing enabled
+        if window_size is None:
+            window_size = OCR_SMOOTHING.default_window_size
+        if ttl is None:
+            ttl = OCR_SMOOTHING.default_ttl_seconds
+
         if smooth:
             now = time.time()
             if region.name in self._last_read_time:
@@ -123,11 +125,9 @@ class OCRService:
                         logger.debug(f"read_number({region.name}): returning cached {cached}")
                         return cached
 
-        # Get raw reading
         raw_value = self._get_raw_number(region, min_value, max_value)
 
         if raw_value is None:
-            # Return last valid value if available
             return self._last_valid.get(region.name)
 
         if not smooth:
@@ -135,23 +135,23 @@ class OCRService:
             self._last_read_time[region.name] = time.time()
             return raw_value
 
-        # Initialize cache for this region if needed
         if region.name not in self._caches:
             self._caches[region.name] = deque(maxlen=window_size)
 
-        # Add to history
         self._caches[region.name].append(raw_value)
 
-        # Get most common value from history
         if len(self._caches[region.name]) > 0:
             counter = Counter(self._caches[region.name])
             smoothed_value, count = counter.most_common(1)[0]
 
-            # Reject sudden jumps >30 as likely OCR errors
+            # Reject sudden jumps as likely OCR errors
+            # Use threshold from OCR_SMOOTHING configuration
             last_valid = self._last_valid.get(region.name)
-            if last_valid is not None and abs(smoothed_value - last_valid) > 30:
+            jump_size = abs(smoothed_value - last_valid) if last_valid is not None else 0
+            if last_valid is not None and jump_size > OCR_SMOOTHING.max_suspicious_jump:
                 logger.warning(
-                    f"{region.name}: Suspicious jump: {last_valid} -> {smoothed_value}"
+                    f"{region.name}: Suspicious jump detected: {last_valid} -> {smoothed_value} "
+                    f"(jump={jump_size}, max={OCR_SMOOTHING.max_suspicious_jump})"
                 )
                 return last_valid
 
@@ -176,11 +176,6 @@ class OCRService:
         min_value: int,
         max_value: int
     ) -> Optional[int]:
-        """
-        Perform raw OCR on a region.
-
-        Uses multiple preprocessing strategies to handle difficult digits.
-        """
         window_position = self.get_window_position()
         if not window_position:
             logger.debug(f"_get_raw_number({region.name}): no window position found")
@@ -188,7 +183,6 @@ class OCRService:
 
         win_x, win_y, _, _ = window_position
 
-        # Calculate absolute screen region
         abs_region = (
             win_x + region.x,
             win_y + region.y,
@@ -196,13 +190,9 @@ class OCRService:
             region.height
         )
 
-        # Capture screenshot
         screenshot = pyautogui.screenshot(region=abs_region)
-
-        # Apply multiple preprocessing strategies
         strategies = self._preprocess_for_numbers(screenshot)
 
-        # Save debug images if enabled
         if self.debug:
             os.makedirs("ocr_debug", exist_ok=True)
             for i, processed_img in enumerate(strategies):
@@ -212,11 +202,9 @@ class OCRService:
                 except Exception:
                     logger.debug(f"Failed to save debug image {fname}", exc_info=True)
 
-        # OCR config
-        configs = [r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789']
+        configs = [TESSERACT_CONFIG.get_config_string()]
         all_results = []
 
-        # Try each strategy
         for i, processed_img in enumerate(strategies):
             for config in configs:
                 try:
@@ -227,7 +215,6 @@ class OCRService:
                         f"raw:'{text.strip()}' cleaned:'{cleaned_text}'"
                     )
 
-                    # Extract numbers
                     numbers = re.findall(r'\d+', cleaned_text)
                     if numbers:
                         value = int(numbers[0])
@@ -239,7 +226,6 @@ class OCRService:
         if not all_results:
             return None
 
-        # Get consensus value (most common)
         ocr_consensus = Counter(all_results).most_common(1)[0][0]
 
         # Special handling: OCR often misreads 9 as 4
@@ -253,53 +239,25 @@ class OCRService:
         Apply multiple preprocessing strategies to improve OCR accuracy.
 
         Different strategies work better for different digits (e.g., 9 vs 11).
+        Uses configuration from constants.OCR_PREPROCESSING.
         """
         strategies = []
 
-        # Strategy 1: High contrast, threshold 61
-        img = screenshot.convert('L')
-        img = ImageOps.invert(img)
-        img = img.resize((img.width * 5, img.height * 5))
-        enhancer = ImageEnhance.Contrast(img)
-        img1 = enhancer.enhance(4)
-        img1 = img1.point(lambda p: 255 if p > 61 else 0)
-        strategies.append(img1)
+        for strategy in OCR_PREPROCESSING.get_all_strategies():
+            img = screenshot.convert('L')
+            img = ImageOps.invert(img)
+            img = img.resize((
+                img.width * strategy.resize_multiplier,
+                img.height * strategy.resize_multiplier
+            ))
+            enhancer = ImageEnhance.Contrast(img)
+            img_processed = enhancer.enhance(strategy.contrast_level)
+            img_processed = img_processed.point(
+                lambda p: 255 if p > strategy.threshold else 0
+            )
+            strategies.append(img_processed)
 
-        # Strategy 2: Medium contrast, lower threshold
-        img = screenshot.convert('L')
-        img = ImageOps.invert(img)
-        img = img.resize((img.width * 6, img.height * 6))
-        enhancer = ImageEnhance.Contrast(img)
-        img2 = enhancer.enhance(3)
-        img2 = img2.point(lambda p: 255 if p > 40 else 0)
-        strategies.append(img2)
-
-        # Strategy 3: Medium-high contrast
-        img = screenshot.convert('L')
-        img = ImageOps.invert(img)
-        img = img.resize((img.width * 4, img.height * 4))
-        enhancer = ImageEnhance.Contrast(img)
-        img3 = enhancer.enhance(3.5)
-        img3 = img3.point(lambda p: 255 if p > 65 else 0)
-        strategies.append(img3)
-
-        # Strategy 4: Very high contrast
-        img = screenshot.convert('L')
-        img = ImageOps.invert(img)
-        img = img.resize((img.width * 5, img.height * 5))
-        enhancer = ImageEnhance.Contrast(img)
-        img4 = enhancer.enhance(5)
-        img4 = img4.point(lambda p: 255 if p > 70 else 0)
-        strategies.append(img4)
-
-        # Strategy 5: High threshold
-        img = screenshot.convert('L')
-        img = ImageOps.invert(img)
-        img = img.resize((img.width * 5, img.height * 5))
-        enhancer = ImageEnhance.Contrast(img)
-        img5 = enhancer.enhance(4)
-        img5 = img5.point(lambda p: 255 if p > 100 else 0)
-        strategies.append(img5)
+            logger.debug(f"Applied preprocessing strategy: {strategy}")
 
         return strategies
 
@@ -310,9 +268,17 @@ class OCRService:
         region_name: str
     ) -> int:
         """
-        Check if OCR misread a 9 as a 4.
+        Special handling for OCR confusion between 4 and 9.
 
-        Uses shape detection heuristics.
+        Uses shape detection heuristics from constants.SHAPE_DETECTION.
+
+        Args:
+            strategies: List of preprocessed images
+            all_results: All OCR results from different strategies
+            region_name: Name of the region being analyzed (for logging)
+
+        Returns:
+            9 if shape analysis confirms it's a nine, otherwise 4
         """
         try:
             nine_votes = 0
@@ -320,7 +286,10 @@ class OCRService:
 
             for idx, proc_img in enumerate(strategies):
                 try:
-                    bw = preprocess_for_shape_detection(proc_img, size=(140, 140))
+                    bw = preprocess_for_shape_detection(
+                        proc_img,
+                        size=SHAPE_DETECTION.shape_detection_size
+                    )
                     hc, tf, asp = count_holes_and_tail(bw)
                 except Exception:
                     hc, tf, asp = 0, 0.0, 0.0
@@ -338,10 +307,17 @@ class OCRService:
                     f"raw_votes_has9={9 in all_results}, per-strategy={diagnostics}"
                 )
 
-            if nine_votes >= 2 or (nine_votes >= 1 and 9 in all_results):
+            threshold_met = nine_votes >= SHAPE_DETECTION.min_nine_votes_for_correction
+            ocr_agrees = (
+                SHAPE_DETECTION.trust_ocr_with_single_vote and
+                nine_votes >= 1 and
+                9 in all_results
+            )
+
+            if threshold_met or ocr_agrees:
                 logger.info(
                     f"{region_name}: Correcting OCR 4 -> 9 based on "
-                    "multi-strategy shape heuristic"
+                    f"multi-strategy shape heuristic (votes={nine_votes})"
                 )
                 return 9
         except Exception:
@@ -351,28 +327,12 @@ class OCRService:
 
     @staticmethod
     def _clean_ocr_text(text: str) -> str:
-        """Clean OCR output by replacing common misread characters."""
-        replacements = {
-            'i': '1', 'I': '1', 'l': '1', '|': '1',
-            'o': '0', 'O': '0', 'Q': '0',
-            'S': '5', 's': '5',
-            'Z': '2', 'z': '2',
-            'B': '8', 'g': '9', 'G': '6',
-            ' ': '', '\n': '', '\r': '', '\t': '',
-            'D': '0', 'd': '0', 'q': '9', 'a': '4'
-        }
         cleaned = text or ""
-        for old, new in replacements.items():
+        for old, new in OCR_CHAR_REPLACEMENTS.replacements.items():
             cleaned = cleaned.replace(old, new)
         return cleaned
 
     def reset_cache(self, region_name: Optional[str] = None):
-        """
-        Reset cached values for a region or all regions.
-
-        Args:
-            region_name: Region to reset, or None to reset all
-        """
         if region_name:
             self._caches.pop(region_name, None)
             self._last_valid.pop(region_name, None)

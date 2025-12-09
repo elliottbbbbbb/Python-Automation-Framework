@@ -10,6 +10,8 @@ import pyautogui
 from typing import Tuple, Optional, Literal
 from dataclasses import dataclass
 
+from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT
+
 logger = logging.getLogger(__name__)
 
 MovementStyle = Literal["instant", "linear", "curved", "overshoot", "random"]
@@ -17,7 +19,11 @@ MovementStyle = Literal["instant", "linear", "curved", "overshoot", "random"]
 
 @dataclass
 class MouseConfig:
-    """Configuration for mouse behavior"""
+    """
+    Configuration for mouse behavior.
+
+    Defaults are set in constants.py for easy tuning.
+    """
     min_speed: float = 0.1
     max_speed: float = 0.5
     overshoot_chance: float = 0.15
@@ -70,7 +76,7 @@ class MouseService:
                 duration = random.uniform(
                     self.config.min_speed,
                     self.config.max_speed
-                ) * (1 + distance / 1000)
+                ) * (1 + distance / MOUSE_MOVEMENT.distance_factor)
 
             if style == "instant":
                 pyautogui.moveTo(x, y, duration=0)
@@ -154,7 +160,7 @@ class MouseService:
         variance: bool = True
     ) -> bool:
         """
-        Move to position and click (combined operation).
+        This function must be passed absolute coordinates otherwise the click may end up out of bounds.
 
         Args:
             x: Target X coordinate
@@ -169,7 +175,10 @@ class MouseService:
         if not self.move_to(x, y, style=move_style):
             return False
 
-        time.sleep(random.uniform(0.05, 0.15))
+        time.sleep(random.uniform(
+            MOUSE_MOVEMENT.post_move_delay_min,
+            MOUSE_MOVEMENT.post_move_delay_max
+        ))
 
         return self.click(x, y, button=button, variance=variance)
 
@@ -185,13 +194,29 @@ class MouseService:
         Move mouse along a Bezier curve (OSBC-inspired).
 
         Creates a smooth curved path with random control points.
+        Uses configuration from constants.BEZIER_CURVE.
         """
-        cp1_x = start_x + random.randint(-100, 100)
-        cp1_y = start_y + random.randint(-100, 100)
-        cp2_x = end_x + random.randint(-100, 100)
-        cp2_y = end_y + random.randint(-100, 100)
+        cp1_x = start_x + random.randint(
+            BEZIER_CURVE.control_point_offset_min,
+            BEZIER_CURVE.control_point_offset_max
+        )
+        cp1_y = start_y + random.randint(
+            BEZIER_CURVE.control_point_offset_min,
+            BEZIER_CURVE.control_point_offset_max
+        )
+        cp2_x = end_x + random.randint(
+            BEZIER_CURVE.control_point_offset_min,
+            BEZIER_CURVE.control_point_offset_max
+        )
+        cp2_y = end_y + random.randint(
+            BEZIER_CURVE.control_point_offset_min,
+            BEZIER_CURVE.control_point_offset_max
+        )
 
-        steps = max(10, int(duration * 60))
+        steps = max(
+            BEZIER_CURVE.min_steps,
+            int(duration * BEZIER_CURVE.steps_per_second)
+        )
 
         start_time = time.time()
 
@@ -229,10 +254,12 @@ class MouseService:
     ) -> None:
         """
         Move with occasional overshoot (human-like correction).
+
+        Uses configuration from constants.MOUSE_MOVEMENT.
         """
         if random.random() < self.config.overshoot_chance:
             overshoot_dist = random.randint(
-                5,
+                MOUSE_MOVEMENT.overshoot_distance_min,
                 self.config.overshoot_distance
             )
 
@@ -247,11 +274,14 @@ class MouseService:
                 self._move_bezier(
                     start_x, start_y,
                     overshoot_x, overshoot_y,
-                    duration * 0.7
+                    duration * MOUSE_MOVEMENT.overshoot_duration_fraction
                 )
 
-                time.sleep(0.02)
-                pyautogui.moveTo(end_x, end_y, duration=duration * 0.3)
+                time.sleep(MOUSE_MOVEMENT.correction_delay)
+                pyautogui.moveTo(
+                    end_x, end_y,
+                    duration=duration * MOUSE_MOVEMENT.correction_duration_fraction
+                )
             else:
                 pyautogui.moveTo(end_x, end_y, duration=duration)
         else:
@@ -282,16 +312,18 @@ class MouseService:
             return False
 
     def get_position(self) -> Tuple[int, int]:
-        """Get current mouse position."""
         return pyautogui.position()
 
-    def random_movement(self, radius: int = 50) -> None:
+    def random_movement(self, radius: Optional[int] = None) -> None:
         """
-        Make a small random mouse movement (anti-AFK).
+        Perform random mouse movement within a radius.
 
         Args:
-            radius: Maximum pixels to move from current position
+            radius: Movement radius in pixels (defaults to MOUSE_MOVEMENT.random_movement_radius)
         """
+        if radius is None:
+            radius = MOUSE_MOVEMENT.random_movement_radius
+
         current_x, current_y = self.get_position()
 
         offset_x = random.randint(-radius, radius)

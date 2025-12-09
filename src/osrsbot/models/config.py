@@ -156,7 +156,7 @@ class Config:
     def save(self) -> bool:
         try:
             with open(self.config_file, 'w') as f:
-                json.dump(self.data, indent=2, fp=f)
+                json.dump(self.data, f, indent=2)
             return True
         except IOError as e:
             logger.error(f"Failed to save config: {e}")

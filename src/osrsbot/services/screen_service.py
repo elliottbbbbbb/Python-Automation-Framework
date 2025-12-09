@@ -1,20 +1,21 @@
-"""
-ScreenService - Handles all screen capture and visual detection.
-
-Separates screen interaction from mouse/click logic.
-"""
+# osrsbot/services/screen_service.py
+from __future__ import annotations
 import logging
 import pyautogui
-from typing import Tuple, Optional, List
+import cv2 as cv
+import numpy as np
+from typing import Tuple, Optional, List, Union, Dict, Any, Callable
 from PIL import Image
 from dataclasses import dataclass
+from pathlib import Path
+
+from osrsbot.constants import COLOR_DETECTION
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ColorMatch:
-    """Represents a found color match"""
     x: int
     y: int
     confidence: float
@@ -23,288 +24,216 @@ class ColorMatch:
 
 class ScreenService:
     """
-    Handles all screen capture and color detection operations.
-
-    Keeps screen logic separate from mouse/click operations.
+    ScreenService: captures pixels and forwards frames to an injected Vision instance.
+    Gets window bounds dynamically from GameInterface (single source of truth).
+    Does NOT perform clicks — it returns absolute coords.
     """
 
-    def __init__(self, window_bounds: Optional[Tuple[int, int, int, int]] = None):
+    def __init__(
+        self,
+        window_getter: Optional[Callable[[], Tuple[int, int, int, int]]] = None,
+        vision: Optional[Any] = None,
+    ):
         """
+        Initialize ScreenService.
+
         Args:
-            window_bounds: (left, top, width, height) of game window
-                          If None, uses full screen
+            window_getter: Callable that returns (left, top, width, height) when called.
+                          Should get bounds from GameInterface for single source of truth.
+            vision: Optional vision service for semantic detection
         """
-        self.window_bounds = window_bounds
+        self.window_getter = window_getter
+        self.vision = vision
 
-    def set_window_bounds(self, left: int, top: int, width: int, height: int):
-        """Update the window bounds for relative coordinates."""
-        self.window_bounds = (left, top, width, height)
-        logger.debug(f"Window bounds set to: {self.window_bounds}")
+    # ---------------- bounds helpers ----------------
+    def _get_bounds(self) -> Optional[Tuple[int, int, int, int]]:
+        """Get fresh window bounds from GameInterface."""
+        if self.window_getter is None:
+            return None
+        try:
+            return self.window_getter()
+        except Exception:
+            logger.exception("Failed to get window bounds from window_getter")
+            return None
 
+    def relative_to_absolute(self, x: int, y: int) -> Tuple[int, int]:
+        """
+        Convert coordinates relative to window to absolute screen coordinates.
+        If window_bounds is None, returns the inputs unchanged.
+        """
+        bounds = self._get_bounds()
+        if bounds:
+            left, top, _, _ = bounds
+            return (left + x, top + y)
+        return (x, y)
+
+    # ---------------- capture helpers ----------------
     def capture(
         self,
         region: Optional[Tuple[int, int, int, int]] = None,
-        relative: bool = True
+        relative: bool = True,
     ) -> Image.Image:
         """
-        Capture screenshot of region.
-
-        Args:
-            region: (x, y, width, height) to capture
-                   If None, captures entire window/screen
-            relative: If True, region is relative to window_bounds
-                     If False, region is absolute screen coordinates
-
-        Returns:
-            PIL Image of captured region
+        Capture a PIL Image for the given region.
+        region: (x, y, w, h). If relative=True, it's relative to window_bounds.
+        If no bounds are set and relative=True, falls back to absolute capture.
         """
+        bounds = self._get_bounds()
+
         if region is None:
-            if self.window_bounds:
-                left, top, width, height = self.window_bounds
-                screenshot = pyautogui.screenshot(region=(left, top, width, height))
-            else:
-                screenshot = pyautogui.screenshot()
-        else:
-            x, y, w, h = region
+            if bounds:
+                left, top, width, height = bounds
+                return pyautogui.screenshot(region=(left, top, width, height))
+            return pyautogui.screenshot()
 
-            if relative and self.window_bounds:
-                win_left, win_top, _, _ = self.window_bounds
-                screenshot = pyautogui.screenshot(
-                    region=(win_left + x, win_top + y, w, h)
-                )
-            else:
-                screenshot = pyautogui.screenshot(region=(x, y, w, h))
+        x, y, w, h = region
+        if relative and bounds:
+            win_left, win_top, _, _ = bounds
+            return pyautogui.screenshot(region=(win_left + x, win_top + y, w, h))
+        return pyautogui.screenshot(region=(x, y, w, h))
 
-        return screenshot
+    def capture_grayscale(
+        self,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        relative: bool = True,
+    ) -> Optional[np.ndarray]:
+        """
+        Capture screenshot and return a grayscale numpy array.
+        Returns None if capture fails.
+        """
+        try:
+            img = self.capture(region=region, relative=relative)
+            arr = np.array(img)
+            # PIL returns image in RGB order
+            gray = cv.cvtColor(arr, cv.COLOR_RGB2GRAY)
+            return gray
+        except Exception:
+            logger.exception("Failed to capture grayscale image")
+            return None
+
+    # ---------------- color helpers ----------------
+    def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
+        hex_color = hex_color.lstrip("#")
+        chunk_size = COLOR_DETECTION.hex_chunk_size
+        return tuple(int(hex_color[i : i + chunk_size], COLOR_DETECTION.hex_base) for i in (0, 2, 4))
+
+    def _color_matches(self, color1: Tuple[int, int, int], color2: Tuple[int, int, int], tolerance: int) -> bool:
+        return all(abs(c1 - c2) <= tolerance for c1, c2 in zip(color1, color2))
+
+    def _color_similarity(self, color1: Tuple[int, int, int], color2: Tuple[int, int, int]) -> float:
+        distance = sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)) ** 0.5
+        max_distance = (COLOR_DETECTION.max_rgb_value ** 2 * COLOR_DETECTION.rgb_channels) ** 0.5
+        return COLOR_DETECTION.perfect_match - (distance / max_distance)
 
     def find_color(
         self,
         hex_color: str,
-        tolerance: int = 10,
+        tolerance: int = COLOR_DETECTION.default_tolerance,
         region: Optional[Tuple[int, int, int, int]] = None,
-        find_all: bool = False
-    ) -> Optional[List[ColorMatch]] if False else Optional[ColorMatch]:
-        """
-        Find pixel(s) matching a color.
+        find_all: bool = False,
+    ) -> Optional[Union[ColorMatch, List[ColorMatch]]]:
+        """Find pixel(s) matching a color in the given region (or full window)."""
+        target = self._hex_to_rgb(hex_color)
+        try:
+            screenshot = self.capture(region=region)
+            pixels = screenshot.load()
+            if pixels is None:
+                logger.error("Failed to load screenshot pixels")
+                return None
 
-        Args:
-            hex_color: Color to find (e.g., "#FF0000")
-            tolerance: How close the color needs to match (0-255)
-            region: Region to search (x, y, width, height)
-            find_all: If True, return all matches; if False, return first match
+            matches: List[ColorMatch] = []
+            for x in range(screenshot.width):
+                for y in range(screenshot.height):
+                    pixel = pixels[x, y][:3]  # type: ignore
+                    if self._color_matches(pixel, target, tolerance):
+                        cm = ColorMatch(x=x, y=y, confidence=self._color_similarity(pixel, target), color=pixel)  # type: ignore
+                        if not find_all:
+                            return cm
+                        matches.append(cm)
 
-        Returns:
-            ColorMatch or List[ColorMatch] or None
-        """
-        target_rgb = self._hex_to_rgb(hex_color)
-        screenshot = self.capture(region=region)
-
-        pixels = screenshot.load()
-        if pixels is None:
-            logger.error("Failed to load screenshot pixels")
+            return matches if find_all else None
+        except Exception:
+            logger.exception("find_color failed")
             return None
 
-        matches = []
-
-        for x in range(screenshot.width):
-            for y in range(screenshot.height):
-                pixel = pixels[x, y][:3]
-
-                if self._color_matches(pixel, target_rgb, tolerance):
-                    match = ColorMatch(
-                        x=x,
-                        y=y,
-                        confidence=self._color_similarity(pixel, target_rgb),
-                        color=pixel
-                    )
-
-                    if not find_all:
-                        return match
-
-                    matches.append(match)
-
-        return matches if find_all else None
-
-    def get_pixel_color(
-        self,
-        x: int,
-        y: int,
-        relative: bool = True
-    ) -> Tuple[int, int, int]:
-        """
-        Get RGB color at specific coordinate.
-
-        Args:
-            x: X coordinate
-            y: Y coordinate
-            relative: If True, coordinates are relative to window
-
-        Returns:
-            (R, G, B) tuple
-        """
-        if relative and self.window_bounds:
-            win_left, win_top, _, _ = self.window_bounds
-            abs_x = win_left + x
-            abs_y = win_top + y
+    def get_pixel_color(self, x: int, y: int, relative: bool = True) -> Tuple[int, int, int]:
+        """Return absolute RGB pixel color (uses pyautogui.pixel)."""
+        bounds = self._get_bounds()
+        if relative and bounds:
+            left, top, _, _ = bounds
+            abs_x = left + x
+            abs_y = top + y
         else:
-            abs_x = x
-            abs_y = y
-
+            abs_x, abs_y = x, y
         return pyautogui.pixel(abs_x, abs_y)
 
+    # ---------------- image helpers ----------------
     def find_image(
         self,
         template_path: str,
         confidence: float = 0.8,
         region: Optional[Tuple[int, int, int, int]] = None,
-        grayscale: bool = False
+        grayscale: bool = False,
     ) -> Optional[Tuple[int, int, int, int]]:
-        """
-        Find template image on screen using template matching.
-
-        Args:
-            template_path: Path to template image
-            confidence: Match confidence (0.0 to 1.0)
-            region: Region to search in
-            grayscale: Convert to grayscale before matching (faster)
-
-        Returns:
-            (x, y, width, height) of match or None
-        """
+        """Small wrapper around pyautogui.locate that accepts relative regions."""
         try:
-            location = pyautogui.locate(
-                template_path,
-                self.capture(region=region),
-                confidence=confidence,
-                grayscale=grayscale
-            )
-
+            needle_screenshot = self.capture(region=region)
+            location = pyautogui.locate(template_path, needle_screenshot, confidence=confidence, grayscale=grayscale)
             if location:
                 return (location.left, location.top, location.width, location.height)
-
+            return None
+        except Exception:
+            logger.exception("find_image failed")
             return None
 
-        except Exception as e:
-            logger.error(f"Image search failed: {e}", exc_info=True)
+    # ---------------- vision wrappers ----------------
+    def detect_inventory(self, force: bool = False) -> bool:
+        """
+        Capture current window and forward to vision.detect_inventory.
+        Returns False if vision not injected or capture failed.
+        """
+        if self.vision is None:
+            logger.debug("No vision instance injected; detect_inventory returning False")
+            return False
+        frame = self.capture_grayscale()
+        if frame is None:
+            return False
+        return self.vision.detect_inventory(frame, force=force)
+
+    def detect_items(self) -> Dict[Tuple[int, int], str]:
+        """Capture frame and forward to vision.detect_items; returns empty dict if no vision or capture fail."""
+        if self.vision is None:
+            return {}
+        frame = self.capture_grayscale()
+        if frame is None:
+            return {}
+        return self.vision.detect_items(frame)
+
+    def detect_ui_element(self, name: str, force: bool = False) -> bool:
+        """Capture and forward UI element detection; returns False if missing."""
+        if self.vision is None:
+            return False
+        frame = self.capture_grayscale()
+        if frame is None:
+            return False
+        return self.vision.detect_ui_element(name, frame, force=force)
+
+    def get_slot_absolute(self, index: int) -> Optional[Tuple[int, int]]:
+        """
+        Return absolute screen coordinates for the given slot index, or None.
+        Vision returns coords relative to the captured frame; this converts to absolute.
+        """
+        if self.vision is None:
             return None
+        pos = self.vision.get_slot_position(index)
+        if pos is None:
+            return None
+        return self.relative_to_absolute(pos[0], pos[1])
 
-    def wait_for_color(
-        self,
-        hex_color: str,
-        timeout: float = 10.0,
-        check_interval: float = 0.5,
-        tolerance: int = 10,
-        region: Optional[Tuple[int, int, int, int]] = None
-    ) -> Optional[ColorMatch]:
-        """
-        Wait for a color to appear on screen.
+    def invalidate_vision_cache(self) -> None:
+        if self.vision is not None:
+            try:
+                self.vision.invalidate_cache()
+            except Exception:
+                logger.exception("invalidate_vision_cache failed")
 
-        Args:
-            hex_color: Color to wait for
-            timeout: Maximum seconds to wait
-            check_interval: Seconds between checks
-            tolerance: Color match tolerance
-            region: Region to search
-
-        Returns:
-            ColorMatch if found, None if timeout
-        """
-        import time
-        start_time = time.time()
-
-        while (time.time() - start_time) < timeout:
-            match = self.find_color(hex_color, tolerance, region)
-            if match:
-                return match
-
-            time.sleep(check_interval)
-
-        logger.warning(f"Color {hex_color} not found within {timeout}s")
-        return None
-
-    def wait_for_image(
-        self,
-        template_path: str,
-        timeout: float = 10.0,
-        check_interval: float = 0.5,
-        confidence: float = 0.8,
-        region: Optional[Tuple[int, int, int, int]] = None
-    ) -> Optional[Tuple[int, int, int, int]]:
-        """
-        Wait for an image to appear on screen.
-
-        Args:
-            template_path: Path to template image
-            timeout: Maximum seconds to wait
-            check_interval: Seconds between checks
-            confidence: Match confidence
-            region: Region to search
-
-        Returns:
-            (x, y, width, height) if found, None if timeout
-        """
-        import time
-        start_time = time.time()
-
-        while (time.time() - start_time) < timeout:
-            location = self.find_image(template_path, confidence, region)
-            if location:
-                return location
-
-            time.sleep(check_interval)
-
-        logger.warning(f"Image {template_path} not found within {timeout}s")
-        return None
-
-    def color_exists(
-        self,
-        hex_color: str,
-        tolerance: int = 10,
-        region: Optional[Tuple[int, int, int, int]] = None
-    ) -> bool:
-        """
-        Check if a color exists anywhere on screen.
-
-        Faster than find_color since it returns immediately on first match.
-        """
-        return self.find_color(hex_color, tolerance, region) is not None
-
-    def image_exists(
-        self,
-        template_path: str,
-        confidence: float = 0.8,
-        region: Optional[Tuple[int, int, int, int]] = None
-    ) -> bool:
-        """
-        Check if an image exists on screen.
-        """
-        return self.find_image(template_path, confidence, region) is not None
-
-    @staticmethod
-    def _hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
-        """Convert hex color to RGB tuple."""
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-    @staticmethod
-    def _color_matches(
-        color1: Tuple[int, int, int],
-        color2: Tuple[int, int, int],
-        tolerance: int
-    ) -> bool:
-        """Check if two colors match within tolerance."""
-        return all(abs(c1 - c2) <= tolerance for c1, c2 in zip(color1, color2))
-
-    @staticmethod
-    def _color_similarity(
-        color1: Tuple[int, int, int],
-        color2: Tuple[int, int, int]
-    ) -> float:
-        """
-        Calculate color similarity (0.0 to 1.0).
-
-        Returns 1.0 for perfect match, 0.0 for completely different.
-        """
-        distance = sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)) ** 0.5
-        max_distance = (255 ** 2 * 3) ** 0.5
-        return 1.0 - (distance / max_distance)

@@ -12,12 +12,14 @@ Each action uses the appropriate services (MouseService, ScreenService, etc.)
 import time
 import logging
 import pyautogui
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
+from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
+from osrsbot.constants import COLOR_DETECTION, GAME_TIMING
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,9 @@ class GameActions:
         mouse: MouseService,
         screen: ScreenService,
         interface: GameInterface,
-        config: Config
+        config: Config,
+        state: Optional[Any] = None,
+        template_service: Optional[TemplateMatchService] = None
     ):
         """
         Initialize game actions.
@@ -50,24 +54,31 @@ class GameActions:
             screen: ScreenService instance
             interface: GameInterface for window bounds
             config: Configuration instance
+            state: Optional GameState instance (for inventory access)
+            template_service: Optional TemplateMatchService for UI detection
         """
         self.mouse = mouse
         self.screen = screen
         self.interface = interface
         self.config = config
+        self.state = state
+        self.template_service = template_service
 
     def wait(self, timing_type: str) -> None:
-        delay = self.config.get("timings", timing_type, default=1.0)
+        delay = self.config.get("timings", timing_type, default=GAME_TIMING.default_wait)
 
         if not isinstance(delay, (int, float)):
-            logger.warning(f"Invalid timing for '{timing_type}', using 1.0s")
-            delay = 1.0
+            logger.warning(
+                f"Invalid timing for '{timing_type}', "
+                f"using {GAME_TIMING.default_wait}s"
+            )
+            delay = GAME_TIMING.default_wait
 
         time.sleep(float(delay))
 
     def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
         """
-        Convert relative coords to absolute, refreshing window bounds first.
+        Convert relative coords to absolute screen coordinates.
 
         Args:
             x: X coordinate relative to window
@@ -76,9 +87,6 @@ class GameActions:
         Returns:
             (abs_x, abs_y) absolute screen coordinates
         """
-        # Refresh bounds from interface and update screen service
-        bounds = self.interface.get_bounds()
-        self.screen.set_window_bounds(*bounds)
         return self.screen.relative_to_absolute(x, y)
 
     def click_inventory_slot(
@@ -86,21 +94,206 @@ class GameActions:
         slot_num: int,
         move_style: MovementStyle = "curved"
     ) -> bool:
-        if not 1 <= slot_num <= 28:
-            logger.error(f"Invalid slot: {slot_num}, must be 1-28")
-            return False
+        """
+        Click an inventory slot using config coordinates.
 
+        Args:
+            slot_num: Slot number (1-28)
+            move_style: Mouse movement style
+
+        Returns:
+            True if clicked, False on error
+        """
         coord = self.config.get("coordinates", "inventory", f"slot_{slot_num}")
 
         if not coord or "x" not in coord or "y" not in coord:
-            logger.error(f"No coordinates for slot {slot_num}")
+            logger.error(
+                f"No coordinates for slot {slot_num} in config"
+            )
             return False
 
         x, y = coord["x"], coord["y"]
         abs_x, abs_y = self._to_absolute(x, y)
 
-        logger.debug(f"Clicking inventory slot {slot_num} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
+        logger.debug(
+            f"Clicking inventory slot {slot_num} at "
+            f"relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})"
+        )
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+
+    def click_inventory_slot_detected(
+        self,
+        slot_num: int,
+        move_style: MovementStyle = "curved",
+        force_detect: bool = False
+    ) -> bool:
+        """
+        Click an inventory slot using template matching detection.
+
+        This method detects the inventory grid position dynamically using
+        OpenCV template matching, then calculates the slot position mathematically.
+        It will attempt to open the inventory if it's closed.
+
+        Args:
+            slot_num: Slot number (1-28)
+            move_style: Mouse movement style
+            force_detect: Force re-detection even if cached
+
+        Returns:
+            True if clicked, False on error
+        """
+        if not self.template_service:
+            logger.error(
+                "TemplateMatchService not available. "
+                "Use click_inventory_slot() for config-based clicking."
+            )
+            return False
+
+        if not 1 <= slot_num <= 28:
+            logger.error(f"Invalid slot number: {slot_num}. Must be 1-28.")
+            return False
+
+        if not self.ensure_inventory_open():
+            logger.error("Could not open inventory")
+            return False
+
+        img_gray = self.screen.capture_grayscale()
+        if img_gray is None:
+            logger.error("Failed to capture screenshot")
+            return False
+
+        detected = self.template_service.detect_grid(
+            "inventory",
+            img_gray,
+            force=force_detect
+        )
+        if not detected:
+            logger.error("Failed to detect inventory grid")
+            return False
+
+        # Convert 1-indexed slot number to 0-indexed array position
+        position = self.template_service.get_slot_position("inventory", slot_num - 1)
+        if not position:
+            logger.error(f"Failed to get position for slot {slot_num}")
+            return False
+
+        rel_x, rel_y = position
+        abs_x, abs_y = self._to_absolute(rel_x, rel_y)
+
+        logger.debug(
+            f"Clicking inventory slot {slot_num} (detected) at "
+            f"relative ({rel_x}, {rel_y}) -> absolute ({abs_x}, {abs_y})"
+        )
+
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+
+    def click_ui_button_detected(
+        self,
+        button_name: str,
+        move_style: MovementStyle = "curved",
+        force_detect: bool = False
+    ) -> bool:
+        """
+        Click a UI button using template matching detection.
+
+        This method detects UI buttons (prayer, run, logout, etc.) dynamically
+        using OpenCV template matching.
+
+        Args:
+            button_name: Name of button to click (e.g., "prayer_button", "run_button")
+            move_style: Mouse movement style
+            force_detect: Force re-detection even if cached
+
+        Returns:
+            True if clicked, False on error
+        """
+        if not self.template_service:
+            logger.error("TemplateMatchService not available")
+            return False
+
+        img_gray = self.screen.capture_grayscale()
+        if img_gray is None:
+            logger.error("Failed to capture screenshot")
+            return False
+
+        detected = self.template_service.detect_button(
+            button_name,
+            img_gray,
+            force=force_detect
+        )
+        if not detected:
+            logger.error(f"Failed to detect button: {button_name}")
+            return False
+
+        position = self.template_service.get_button_position(button_name)
+        if not position:
+            logger.error(f"Failed to get position for button: {button_name}")
+            return False
+
+        rel_x, rel_y = position
+        abs_x, abs_y = self._to_absolute(rel_x, rel_y)
+
+        logger.debug(
+            f"Clicking button '{button_name}' (detected) at "
+            f"relative ({rel_x}, {rel_y}) -> absolute ({abs_x}, {abs_y})"
+        )
+
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+
+    def ensure_inventory_open(self, max_attempts: int = 3) -> bool:
+        """
+        Ensure the inventory interface is open.
+
+        Attempts to detect the inventory. If not detected, clicks the inventory
+        button or presses ESC to close other interfaces, then retries.
+
+        Args:
+            max_attempts: Maximum number of attempts to open inventory
+
+        Returns:
+            True if inventory is open/detected, False otherwise
+        """
+        if not self.template_service:
+            logger.warning(
+                "TemplateMatchService not available. "
+                "Cannot verify inventory state."
+            )
+            return True  # Assume open when detection unavailable
+
+        for attempt in range(max_attempts):
+            img_gray = self.screen.capture_grayscale()
+            if img_gray is None:
+                logger.error(f"Failed to capture screenshot (attempt {attempt + 1})")
+                continue
+
+            detected = self.template_service.detect_grid(
+                "inventory",
+                img_gray,
+                force=True
+            )
+            if detected:
+                logger.debug(f"Inventory detected on attempt {attempt + 1}")
+                return True
+
+            logger.debug(
+                f"Inventory not detected (attempt {attempt + 1}/{max_attempts}). "
+                "Attempting to open..."
+            )
+
+            # First attempt: click inventory button if available, else press ESC
+            # Subsequent attempts: always press ESC to close competing interfaces
+            if attempt == 0:
+                if self.template_service.has_button("inventory_button"):
+                    self.click_ui_button_detected("inventory_button", force_detect=True)
+                else:
+                    pyautogui.press('escape')
+            else:
+                pyautogui.press('escape')
+
+            self.wait("short")
+
+        logger.error(f"Failed to open inventory after {max_attempts} attempts")
+        return False
 
     def click_color(
         self,
@@ -116,21 +309,19 @@ class GameActions:
             return False
 
         if tolerance is None:
-            tolerance = self.config.get("tolerances", "color_match", default=10)
-
-        # Refresh window bounds BEFORE taking screenshot
-        bounds = self.interface.get_bounds()
-        self.screen.set_window_bounds(*bounds)
+            tolerance = self.config.get(
+                "tolerances", "color_match", default=COLOR_DETECTION.default_tolerance
+            )
 
         match = self.screen.find_color(hex_color, tolerance, region)
         logger.debug(f"Found match: {match}")
         if not match:
             logger.debug(f"Color '{color_name}' ({hex_color}) not found")
             return False
-        # This is where we go from relative coordinates to click -> absolute coordinates
-        # Otherwise we click out of bounds. The position of the OSRS window is updated for each new click.
+
         abs_x, abs_y = self._to_absolute(match.x, match.y)
-        logger.debug(f"Found '{color_name}' at relative ({match.x}, {match.y}) -> absolute ({abs_x}, {abs_y})")
+        logger.debug(
+            f"Found '{color_name}' at relative ({match.x}, {match.y}) -> absolute ({abs_x}, {abs_y})")
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def click_coordinate(
@@ -156,7 +347,8 @@ class GameActions:
 
         x, y = current["x"], current["y"]
         abs_x, abs_y = self._to_absolute(x, y)
-        logger.debug(f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
+        logger.debug(
+            f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
     def use_item(self, item_color_name: str) -> bool:
@@ -174,7 +366,7 @@ class GameActions:
 
     def teleport_varrock(self) -> bool:
         """Double-clicks to handle RuneLite menu behavior."""
-        for _ in range(2):
+        for _ in range(GAME_TIMING.teleport_double_click_count):
             if not self.click_inventory_slot(2):
                 logger.error("Failed to click Varrock teleport")
                 return False
@@ -184,7 +376,7 @@ class GameActions:
         return True
 
     def teleport_item(self, item_color_name: str) -> bool:
-        for _ in range(2):
+        for _ in range(GAME_TIMING.teleport_double_click_count):
             if not self.use_item(item_color_name):
                 logger.error(f"Failed to use {item_color_name}")
                 return False

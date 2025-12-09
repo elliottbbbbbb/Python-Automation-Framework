@@ -5,7 +5,7 @@ from osrsbot.app.calibration import Calibrator
 from osrsbot.controllers.runner import ScriptRunner
 from osrsbot.scripts.green_dragons import GreenDragonsBot
 from osrsbot.scripts.guns import guns_script
-from osrsbot.scripts.test import test_script 
+from osrsbot.scripts.test import test_script
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +29,6 @@ def get_valid_int(prompt: str, default: int) -> int:
 
 
 def main() -> None:
-    # Set up basic logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -43,7 +42,7 @@ def main() -> None:
         print("2. Run Green Dragons Script")
         print("3. Run Guns Script (Pickpocketing)")
         print("4. Test Script")
-        print("5. Dev")
+        print("5. Test Template Matching - Click All 28 Inventory Slots")
 
         choice = input("\nSelect: ").strip()
 
@@ -122,18 +121,18 @@ def main() -> None:
                 sys.exit(1)
 
         elif choice == "5":
-            # Dev Mode
-            logger.info("Starting Dev mode")
+            # Template Matching Test
+            logger.info("Starting template matching test")
             try:
                 config = Config()
                 window_title = config.get_window_title()
-                runs = 500
-                bank = "GE"
+                runs = get_valid_int(
+                    "Number of runs [default: 1]: ", default=1)
 
                 runner = ScriptRunner(window_title)
-                runner.run_script(test_script, bank_location=bank, runs=runs)
+                runner.run_script(test_script, bank_location="", runs=runs)
             except Exception as e:
-                logger.error(f"Dev mode failed: {e}", exc_info=True)
+                logger.error(f"Template matching test failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
                 sys.exit(1)
 

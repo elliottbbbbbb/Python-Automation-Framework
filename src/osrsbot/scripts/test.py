@@ -1,65 +1,72 @@
 import time
 import logging
-# Assuming these imports are available in your runner environment
 from osrsbot.models.state import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
 
 logger = logging.getLogger(__name__)
 
-# NOTE: The 'interface' object is assumed to be an instance of GameInterface 
-# passed by your script runner.
+
 def test_script(
-    interface, 
-    state: GameState, 
-    actions: Actions, 
-    config: Config, 
-    bank_location: str = "GE", 
+    interface,
+    state: GameState,
+    actions: Actions,
+    config: Config,
+    bank_location: str = "GE",
     runs: int = 10
 ) -> None:
     """
-    Standalone function for testing core functionality, including the window 
-    bounds refresh fix.
+    Test template matching by clicking all 28 inventory slots.
+
+    This validates:
+    - Inventory grid detection
+    - Slot position calculation
+    - Coordinate conversion (relative → absolute)
+    - Template caching
     """
-    print(f"\n=== Starting Test Script ({runs} runs) ===")
-    
-    # 1. CRITICAL FIX: REFRESH WINDOW BOUNDS
-    # This function uses the 'interface' dependency to get the new position
-    # and updates the 'ScreenService' instance accessible via 'state'.
-    try:
-        logger.info("Refreshing window bounds...")
-        
-        # Assumes interface.get_current_window_bounds() is implemented to talk to the OS
-        new_bounds = interface.get_window_position() 
-        
-        # Assumes state exposes the screen service via 'state.screen' 
-        # which has the set_window_bounds method.
-        state.screen.set_window_bounds(*new_bounds)
-         
-        
-        logger.info(f"Window bounds successfully set to: {new_bounds}")
-    except Exception as e:
-        logger.error(f"Failed to refresh window bounds: {e}. Mouse clicks will likely fail.", exc_info=True)
-        return # Stop script if bounds cannot be set safely
+    print(f"\n{'='*60}")
+    print("TEMPLATE MATCHING TEST - CLICK ALL 28 INVENTORY SLOTS")
+    print(f"{'='*60}")
+    print("\n📋 This test will:")
+    print("  1. Detect the inventory grid using template matching")
+    print("  2. Calculate all 28 slot positions mathematically")
+    print("  3. Click each slot in order (1-28)")
+    print("  4. Show ✅/❌ for each slot\n")
+    print("⚠️  Make sure your OSRS window is visible and inventory is open!")
+    print(f"   Runs: {runs}\n")
 
-    # 2. EXECUTE TEST LOOP LOGIC
+    input("Press ENTER to start...")
+
     for run in range(runs):
-        # Refresh bounds every iteration to handle window movement
-        try:
-            new_bounds = interface.get_window_position()
-            if state.screen and new_bounds != state.screen.window_bounds:
-                logger.info(f"Window moved, updating bounds: {new_bounds}")
-                state.screen.set_window_bounds(*new_bounds)
-        except Exception as e:
-            logger.warning(f"Failed to refresh bounds: {e}")
+        print(f"\n{'='*60}")
+        print(f"RUN {run + 1}/{runs}")
+        print(f"{'='*60}\n")
 
-        hp = state.get_health()
-        print(f"Run {run + 1}/{runs}: Current HP = {hp}")
+        for slot in range(1, 29):
+            try:
+                logger.info(f"Run {run + 1}/{runs} - Clicking slot {slot}/28")
+                print(f"  📍 Slot {slot:02d}/28", end="", flush=True)
 
-        # Corrected coordinate lookup syntax and action call
-        #actions.click_coordinate(("ui", "settings"), "curved")
-        logger.info("Clicking at yellow tile marker")
-        actions.click_color("yellow_tile_marker")
-        time.sleep(3.5)
+                success = actions.click_inventory_slot_detected(slot)
 
-    print("\n✅ Test script complete.")
+                if success:
+                    print(" ✅")
+                else:
+                    print(" ❌ (detection failed)")
+                    logger.warning(f"Failed to click slot {slot}")
+
+                time.sleep(0.1)  # Small delay between clicks
+
+            except Exception as e:
+                logger.error(f"Error clicking slot {slot}: {e}", exc_info=True)
+                print(f" ❌ Error: {e}")
+
+        if run < runs - 1:
+            print(f"\n⏸️  Run {run + 1} complete. Next run in 2 seconds...")
+            time.sleep(2)
+
+    print(f"\n{'='*60}")
+    print("✅ TEST COMPLETE!")
+    print(f"{'='*60}\n")
+
+
