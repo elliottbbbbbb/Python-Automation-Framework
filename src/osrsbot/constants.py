@@ -315,6 +315,13 @@ class ColorDetectionConfig:
     hex_base: int = 16  # Hexadecimal base
     hex_chunk_size: int = 2  # Bytes per color channel
 
+    # Color thresholds for click detection (red vs yellow distinction)
+    # Used to distinguish red clicks (combat/interaction) from yellow clicks (movement)
+    red_channel_min: int = 150  # Minimum red value for red/yellow detection
+    green_channel_max_red: int = 100  # Max green value for red click
+    green_channel_min_yellow: int = 150  # Min green value for yellow click
+    blue_channel_max: int = 100  # Max blue value for red/yellow detection
+
 
 # Global color detection configuration
 COLOR_DETECTION = ColorDetectionConfig()
@@ -347,7 +354,9 @@ class GameTimingConfig:
     dev_mode_runs: int = 500              # Runs for dev/testing mode
 
     # Combat & script loop delays
-    combat_tick: float = 0.6              # OSRS game tick is 0.6s, use 1.0 for safety margin
+    # Combat tick with variance - OSRS game tick is 0.6s
+    # Using tuple range (0.55, 0.68) to add anti-detection variance
+    combat_tick: Tuple[float, float] = (0.55, 0.68)
     kill_log_frequency: int = 5           # Log every N kills to reduce spam
 
     # Test script delays
@@ -506,3 +515,40 @@ class TemplateMatchingConfig:
 
 # Global template matching configuration
 TEMPLATE_MATCHING = TemplateMatchingConfig()
+
+
+# ============================================================================
+# TARGET SELECTION & SMART CLICKING CONSTANTS
+# ============================================================================
+
+@dataclass
+class TargetSelectionConfig:
+    """Configuration for intelligent color-based target selection."""
+
+    # Stuck detection
+    # Detects when bot is repeatedly clicking same location
+    stuck_detection_window: int = 3  # Check last 3 clicks
+    stuck_threshold_pixels: int = 18  # Within 18 pixels = stuck
+
+    # Blacklisting
+    # Temporarily avoid inaccessible locations
+    blacklist_threshold: int = 6  # Blacklist after 6 failed attempts
+    blacklist_duration: float = 12.0  # 12 seconds
+    blacklist_radius: int = 25  # 25 pixel radius around failed location
+
+    # Target locking
+    # Lock onto targets and follow them as they move
+    target_lock_search_radius: int = 60  # Search 60px around locked target (increased for moving NPCs)
+    target_lock_max_age: float = 8.0  # Lock expires after 8 seconds
+
+    # Failure handling
+    # Give up after extended period with no valid targets
+    no_targets_timeout: float = 45.0  # Give up after 45 seconds
+
+    # Distance calculation
+    # Use player position as reference for selecting closest target
+    use_player_center: bool = True  # Use player position for distance calc
+
+
+# Global target selection configuration
+TARGET_SELECTION = TargetSelectionConfig()

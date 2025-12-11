@@ -8,7 +8,7 @@ Demonstrates:
 """
 import logging
 from osrsbot.models.config import Config
-from osrsbot.models.state import GameState
+from osrsbot.queries.game_queries import GameState
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.controllers.runner import ScriptRunner
 

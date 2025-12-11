@@ -1,15 +1,25 @@
 """
 GameActions - High-level game actions using service layer.
 
-This is where you write game-specific actions like:
-- Banking
-- Teleporting
-- Attacking NPCs
-- Using items
+Provides game-specific operations that combine multiple services.
+Uses MouseService, ScreenService, TemplateMatchService, etc.
 
-Each action uses the appropriate services (MouseService, ScreenService, etc.)
+Organization:
+- Initialization: Setup with service dependencies
+- Utility & Timing: Wait, coordinate conversion, tracking
+- Inventory & UI Management: Slot clicking, inventory detection
+- Core Clicking & Color Detection: Smart clicking, color-based actions
+- Coordinate-Based Actions: Config-driven clicking
+- Game-Specific Actions: Combat, items, movement
+- Banking Actions: Deposit, search
+- Food/Potion Actions: Eating, drinking
+
+Command-Query Separation:
+- GameActions = Commands (actions that change state)
+- GameState = Queries (read-only state checks)
 """
 import time
+import random
 import logging
 import pyautogui
 from typing import Optional, Tuple, TYPE_CHECKING
@@ -17,12 +27,13 @@ from typing import Optional, Tuple, TYPE_CHECKING
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_match_service import TemplateMatchService
+from osrsbot.services.click_target_tracker import ClickTargetTracker
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
-from osrsbot.constants import COLOR_DETECTION, GAME_TIMING
+from osrsbot.constants import COLOR_DETECTION, GAME_TIMING, TARGET_SELECTION
 
 if TYPE_CHECKING:
-    from osrsbot.models.state import GameState
+    from osrsbot.queries.game_queries import GameState
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +50,8 @@ class GameActions:
     - GameActions = Commands (actions that change state)
     - GameState = Queries (read-only state checks)
     """
+
+    # ==================== Initialization ====================
 
     def __init__(
         self,
@@ -66,18 +79,28 @@ class GameActions:
         self.config = config
         self.state = state
         self.template_service = template_service
+        self._target_tracker = ClickTargetTracker()
+
+    # ==================== Utility & Timing ====================
 
     def wait(self, timing_type: str) -> None:
         delay = self.config.get("timings", timing_type, default=GAME_TIMING.default_wait)
 
-        if not isinstance(delay, (int, float)):
+        # Handle tuple/list ranges for variance (Phase 0 anti-detection)
+        if isinstance(delay, (list, tuple)) and len(delay) == 2:
+            min_delay, max_delay = delay
+            actual_delay = random.uniform(float(min_delay), float(max_delay))
+            logger.debug(f"Wait '{timing_type}': {actual_delay:.2f}s (range: {min_delay}-{max_delay}s)")
+        elif isinstance(delay, (int, float)):
+            actual_delay = float(delay)
+        else:
             logger.warning(
                 f"Invalid timing for '{timing_type}', "
                 f"using {GAME_TIMING.default_wait}s"
             )
-            delay = GAME_TIMING.default_wait
+            actual_delay = GAME_TIMING.default_wait
 
-        time.sleep(float(delay))
+        time.sleep(actual_delay)
 
     def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
         """
@@ -91,6 +114,25 @@ class GameActions:
             (abs_x, abs_y) absolute screen coordinates
         """
         return self.screen.relative_to_absolute(x, y)
+
+    def _get_player_position(self) -> Tuple[int, int]:
+        """
+        Get player position in relative window coordinates.
+
+        In OSRS, the player is always at the center of the game window.
+
+        Returns:
+            (x, y) relative coordinates of player position
+        """
+        _, _, width, height = self.interface.get_bounds()
+        return (width // 2, height // 2)
+
+    def reset_click_tracking(self) -> None:
+        """Clear click history, target locks, and blacklist."""
+        self._target_tracker.reset()
+        logger.debug("Click tracking reset")
+
+    # ==================== Inventory & UI Management ====================
 
     def click_inventory_slot(
         self,
@@ -298,6 +340,8 @@ class GameActions:
         logger.error(f"Failed to open inventory after {max_attempts} attempts")
         return False
 
+    # ==================== Core Clicking & Color Detection ====================
+
     def click_color(
         self,
         color_name: str,
@@ -329,6 +373,175 @@ class GameActions:
         )
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
 
+    def click_color_smart(
+        self,
+        color_name: str,
+        player_position: Optional[Tuple[int, int]] = None,
+        move_style: MovementStyle = "curved",
+        tolerance: Optional[int] = None,
+        enable_target_lock: bool = True,
+        enable_stuck_detection: bool = True,
+        enable_blacklist: bool = True,
+        region: Optional[Tuple[int, int, int, int]] = None
+    ) -> bool:
+        """
+        Intelligently click a color with distance-based selection, stuck detection,
+        target locking, and blacklisting.
+
+        Features:
+        - Selects closest match to player position
+        - Detects stuck clicking (3 attempts at same location)
+        - Locks onto targets and follows them as they move
+        - Temporarily blacklists inaccessible locations
+
+        Args:
+            color_name: Color name from config
+            player_position: Player position (x, y) relative to window.
+                           Defaults to window center if None.
+            move_style: Mouse movement style
+            tolerance: Color matching tolerance (uses config default if None)
+            enable_target_lock: Enable target locking to follow moving NPCs
+            enable_stuck_detection: Enable stuck detection and auto-blacklisting
+            enable_blacklist: Enable blacklist filtering
+            region: Optional search region (x, y, width, height)
+
+        Returns:
+            True if clicked successfully, False if no valid targets found
+        """
+        # Get color from config
+        hex_color = self.config.get("colors", color_name)
+        if not hex_color:
+            logger.warning(f"Color '{color_name}' not in config")
+            return False
+
+        # Get tolerance from config if not specified
+        if tolerance is None:
+            tolerance = self.config.get(
+                "tolerances", "color_match", default=COLOR_DETECTION.default_tolerance
+            )
+            # Ensure tolerance is always an int
+            if tolerance is None:
+                tolerance = COLOR_DETECTION.default_tolerance
+
+        # Get player position (default to window center)
+        if player_position is None:
+            player_position = self._get_player_position()
+
+        # Check for existing target lock
+        search_region = region
+        target_lock = None
+        if enable_target_lock:
+            target_lock = self._target_tracker.get_target_lock()
+            if target_lock:
+                # Search near last locked position
+                logger.debug(
+                    f"Target locked at ({target_lock.x}, {target_lock.y}), "
+                    f"searching within {target_lock.search_radius}px"
+                )
+                # Create search region around locked target
+                search_region = (
+                    max(0, target_lock.x - target_lock.search_radius),
+                    max(0, target_lock.y - target_lock.search_radius),
+                    target_lock.search_radius * 2,
+                    target_lock.search_radius * 2
+                )
+
+        # Find all color matches sorted by distance from player
+        blacklist_checker = None
+        if enable_blacklist:
+            blacklist_checker = self._target_tracker.is_blacklisted
+
+        matches_with_distance = self.screen.find_color_with_distance(
+            hex_color=hex_color,
+            reference_point=player_position,
+            tolerance=tolerance,
+            region=search_region,
+            blacklist_checker=blacklist_checker
+        )
+
+        # Handle no matches found
+        if not matches_with_distance:
+            if target_lock:
+                # Lock expired or target moved out of search radius
+                logger.debug("No matches near locked target, clearing lock and retrying")
+                self._target_tracker.clear_target_lock()
+                # Retry without lock constraint
+                return self.click_color_smart(
+                    color_name=color_name,
+                    player_position=player_position,
+                    move_style=move_style,
+                    tolerance=tolerance,
+                    enable_target_lock=False,  # Disable lock for retry
+                    enable_stuck_detection=enable_stuck_detection,
+                    enable_blacklist=enable_blacklist,
+                    region=region
+                )
+            logger.debug(f"No valid targets found for '{color_name}'")
+            return False
+
+        # Select best target (closest to player)
+        best_match, distance = matches_with_distance[0]
+        logger.debug(
+            f"Selected target at ({best_match.x}, {best_match.y}), "
+            f"distance: {distance:.1f}px from player"
+        )
+
+        # Check for stuck clicking (before clicking)
+        if enable_stuck_detection and self._target_tracker.is_stuck(
+            window=TARGET_SELECTION.stuck_detection_window,
+            threshold_pixels=TARGET_SELECTION.stuck_threshold_pixels
+        ):
+            # Blacklist this location and retry with next best target
+            logger.warning(
+                f"Stuck detected at ({best_match.x}, {best_match.y}), blacklisting"
+            )
+            self._target_tracker.blacklist_location(
+                best_match.x,
+                best_match.y,
+                duration=TARGET_SELECTION.blacklist_duration,
+                radius=TARGET_SELECTION.blacklist_radius
+            )
+            # Clear target lock since we're switching targets
+            self._target_tracker.clear_target_lock()
+            # Retry with blacklist active
+            return self.click_color_smart(
+                color_name=color_name,
+                player_position=player_position,
+                move_style=move_style,
+                tolerance=tolerance,
+                enable_target_lock=enable_target_lock,
+                enable_stuck_detection=enable_stuck_detection,
+                enable_blacklist=True,  # Ensure blacklist is active
+                region=region
+            )
+
+        # Click the target
+        abs_x, abs_y = self._to_absolute(best_match.x, best_match.y)
+        logger.debug(
+            f"Clicking '{color_name}' at relative ({best_match.x}, {best_match.y}) -> "
+            f"absolute ({abs_x}, {abs_y})"
+        )
+
+        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        if not success:
+            return False
+
+        # Record click in history
+        self._target_tracker.add_click(best_match.x, best_match.y)
+
+        # Update target lock
+        if enable_target_lock:
+            self._target_tracker.set_target_lock(
+                best_match.x,
+                best_match.y,
+                search_radius=TARGET_SELECTION.target_lock_search_radius,
+                max_age=TARGET_SELECTION.target_lock_max_age
+            )
+
+        return True
+
+    # ==================== Coordinate-Based Actions ====================
+
     def click_coordinate(
         self,
         coord_path: Tuple[str, ...],
@@ -357,6 +570,8 @@ class GameActions:
             f"absolute ({abs_x}, {abs_y})"
         )
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+
+    # ==================== Game-Specific Actions ====================
 
     def use_item(self, item_color_name: str) -> bool:
         return self.click_color(item_color_name)
@@ -391,6 +606,8 @@ class GameActions:
 
         self.wait("teleport")
         return True
+
+    # ==================== Banking Actions ====================
 
     def bank_deposit_all(self) -> bool:
         if not self.click_coordinate(("ui", "bank_deposit_all")):

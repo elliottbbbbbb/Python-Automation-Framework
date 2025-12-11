@@ -1,5 +1,18 @@
+"""
+GREEN DRAGONS BOT - LEGACY VERSION (DEPRECATED)
+
+⚠️ DEPRECATED: This is the legacy Bot-based implementation.
+⚠️ Use green_dragons_state.py (state machine version) instead.
+
+This file is kept for reference only.
+The Bot-based approach lacks explicit state management and is harder to maintain.
+New bots should use the StateMachineBot framework.
+
+See: src/osrsbot/scripts/green_dragons_state.py
+"""
 import logging
 import time
+import random
 from osrsbot.core.base_bot import Bot
 from osrsbot.constants import GAME_TIMING
 
@@ -13,7 +26,12 @@ class GreenDragonsBot(Bot):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, script_name="Green Dragons Bot")
-        self.hp_threshold = self.config.get("hp_threshold", default=70)
+
+        # Add HP threshold variance (Phase 0 anti-detection)
+        base_threshold = self.config.get("hp_threshold", default=70)
+        variance = random.choice([-5, -3, 0, 3, 5])  # Discrete variance options
+        self.hp_threshold = base_threshold + variance
+        logger.info(f"HP threshold set to {self.hp_threshold} (base: {base_threshold}, variance: {variance:+d})")
 
     def _navigation_and_potions(self) -> None:
         """Handles the initial movement and potion usage phase."""
@@ -58,7 +76,9 @@ class GreenDragonsBot(Bot):
                     if kills % GAME_TIMING.kill_log_frequency == 0:
                         logger.debug(f"Kills: {kills}")
 
-            time.sleep(GAME_TIMING.combat_tick)
+            # Combat tick with variance (Phase 0 anti-detection)
+            tick_delay = random.uniform(*GAME_TIMING.combat_tick)
+            time.sleep(tick_delay)
 
         logger.info(f"Inventory full, kills: {kills}")
 
