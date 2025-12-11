@@ -6,10 +6,11 @@ import pytesseract
 
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MouseConfig
+from osrsbot.services.virtual_mouse_service import VirtualMouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.ocr_service import OCRService
 from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.models.state import GameState
+from osrsbot.queries.game_queries import GameState
 from osrsbot.controllers.actions import GameActions
 from osrsbot.models.config import Config
 
@@ -132,7 +133,13 @@ class ScriptRunner:
 
         try:
             logger.debug("Initializing GameState")
-            self.state = GameState(self.interface, self.config, self.ocr, self.screen)
+            self.state = GameState(
+                self.interface,
+                self.config,
+                self.ocr,
+                self.screen,
+                self.template_service
+            )
             logger.info("GameState initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize GameState: {e}", exc_info=True)
@@ -156,6 +163,33 @@ class ScriptRunner:
 
         logger.info("ScriptRunner initialization complete")
 
+    def _execute_with_error_handling(
+            self,
+            script_name: str,
+            executable: Callable[[], None]) -> None:
+        """
+        Execute a script with standardized error handling and logging.
+
+        Args:
+            script_name: Name of the script for logging
+            executable: Callable that executes the script logic
+
+        Raises:
+            KeyboardInterrupt: If user interrupts execution
+            Exception: If script execution fails
+        """
+        try:
+            executable()
+            logger.info(f"Script '{script_name}' completed successfully")
+        except KeyboardInterrupt:
+            logger.warning(f"Script '{script_name}' interrupted by user")
+            raise
+        except Exception as e:
+            logger.error(
+                f"Script '{script_name}' failed with error: {e}",
+                exc_info=True)
+            raise Exception(f"Script '{script_name}' failed: {e}") from e
+
     def run_script(
             self,
             script: Union[Callable, type, "Bot"],
@@ -172,14 +206,12 @@ class ScriptRunner:
         """
         from osrsbot.core.base_bot import Bot
 
-        # Determine if it's a bot class/instance or a function
         if isinstance(script, type) and issubclass(script, Bot):
-            # It's a Bot class - instantiate it
             script_name = script.__name__
             logger.info(f"Starting bot class: {script_name}")
             logger.debug(f"Bot arguments: {kwargs}")
 
-            try:
+            def execute_bot_class():
                 bot_instance = script(
                     interface=self.interface,
                     state=self.state,
@@ -187,57 +219,34 @@ class ScriptRunner:
                     config=self.config
                 )
                 bot_instance.run(**kwargs)
-                logger.info(f"Bot '{script_name}' completed successfully")
-            except KeyboardInterrupt:
-                logger.warning(f"Bot '{script_name}' interrupted by user")
-                raise
-            except Exception as e:
-                logger.error(
-                    f"Bot '{script_name}' failed with error: {e}",
-                    exc_info=True)
-                raise Exception(f"Bot '{script_name}' failed: {e}") from e
+
+            self._execute_with_error_handling(script_name, execute_bot_class)
 
         elif isinstance(script, Bot):
-            # It's already a Bot instance
             script_name = script.script_name
             logger.info(f"Starting bot instance: {script_name}")
             logger.debug(f"Bot arguments: {kwargs}")
 
-            try:
+            def execute_bot_instance():
                 script.run(**kwargs)
-                logger.info(f"Bot '{script_name}' completed successfully")
-            except KeyboardInterrupt:
-                logger.warning(f"Bot '{script_name}' interrupted by user")
-                raise
-            except Exception as e:
-                logger.error(
-                    f"Bot '{script_name}' failed with error: {e}",
-                    exc_info=True)
-                raise Exception(f"Bot '{script_name}' failed: {e}") from e
+
+            self._execute_with_error_handling(script_name, execute_bot_instance)
 
         elif callable(script):
-            # It's a function (legacy support)
             script_name = script.__name__ if hasattr(
                 script, '__name__') else 'unknown'
             logger.info(f"Starting script function: {script_name}")
             logger.debug(f"Script arguments: {kwargs}")
 
-            try:
+            def execute_function():
                 script(
                     self.interface,
                     self.state,
                     self.actions,
                     self.config,
                     **kwargs)
-                logger.info(f"Script '{script_name}' completed successfully")
-            except KeyboardInterrupt:
-                logger.warning(f"Script '{script_name}' interrupted by user")
-                raise
-            except Exception as e:
-                logger.error(
-                    f"Script '{script_name}' failed with error: {e}",
-                    exc_info=True)
-                raise Exception(f"Script '{script_name}' failed: {e}") from e
+
+            self._execute_with_error_handling(script_name, execute_function)
 
         else:
             raise TypeError(

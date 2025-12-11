@@ -4,9 +4,10 @@ import sys
 from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
 from osrsbot.controllers.runner import ScriptRunner
-from osrsbot.scripts.green_dragons import GreenDragonsBot
-from osrsbot.scripts.guns import guns_script
-from osrsbot.scripts.test import test_script
+from osrsbot.scripts.legacy.green_dragons import GreenDragonsBot
+from osrsbot.scripts.legacy.guns import guns_script
+from osrsbot.scripts.legacy.test import test_script
+from osrsbot.scripts.test_state_machine_bot import StateMachineTestBot
 logger = logging.getLogger(__name__)
 
 
@@ -44,6 +45,7 @@ def main() -> None:
         print("3. Run Guns Script (Pickpocketing)")
         print("4. Test Script")
         print("5. Test Template Matching - Click All 28 Inventory Slots")
+        print("6. State Machine Test Bot (Click Yellow NPCs)")
 
         choice = input("\nSelect: ").strip()
 
@@ -134,6 +136,35 @@ def main() -> None:
                 runner.run_script(test_script, bank_location="", runs=runs)
             except Exception as e:
                 logger.error(f"Template matching test failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "6":
+            # State Machine Test Bot
+            logger.info("Starting State Machine Test Bot")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                runs = get_valid_int(
+                    "Number of runs [default: 1]: ", default=1)
+
+                print("\n🤖 State Machine Test Bot")
+                print("This bot will click yellow NPCs 5 times per cycle.")
+                print("It demonstrates Phase 1 state machine features:")
+                print("  - State transitions (IDLE → CLICK_NPC → COMPLETE)")
+                print("  - Retry logic (keeps clicking until target reached)")
+                print("  - State history tracking")
+                print("  - Timeout protection (30s per state)")
+                print("\nMake sure yellow NPCs are visible in-game!")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(
+                    StateMachineTestBot,
+                    bank_location="",
+                    runs=runs)
+            except Exception as e:
+                logger.error(f"State Machine Test Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
                 sys.exit(1)
 

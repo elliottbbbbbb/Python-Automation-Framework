@@ -1,6 +1,18 @@
+"""
+TEST BOT - LEGACY VERSION (DEPRECATED)
+
+⚠️ DEPRECATED: This is the legacy function-based implementation.
+⚠️ Use test_state_machine_bot.py (state machine version) instead.
+
+This file is kept for reference only.
+The function-based approach is harder to maintain and test.
+New bots should use the StateMachineBot framework.
+
+See: src/osrsbot/scripts/test_state_machine_bot.py
+"""
 import time
 import logging
-from osrsbot.models.state import GameState
+from osrsbot.queries.game_queries import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
 from osrsbot.constants import GAME_TIMING

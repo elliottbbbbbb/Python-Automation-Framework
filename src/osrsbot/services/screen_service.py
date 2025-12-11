@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Tuple, Optional, List, Union, Dict, Any, Callable
 
@@ -11,6 +12,7 @@ import pyautogui
 from PIL import Image
 
 from osrsbot.constants import COLOR_DETECTION
+from osrsbot.utils.color_helpers import hex_to_rgb
 
 logger = logging.getLogger(__name__)
 
@@ -113,14 +115,6 @@ class ScreenService:
             return None
 
     # ==================== Color Helpers ====================
-    def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
-        hex_color = hex_color.lstrip("#")
-        chunk_size = COLOR_DETECTION.hex_chunk_size
-        r = int(hex_color[0:chunk_size], COLOR_DETECTION.hex_base)
-        g = int(hex_color[2:2 + chunk_size], COLOR_DETECTION.hex_base)
-        b = int(hex_color[4:4 + chunk_size], COLOR_DETECTION.hex_base)
-        return (r, g, b)
-
     def _color_matches(
         self,
         color1: Tuple[int, int, int],
@@ -147,37 +141,120 @@ class ScreenService:
         region: Optional[Tuple[int, int, int, int]] = None,
         find_all: bool = False,
     ) -> Optional[Union[ColorMatch, List[ColorMatch]]]:
-        """Find pixel(s) matching a color in the given region (or full window)."""
-        target = self._hex_to_rgb(hex_color)
+        """
+        Find pixel(s) matching a color in the given region (or full window).
+
+        Uses NumPy vectorized operations for 10-100x speed improvement over pixel iteration.
+        """
+        target = hex_to_rgb(hex_color)
         try:
             screenshot = self.capture(region=region)
-            pixels = screenshot.load()
-            if pixels is None:
-                logger.error("Failed to load screenshot pixels")
-                return None
+            # Convert PIL image to NumPy array (much faster than pixel access)
+            img_array = np.array(screenshot)
+
+            # Calculate region offset for coordinate correction
+            region_offset_x = region[0] if region else 0
+            region_offset_y = region[1] if region else 0
+
+            # Vectorized color matching using NumPy broadcasting
+            # Compare all pixels at once instead of nested loops
+            r_match = np.abs(img_array[:, :, 0].astype(int) - target[0]) <= tolerance
+            g_match = np.abs(img_array[:, :, 1].astype(int) - target[1]) <= tolerance
+            b_match = np.abs(img_array[:, :, 2].astype(int) - target[2]) <= tolerance
+
+            # Combine RGB matches (all channels must match)
+            color_mask = r_match & g_match & b_match
+
+            # Get coordinates of matching pixels
+            # Note: np.where returns (y_coords, x_coords) so we need to swap
+            y_coords, x_coords = np.where(color_mask)
+
+            if len(x_coords) == 0:
+                return None if not find_all else []
 
             matches: List[ColorMatch] = []
-            for x in range(screenshot.width):
-                for y in range(screenshot.height):
-                    pixel = pixels[x, y][:3]  # type: ignore
-                    pixel_rgb: Tuple[int, int, int] = (
-                        pixel[0], pixel[1], pixel[2]  # type: ignore
-                    )
-                    if self._color_matches(pixel_rgb, target, tolerance):
-                        cm = ColorMatch(
-                            x=x,
-                            y=y,
-                            confidence=self._color_similarity(pixel_rgb, target),
-                            color=pixel_rgb
-                        )
-                        if not find_all:
-                            return cm
-                        matches.append(cm)
 
-            return matches if find_all else None
+            # If find_all is False, just return first match
+            if not find_all:
+                x, y = int(x_coords[0]), int(y_coords[0])
+                pixel_rgb = tuple(img_array[y, x, :3].tolist())
+                return ColorMatch(
+                    x=x + region_offset_x,  # Correct for region offset
+                    y=y + region_offset_y,
+                    confidence=self._color_similarity(pixel_rgb, target),
+                    color=pixel_rgb  # type: ignore
+                )
+
+            # Build all matches
+            for i in range(len(x_coords)):
+                x, y = int(x_coords[i]), int(y_coords[i])
+                pixel_rgb = tuple(img_array[y, x, :3].tolist())
+                matches.append(ColorMatch(
+                    x=x + region_offset_x,  # Correct for region offset
+                    y=y + region_offset_y,
+                    confidence=self._color_similarity(pixel_rgb, target),
+                    color=pixel_rgb  # type: ignore
+                ))
+
+            return matches
         except Exception:
             logger.exception("find_color failed")
             return None
+
+    def find_color_with_distance(
+        self,
+        hex_color: str,
+        reference_point: Tuple[int, int],
+        tolerance: int = COLOR_DETECTION.default_tolerance,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        blacklist_checker: Optional[Any] = None
+    ) -> List[Tuple[ColorMatch, float]]:
+        """
+        Find all color matches sorted by distance from reference point.
+
+        Args:
+            hex_color: Target color as hex string
+            reference_point: (x, y) to calculate distance from (relative coords)
+            tolerance: Color matching tolerance
+            region: Optional search region (x, y, width, height)
+            blacklist_checker: Optional callable(x, y) -> bool to filter blacklisted
+
+        Returns:
+            List of (ColorMatch, distance) tuples, sorted by distance (closest first)
+        """
+        # Find all color matches
+        matches = self.find_color(
+            hex_color=hex_color,
+            tolerance=tolerance,
+            region=region,
+            find_all=True
+        )
+
+        if not matches or not isinstance(matches, list):
+            return []
+
+        # Calculate distance from reference point for each match
+        matches_with_distance: List[Tuple[ColorMatch, float]] = []
+        ref_x, ref_y = reference_point
+
+        for match in matches:
+            # Filter out blacklisted locations if checker provided
+            if blacklist_checker and blacklist_checker(match.x, match.y):
+                continue
+
+            # Calculate Euclidean distance from reference point
+            distance = ((match.x - ref_x) ** 2 + (match.y - ref_y) ** 2) ** 0.5
+            matches_with_distance.append((match, distance))
+
+        # Sort by distance (ascending - closest first)
+        matches_with_distance.sort(key=lambda item: item[1])
+
+        logger.debug(
+            f"Found {len(matches_with_distance)} color matches "
+            f"sorted by distance from ({ref_x}, {ref_y})"
+        )
+
+        return matches_with_distance
 
     def get_pixel_color(self, x: int, y: int, relative: bool = True) -> Tuple[int, int, int]:
         """Return absolute RGB pixel color (uses pyautogui.pixel)."""
@@ -268,4 +345,38 @@ class ScreenService:
                 self.vision.invalidate_cache()
             except Exception:
                 logger.exception("invalidate_vision_cache failed")
+
+    def wait_for_color(
+        self,
+        hex_color: str,
+        timeout: float = 10.0,
+        check_interval: float = 0.5,
+        tolerance: int = COLOR_DETECTION.default_tolerance,
+        region: Optional[Tuple[int, int, int, int]] = None
+    ) -> Optional[ColorMatch]:
+        """
+        Wait for a color to appear on screen within a timeout period.
+
+        Args:
+            hex_color: Target color in hex format (e.g., "#FF0000")
+            timeout: Maximum time to wait in seconds
+            check_interval: Time between checks in seconds
+            tolerance: Color matching tolerance
+            region: Optional region to search within (x, y, w, h)
+
+        Returns:
+            ColorMatch if found within timeout, None otherwise
+        """
+        start_time = time.time()
+
+        while (time.time() - start_time) < timeout:
+            match = self.find_color(hex_color, tolerance, region)
+            if match:
+                logger.debug(f"Color {hex_color} found at ({match.x}, {match.y})")
+                return match
+
+            time.sleep(check_interval)
+
+        logger.debug(f"Color {hex_color} not found within {timeout}s")
+        return None
 

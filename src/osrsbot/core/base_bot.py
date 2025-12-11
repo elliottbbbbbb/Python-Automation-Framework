@@ -1,24 +1,30 @@
 import time
 import logging
-from typing import Callable, Optional
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Optional
 
-from osrsbot.models.state import GameState
+from osrsbot.queries.game_queries import GameState
 from osrsbot.models.config import Config
 from osrsbot.controllers.actions import GameActions as Actions
 from osrsbot.constants import GAME_TIMING
 
+if TYPE_CHECKING:
+    from osrsbot.core.game_interface import GameInterface
+
 logger = logging.getLogger(__name__)
 
 
-class Bot:
+class Bot(ABC):
     """
-    Base Bot Class providing the core orchestration, dependency injection,
-    and run loop for all individual bot scripts.
+    Abstract base class for all bot scripts.
+
+    Provides core orchestration, dependency injection, and run loop.
+    Child classes must implement the abstract run_cycle() method.
     """
 
     def __init__(
         self,
-        interface: object,  # Assuming interface is an object for window management
+        interface: "GameInterface",
         state: GameState,
         actions: Actions,
         config: Config,
@@ -30,14 +36,18 @@ class Bot:
         self.config = config
         self.script_name = script_name
 
+    @abstractmethod
     def run_cycle(self, bank_location: str, run_number: int) -> None:
         """
         Abstract method representing one full cycle (e.g., combat + banking).
+
         Must be implemented by child classes.
+
+        Args:
+            bank_location: The bank location to use for this cycle
+            run_number: The current run number (0-indexed)
         """
-        raise NotImplementedError(
-            "The 'run_cycle' method must be implemented by the child script class."
-        )
+        pass
 
     def run(self, bank_location: str = "varrock", runs: int = GAME_TIMING.default_runs) -> None:
         """
@@ -53,7 +63,6 @@ class Bot:
                 logger.info(f"Run {run + 1}/{runs} starting")
                 print(f"\n=== Run {run + 1}/{runs} ===")
 
-                # Call the specific script logic implemented in the child class
                 self.run_cycle(bank_location, run)
 
             except KeyboardInterrupt:
@@ -98,7 +107,7 @@ class Bot:
             actions.click_color("purple_item_outline")
             actions.wait("short")
 
-        # Withdraw food (Manta Ray specific logic - can be improved)
+        # TODO: Generalize food withdrawal logic beyond Manta Ray
         actions.wait("medium")
         actions.click_coordinate(("ui", "bank_quantity"))
         actions.wait("medium")

@@ -139,6 +139,14 @@ ocr_debug/
 *.jpg
 *.jpeg
 
+# Video recordings (bot demos, debugging recordings)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+
 # Bot data and logs
 bot_logs/
 screenshots/

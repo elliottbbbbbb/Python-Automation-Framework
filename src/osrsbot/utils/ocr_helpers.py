@@ -1,3 +1,18 @@
+"""
+OCR Helper Utilities - Shape detection and image preprocessing for OCR.
+
+Provides specialized image analysis functions to distinguish problematic digits
+that Tesseract commonly confuses (especially 9 vs 4).
+
+Key Functions:
+- preprocess_for_shape_detection: Prepare images for shape analysis
+- count_holes_and_tail: Analyze digit topology (holes, tails, aspect ratio)
+- looks_like_nine: Heuristic to distinguish 9 from 4
+- flood_label_components: Connected component labeling for hole detection
+
+These functions use morphological operations and connected component analysis
+to supplement OCR when character recognition alone is insufficient.
+"""
 from typing import Tuple
 
 import numpy as np
