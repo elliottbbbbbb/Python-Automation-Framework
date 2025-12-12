@@ -11,7 +11,7 @@ from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.ocr_service import OCRService
 from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.queries.game_queries import GameState
-from osrsbot.controllers.actions import GameActions
+from osrsbot.commands.game_actions import GameActions
 from osrsbot.models.config import Config
 
 if TYPE_CHECKING:
