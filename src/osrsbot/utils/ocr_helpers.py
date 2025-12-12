@@ -16,7 +16,11 @@ to supplement OCR when character recognition alone is insufficient.
 from typing import Tuple
 
 import numpy as np
+<<<<<<< HEAD
+import cv2 as cv
+=======
 from collections import deque as _deque
+>>>>>>> origin/main
 from PIL import ImageOps, ImageFilter, Image
 
 
@@ -34,6 +38,26 @@ def preprocess_for_shape_detection(
     th = arr.mean() * 0.5
     bw = (arr > th).astype(np.uint8)
 
+<<<<<<< HEAD
+    # Morphological closing to fill tiny gaps (OpenCV optimized - 10-100x faster)
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3))
+    closed = cv.morphologyEx(bw, cv.MORPH_CLOSE, kernel)
+    return closed.astype(np.uint8)
+
+
+def flood_label_components(inv: np.ndarray) -> Tuple[np.ndarray, int]:
+    """
+    Connected component labeling using OpenCV (50-200x faster than manual BFS).
+
+    Args:
+        inv: Binary image (background=1, foreground=0)
+
+    Returns:
+        Tuple of (labeled array, number of components)
+    """
+    num_labels, labels = cv.connectedComponents(inv.astype(np.uint8))
+    return labels, num_labels
+=======
     # small closing (dilate then erode) to fill tiny gaps
     padded = np.pad(bw, ((1, 1), (1, 1)), mode='constant', constant_values=0)
     dil = np.zeros_like(bw)
@@ -72,6 +96,7 @@ def flood_label_components(inv: np.ndarray) -> Tuple[np.ndarray, int]:
                             lbl[ny, nx] = label
                             dq.append((ny, nx))
     return lbl, label
+>>>>>>> origin/main
 
 
 def count_holes_and_tail(binary: np.ndarray) -> Tuple[int, float, float]:

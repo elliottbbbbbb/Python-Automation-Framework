@@ -20,13 +20,23 @@ import cv2 as cv
 import numpy as np
 
 from osrsbot.models.config import Config
+<<<<<<< HEAD
+from osrsbot.models.ui_elements import UIElement, UIElementGrid, UIButton
+=======
 from osrsbot.models.ui_elements import UIElement, UIElementGrid
+>>>>>>> origin/main
 from osrsbot.constants import TEMPLATE_MATCHING
 
 logger = logging.getLogger(__name__)
 
 
 # ==================== UI Element Classes ====================
+<<<<<<< HEAD
+# UIElement, UIElementGrid, and UIButton have been moved to osrsbot.models.ui_elements
+# They are imported at the top of this file for use by the service
+
+
+=======
 # UIElement and UIElementGrid have been moved to osrsbot.models.ui_elements
 # They are imported at the top of this file for use by the service
 
@@ -168,6 +178,7 @@ class UIButton:
             return False
 
 
+>>>>>>> origin/main
 class TemplateMatchService:
     """
     Template matching service for OSRS UI element detection.

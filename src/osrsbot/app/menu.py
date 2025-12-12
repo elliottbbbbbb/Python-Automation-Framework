@@ -3,7 +3,11 @@ import sys
 
 from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
+<<<<<<< HEAD
+from osrsbot.core.runner import ScriptRunner
+=======
 from osrsbot.controllers.runner import ScriptRunner
+>>>>>>> origin/main
 from osrsbot.scripts.legacy.green_dragons import GreenDragonsBot
 from osrsbot.scripts.legacy.guns import guns_script
 from osrsbot.scripts.legacy.test import test_script

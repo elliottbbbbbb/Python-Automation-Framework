@@ -333,3 +333,143 @@ class UIElementGrid:
             index = row * self.num_cols + col
             return self.get_element(index)
         return None
+<<<<<<< HEAD
+
+
+class UIButton:
+    """
+    Represents a single UI button (prayer, run, logout, etc.).
+
+    Detects button via template matching and stores center position.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        template_path: str,
+        threshold: float = TEMPLATE_MATCHING.default_threshold,
+        sticky: bool = False,
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds
+    ):
+        """
+        Initialize button template.
+
+        Args:
+            name: Identifier (e.g., "prayer_button", "logout")
+            template_path: Path to template image
+            threshold: Detection confidence threshold (0.0-1.0)
+            sticky: If True, cache detection until TTL expires
+            ttl_seconds: Cache time-to-live in seconds
+        """
+        self.name = name
+        self.template_path = template_path
+        self.threshold = threshold
+        self.sticky = sticky
+        self.ttl_seconds = ttl_seconds
+
+        # Load template image
+        self.template = self._load_template()
+
+        # Detection state
+        self.visible = False
+        self.element: Optional[UIElement] = None
+        self.last_detection_time: float = 0.0
+        self.last_confidence: float = 0.0
+
+    def _load_template(self) -> np.ndarray:
+        """Load template image as grayscale NumPy array."""
+        template_path = Path(self.template_path)
+
+        template = cv.imread(str(template_path), cv.IMREAD_GRAYSCALE)
+
+        if template is None:
+            raise FileNotFoundError(
+                f"Template not found or unreadable: {self.template_path}\n"
+                f"Please ensure the template file exists and is a valid image.\n"
+                f"Expected location: {template_path.absolute()}"
+            )
+
+        logger.debug(
+            f"Loaded template '{self.name}': "
+            f"{template.shape[1]}×{template.shape[0]} pixels"
+        )
+        return template
+
+    def detect(
+        self,
+        img_gray: np.ndarray,
+        force: bool = False
+    ) -> bool:
+        """
+        Detect button in screenshot.
+
+        Args:
+            img_gray: Grayscale screenshot (NumPy array)
+            force: Force re-detection even if cached
+
+        Returns:
+            True if button detected, False otherwise
+        """
+        # Check sticky cache
+        if self.sticky and self.visible and not force:
+            time_since_detection = time.time() - self.last_detection_time
+            if time_since_detection < self.ttl_seconds:
+                logger.debug(
+                    f"{self.name}: Using cached detection "
+                    f"(age: {time_since_detection:.1f}s)"
+                )
+                return True
+
+        # Perform template matching
+        try:
+            # Validate dimensions before matching
+            template_h, template_w = self.template.shape[:2]
+            img_h, img_w = img_gray.shape[:2]
+
+            if template_w > img_w or template_h > img_h:
+                logger.error(
+                    f"{self.name}: Template ({template_w}x{template_h}) is larger than "
+                    f"screenshot ({img_w}x{img_h}). Cannot perform matching."
+                )
+                self.visible = False
+                return False
+
+            res = cv.matchTemplate(img_gray, self.template, cv.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
+
+            if max_val >= self.threshold:
+                x, y = max_loc
+                h, w = self.template.shape
+
+                # Create UIElement for button
+                self.element = UIElement(x, y, x + w, y + h)
+                self.last_confidence = max_val
+                self.last_detection_time = time.time()
+                self.visible = True
+
+                logger.info(
+                    f"{self.name} detected at ({x}, {y}) "
+                    f"with confidence {max_val:.3f}"
+                )
+                return True
+            else:
+                if self.visible:
+                    logger.warning(
+                        f"{self.name} no longer detected "
+                        f"(confidence {max_val:.3f} < {self.threshold})"
+                    )
+                else:
+                    logger.debug(
+                        f"{self.name} not detected "
+                        f"(confidence {max_val:.3f} < {self.threshold})"
+                    )
+
+                self.visible = False
+                return False
+
+        except Exception as e:
+            logger.error(f"Error detecting {self.name}: {e}")
+            self.visible = False
+            return False
+=======
+>>>>>>> origin/main
