@@ -607,3 +607,37 @@ class AntiBanConfig:
 
 # Global anti-ban configuration
 ANTI_BAN = AntiBanConfig()
+
+
+# ============================================================================
+# INVENTORY DETECTION CONSTANTS
+# ============================================================================
+
+@dataclass
+class InventoryConfig:
+    """
+    Configuration for inventory detection system.
+
+    Uses pixel-based detection to identify empty/filled slots.
+    """
+
+    # Total inventory slots in OSRS
+    total_slots: int = 28
+
+    # Default threshold for "full" inventory
+    full_threshold_default: int = 27
+
+    # Cache TTL for inventory state (seconds)
+    detection_cache_ttl: float = 1.0
+
+    # Empty slot background color (OSRS default)
+    # This is the color at the center of an empty inventory slot
+    empty_slot_color: str = "#453c33"
+
+    # Color tolerance for empty slot matching
+    # Higher = more lenient, lower = more strict
+    color_tolerance: int = 15
+
+
+# Global inventory configuration
+INVENTORY = InventoryConfig()

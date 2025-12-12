@@ -10,6 +10,8 @@ from osrsbot.constants import COLOR_DETECTION
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
+    from osrsbot.services.template_match_service import TemplateMatchService
+    from osrsbot.queries.inventory_queries import InventoryState
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,17 @@ class GameState:
         self.ocr_service = ocr_service
         self.screen: Optional["ScreenService"] = screen_service
         self.template_service = template_service
+
+        # Initialize inventory detection if services available
+        if template_service and screen_service:
+            from osrsbot.queries.inventory_queries import InventoryState
+            self.inventory: Optional["InventoryState"] = InventoryState(
+                template_service, screen_service, config
+            )
+            logger.debug("InventoryState initialized successfully")
+        else:
+            self.inventory: Optional["InventoryState"] = None
+            logger.debug("InventoryState not initialized (missing services)")
 
         self._hp_ttl = float(self.config.get("ocr", "hp_ttl", default=0.5))
         self._ocr_window_size = self.config.get(
@@ -375,8 +388,8 @@ class GameState:
         """
         Check if inventory has >= threshold items.
 
-        Uses template matching to detect inventory grid and count filled slots.
-        Falls back to True if template service unavailable (conservative approach).
+        Delegates to InventoryState for detection. Falls back to legacy
+        implementation if InventoryState unavailable (backward compatibility).
 
         Args:
             threshold: Number of items to consider "full" (default 27 out of 28)
@@ -384,6 +397,15 @@ class GameState:
         Returns:
             True if inventory has >= threshold items, False otherwise
         """
+        # Use new InventoryState system if available
+        if self.inventory:
+            try:
+                return self.inventory.is_full(threshold=threshold)
+            except Exception as e:
+                logger.error(f"InventoryState check failed: {e}", exc_info=True)
+                # Fall through to legacy method
+
+        # Legacy fallback (backward compatibility)
         if not self.template_service:
             logger.warning("TemplateMatchService not available, assuming inventory full")
             return True  # Conservative: assume full if can't check
@@ -432,7 +454,7 @@ class GameState:
                         filled_slots += 1
 
             is_full = filled_slots >= threshold
-            logger.debug(f"Inventory check: {filled_slots}/28 slots filled (threshold: {threshold}, full: {is_full})")
+            logger.debug(f"Inventory check (legacy): {filled_slots}/28 slots filled (threshold: {threshold}, full: {is_full})")
             return is_full
 
         except Exception as e:
