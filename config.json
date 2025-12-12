@@ -1,8 +1,10 @@
 {
+  "account_name": "61grouphunt",
   "window_title": "RuneLite - 61grouphunt",
+  "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
   "colors": {
-    "yellow_tile_marker": "#FFFF00",
-    "blue_tile_marker": "#FF00FFFF",
+    "yellow_tile_marker": "#fcfc01",
+    "blue_tile_marker": "#FFFF00",
     "purple_item_outline": "#7d00ff",
     "red_outline": "#FF0000",
     "green_dragon": "#00ffff",
@@ -14,26 +16,27 @@
     "super_combat": "#1e6c0e",
     "ardy_cloak": "#7d666e",
     "mythical_cape": "#aea2a3",
-    "Combat Instructor": "#3A3D4B",
-    "Rat": "#79796E"
+    "empty_inventory_slot": "#4B423A",
+    "combat_indicator_green": "#078B36",
+    "combat_indicator_red": "#63150D"
   },
   "coordinates": {
     "inventory": {
       "slot_1": {
-        "x": 611,
-        "y": 209
+        "x": 591,
+        "y": 257
       },
       "slot_2": {
-        "x": 656,
-        "y": 213
+        "x": 633,
+        "y": 256
       },
       "slot_3": {
-        "x": 697,
-        "y": 215
+        "x": 672,
+        "y": 257
       },
       "slot_4": {
-        "x": 737,
-        "y": 212
+        "x": 715,
+        "y": 258
       },
       "last_slot": {
         "x": 715,
@@ -42,8 +45,8 @@
     },
     "ui": {
       "settings": {
-        "x": 689,
-        "y": 506
+        "x": 687,
+        "y": 509
       },
       "brightness": {
         "x": 712,
@@ -101,13 +104,21 @@
         "w": 27,
         "h": 30
       }
+    },
+    "ocr": {
+      "hp_region": {
+        "x": 527,
+        "y": 79,
+        "width": 35,
+        "height": 20
+      }
     }
   },
   "timings": {
-    "short": 0.5,
-    "medium": 1.0,
-    "long": 3.0,
-    "teleport": 12.0
+    "short": [0.4, 0.7],
+    "medium": [0.8, 1.3],
+    "long": [2.5, 3.8],
+    "teleport": [11.0, 13.0]
   },
   "tolerances": {
     "color_match": 5,
@@ -115,5 +126,63 @@
       0,
       0
     ]
+  },
+  "ocr": {
+    "hp_ttl": 0.1,
+    "window_size": 5
+  },
+  "mouse": {
+    "min_speed": 0.2,
+    "max_speed": 0.6,
+    "overshoot_chance": 0.15,
+    "overshoot_distance": 20,
+    "click_variance": 3,
+    "post_click_delay_min": 0.05,
+    "post_click_delay_max": 0.15
+  },
+  "templates": {
+    "ui_grids": {
+      "inventory": {
+        "path": "templates/inventory.png",
+        "rows": 7,
+        "cols": 4,
+        "threshold": 0.65,
+        "sticky": true,
+        "padding": 5,
+        "border_offset": 3
+      }
+    },
+    "ui_buttons": {
+      "logout": {
+        "path": "templates/logout.png",
+        "threshold": 0.68
+      },
+      "special_attack": {
+        "path": "templates/special_attack.png",
+        "threshold": 0.68
+      },
+      "combat_indicator": {
+        "path": "templates/in_combat.png",
+        "threshold": 0.654,
+        "sticky": false,
+        "ttl_seconds": 0.5
+      },
+      "good_click_1": {
+        "path": "templates/red_1.png",
+        "threshold": 0.49
+      },
+      "good_click_2": {
+        "path": "templates/red_2.png",
+        "threshold": 0.49
+      },
+      "good_click_3": {
+        "path": "templates/red_3.png",
+        "threshold": 0.49
+      },
+      "good_click_4": {
+        "path": "templates/red_4.png",
+        "threshold": 0.49
+      }
+    }
   }
 }

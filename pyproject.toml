@@ -5,13 +5,26 @@ build-backend = "hatchling.build"
 [project]
 name = "osrsbot"
 version = "0.1.0"
-description = "OSRS automation toolkit with calibration, scripts, and CLI runner."
+description = "OSRS automation toolkit with layered architecture for game automation"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Elliott" }]
+keywords = ["osrs", "automation", "bot", "runescape", "gaming"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 
-# runtime deps
+[project.urls]
+Repository = "https://github.com/yourusername/osrsbot"
+Documentation = "https://github.com/yourusername/osrsbot#readme"
+
+# Runtime dependencies
 dependencies = [
   "pyautogui>=0.9.54",
   "PyWinCtl>=0.4; platform_system=='Windows'",
@@ -21,7 +34,16 @@ dependencies = [
   "Pillow>=10.0",
 ]
 
-# command users will run: `osrs-bot`
+# Optional development dependencies
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+]
+
+# CLI command: `osrs-bot`
 [project.scripts]
 osrs-bot = "osrsbot.main:main"
 
