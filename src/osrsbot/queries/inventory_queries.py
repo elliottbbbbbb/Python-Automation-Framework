@@ -12,10 +12,8 @@ All queries are read-only and cached for performance.
 
 import logging
 import time
-from typing import Optional, List, Tuple, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 from dataclasses import dataclass
-
-import numpy as np
 
 from osrsbot.models.config import Config
 from osrsbot.utils.color_helpers import hex_to_rgb, colors_match
@@ -209,14 +207,22 @@ class InventoryState:
         filled_slots: List[int] = []
         empty_slots: List[int] = []
 
-        # Capture current screen
-        img = self.screen.grab_screen()
-        img_gray = self.screen.convert_to_gray(img)
+        # Capture current screen as grayscale for template matching
+        img_gray = self.screen.capture_grayscale()
 
-        # Detect inventory grid
-        inventory_grid = self.template_service.detect_grid("inventory", img_gray, force=True)
+        if img_gray is None:
+            logger.warning("Failed to capture screenshot, returning empty state")
+            return InventorySnapshot(
+                filled_slots=[],
+                empty_slots=list(range(28)),
+                total_items=0,
+                timestamp=time.time()
+            )
 
-        if not inventory_grid or not inventory_grid.detected:
+        # Detect inventory grid using template matching
+        detected = self.template_service.detect_grid("inventory", img_gray, force=True)
+
+        if not detected:
             logger.warning("Inventory grid not detected, returning empty state")
             # All slots empty if inventory not detected
             return InventorySnapshot(
@@ -226,24 +232,34 @@ class InventoryState:
                 timestamp=time.time()
             )
 
+        # Get the grid
+        grid = self.template_service.get_grid("inventory")
+        if not grid or not grid.visible:
+            logger.warning("Inventory grid not visible, returning empty state")
+            return InventorySnapshot(
+                filled_slots=[],
+                empty_slots=list(range(28)),
+                total_items=0,
+                timestamp=time.time()
+            )
+
         # Check each of 28 slots
         for slot_index in range(28):
-            if slot_index >= len(inventory_grid.elements):
+            # Get slot element
+            slot_element = grid.get_element(slot_index)
+            if not slot_element:
                 logger.warning(f"Slot {slot_index} not in grid, marking as empty")
                 empty_slots.append(slot_index)
                 continue
 
-            # Get slot element
-            slot_element = inventory_grid.elements[slot_index]
-
-            # Get center pixel of slot
+            # Get center pixel of slot using ScreenService
             center_x, center_y = slot_element.center
 
-            # Sample pixel color at center (relative to game window)
-            pixel_color = self._get_pixel_color(img, center_x, center_y)
-
-            if pixel_color is None:
-                logger.warning(f"Could not sample slot {slot_index}, marking as empty")
+            try:
+                # Sample pixel color at center (relative to game window)
+                pixel_color = self.screen.get_pixel_color(center_x, center_y, relative=True)
+            except Exception as e:
+                logger.warning(f"Could not sample slot {slot_index}: {e}")
                 empty_slots.append(slot_index)
                 continue
 
@@ -269,38 +285,6 @@ class InventoryState:
             total_items=len(filled_slots),
             timestamp=time.time()
         )
-
-    def _get_pixel_color(
-        self,
-        img: np.ndarray,
-        x: int,
-        y: int
-    ) -> Optional[Tuple[int, int, int]]:
-        """
-        Get pixel color at coordinates.
-
-        Args:
-            img: Screenshot image (BGR format from OpenCV)
-            x: X coordinate (relative to game window)
-            y: Y coordinate (relative to game window)
-
-        Returns:
-            RGB tuple or None if out of bounds
-        """
-        try:
-            # OpenCV uses BGR format, we need RGB
-            # Also note: numpy arrays are indexed [y, x] not [x, y]
-            if 0 <= y < img.shape[0] and 0 <= x < img.shape[1]:
-                bgr_pixel = img[y, x]
-                # Convert BGR to RGB
-                rgb_pixel = (int(bgr_pixel[2]), int(bgr_pixel[1]), int(bgr_pixel[0]))
-                return rgb_pixel
-            else:
-                logger.warning(f"Pixel coordinates out of bounds: ({x}, {y})")
-                return None
-        except Exception as e:
-            logger.error(f"Error sampling pixel at ({x}, {y}): {e}")
-            return None
 
     def clear_cache(self):
         """Clear cached inventory state, forcing fresh scan on next query."""
