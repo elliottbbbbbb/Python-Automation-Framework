@@ -240,12 +240,15 @@ class StateMachineBot(Bot):
         states_executed = 0
 
         while states_executed < max_states:
+<<<<<<< HEAD
             # Check for scheduled break (anti-ban)
             if hasattr(self, 'actions') and self.actions.anti_ban:
                 if self.actions.anti_ban.should_take_break():
                     logger.info("Anti-ban: Taking scheduled break")
                     self.actions.anti_ban.execute_break()
 
+=======
+>>>>>>> origin/main
             result = self._execute_state(self._current_state)
 
             # Get next state based on result

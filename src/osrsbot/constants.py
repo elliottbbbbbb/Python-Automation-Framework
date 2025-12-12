@@ -551,6 +551,7 @@ class TargetSelectionConfig:
 
 
 # Global target selection configuration
+<<<<<<< HEAD
 TARGET_SELECTION = TargetSelectionConfig()
 
 
@@ -641,3 +642,6 @@ class InventoryConfig:
 
 # Global inventory configuration
 INVENTORY = InventoryConfig()
+=======
+TARGET_SELECTION = TargetSelectionConfig()
+>>>>>>> origin/main
