@@ -552,3 +552,58 @@ class TargetSelectionConfig:
 
 # Global target selection configuration
 TARGET_SELECTION = TargetSelectionConfig()
+
+
+# ============================================================================
+# ANTI-BAN SYSTEM CONSTANTS
+# ============================================================================
+
+@dataclass
+class AntiBanConfig:
+    """
+    Configuration for anti-ban behavioral randomization system.
+
+    Comprehensive anti-detection features:
+    - Scheduled breaks with randomized timing/duration
+    - Micro-breaks between actions (short random pauses)
+    - Session-level behavioral variance (timing/speed multipliers)
+    - Idle actions (mouse jitter, stats checking)
+    - Activity pattern tracking
+
+    All features can be enabled/disabled via config.json.
+    """
+
+    # ========== SCHEDULED BREAKS ==========
+    # Main breaks to prevent fatigue patterns
+    enable_breaks: bool = True
+    break_interval_range: Tuple[float, float] = (1800.0, 3600.0)  # 30-60 minutes
+    break_duration_range: Tuple[float, float] = (120.0, 300.0)    # 2-5 minutes
+
+    # ========== MICRO-BREAKS ==========
+    # Short pauses between actions (random chance)
+    enable_micro_breaks: bool = True
+    micro_break_chance: float = 0.05  # 5% chance per action
+    micro_break_duration_range: Tuple[float, float] = (0.5, 2.0)  # 0.5-2 seconds
+
+    # ========== SESSION VARIANCE ==========
+    # Randomize timing/speed multipliers per session (±15%)
+    # Makes each session feel slightly different
+    enable_session_variance: bool = True
+    timing_variance_range: Tuple[float, float] = (0.85, 1.15)      # ±15% timing
+    mouse_speed_variance_range: Tuple[float, float] = (0.9, 1.1)   # ±10% speed
+
+    # ========== IDLE ACTIONS ==========
+    # Random actions during waiting periods
+    enable_idle_actions: bool = True
+    idle_action_interval: float = 300.0  # Every 5 minutes
+    mouse_jitter_range: Tuple[int, int] = (5, 25)  # 5-25 pixels
+
+    # ========== PATTERN DETECTION ==========
+    # Track actions to avoid repetitive patterns
+    enable_pattern_detection: bool = True
+    pattern_window: int = 10  # Last 10 actions
+    pattern_similarity_threshold: float = 0.8  # 80% similarity = pattern
+
+
+# Global anti-ban configuration
+ANTI_BAN = AntiBanConfig()

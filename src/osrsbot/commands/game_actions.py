@@ -22,7 +22,7 @@ import time
 import random
 import logging
 import pyautogui
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
@@ -56,7 +56,8 @@ class GameActions:
         screen: ScreenService,
         interface: GameInterface,
         config: Config,
-        template_service: Optional[TemplateMatchService] = None
+        template_service: Optional[TemplateMatchService] = None,
+        anti_ban_service: Optional[Any] = None
     ):
         """
         Initialize game actions (Commands in CQRS).
@@ -67,6 +68,7 @@ class GameActions:
             interface: GameInterface for window bounds
             config: Configuration instance
             template_service: Optional TemplateMatchService for UI detection
+            anti_ban_service: Optional AntiBanService for behavioral randomization
 
         Note:
             GameActions implements the Command side of CQRS (actions that change state).
@@ -77,6 +79,7 @@ class GameActions:
         self.interface = interface
         self.config = config
         self.template_service = template_service
+        self.anti_ban = anti_ban_service
         self._target_tracker = ClickTargetTracker()
 
     # ==================== Utility & Timing ====================
@@ -98,7 +101,17 @@ class GameActions:
             )
             actual_delay = GAME_TIMING.default_wait
 
+        # Apply session variance if anti-ban enabled
+        if self.anti_ban:
+            variance = self.anti_ban.get_timing_variance()
+            actual_delay *= variance
+            logger.debug(f"Applied session variance ({variance:.3f}): {actual_delay:.2f}s")
+
         time.sleep(actual_delay)
+
+        # Check for micro-break after delay
+        if self.anti_ban and self.anti_ban.should_micro_break():
+            self.anti_ban.execute_micro_break()
 
     def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
         """

@@ -10,6 +10,7 @@ from osrsbot.services.virtual_mouse_service import VirtualMouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.ocr_service import OCRService
 from osrsbot.services.template_match_service import TemplateMatchService
+from osrsbot.services.anti_ban_service import AntiBanService
 from osrsbot.queries.game_queries import GameState
 from osrsbot.commands.game_actions import GameActions
 from osrsbot.models.config import Config
@@ -145,6 +146,15 @@ class ScriptRunner:
             logger.error(f"Failed to initialize GameState: {e}", exc_info=True)
             raise
 
+        # Initialize anti-ban service
+        try:
+            logger.debug("Initializing AntiBanService")
+            self.anti_ban = AntiBanService(self.config)
+            logger.info("AntiBanService initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize AntiBanService: {e}", exc_info=True)
+            raise
+
         try:
             logger.debug("Initializing GameActions (Commands)")
             self.actions = GameActions(
@@ -152,7 +162,8 @@ class ScriptRunner:
                 self.screen,
                 self.interface,
                 self.config,
-                self.template_service
+                self.template_service,
+                self.anti_ban
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:
