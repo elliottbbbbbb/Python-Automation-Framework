@@ -11,6 +11,7 @@ from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.ocr_service import OCRService
 from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.services.anti_ban_service import AntiBanService
+from osrsbot.services.loot_detection_service import LootDetectionService
 from osrsbot.queries.game_queries import GameState
 from osrsbot.commands.game_actions import GameActions
 from osrsbot.models.config import Config
@@ -146,13 +147,20 @@ class ScriptRunner:
             logger.error(f"Failed to initialize GameState: {e}", exc_info=True)
             raise
 
-        # Initialize anti-ban service
         try:
             logger.debug("Initializing AntiBanService")
             self.anti_ban = AntiBanService(self.config)
             logger.info("AntiBanService initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize AntiBanService: {e}", exc_info=True)
+            raise
+
+        try:
+            logger.debug("Initializing LootDetectionService")
+            self.loot_detection = LootDetectionService(self.screen)
+            logger.info("LootDetectionService initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize LootDetectionService: {e}", exc_info=True)
             raise
 
         try:
@@ -163,7 +171,8 @@ class ScriptRunner:
                 self.interface,
                 self.config,
                 self.template_service,
-                self.anti_ban
+                self.anti_ban,
+                self.loot_detection
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:

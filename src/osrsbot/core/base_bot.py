@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from osrsbot.queries.game_queries import GameState
 from osrsbot.models.config import Config
-from osrsbot.controllers.actions import GameActions as Actions
+from osrsbot.commands.game_actions import GameActions as Actions
 from osrsbot.constants import GAME_TIMING
 
 if TYPE_CHECKING:
@@ -107,7 +107,6 @@ class Bot(ABC):
             actions.click_color("purple_item_outline")
             actions.wait("short")
 
-        # TODO: Generalize food withdrawal logic beyond Manta Ray
         actions.wait("medium")
         actions.click_coordinate(("ui", "bank_quantity"))
         actions.wait("medium")

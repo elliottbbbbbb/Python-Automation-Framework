@@ -53,7 +53,7 @@ class Config:
             "colors": {
                 # Marker
                 "yellow_tile_marker": "#FFFF00",
-                "blue_tile_marker": "#FFFF00",
+                "blue_outline": "#0002cd",
 
                 # Item outlines
                 "purple_item_outline": "#7d00ff",

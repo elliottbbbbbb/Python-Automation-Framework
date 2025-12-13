@@ -1,13 +1,4 @@
-"""
-State Machine Bot - Base class for state-machine driven bots.
-
-Provides a state machine framework for bot scripts with:
-- Explicit state management
-- Retry logic and failover
-- State history tracking
-- Transition guards
-- Recovery mechanisms
-"""
+"""State machine bot - base class for state-driven scripts."""
 import time
 import logging
 from abc import abstractmethod
@@ -28,147 +19,59 @@ logger = logging.getLogger(__name__)
 
 
 class StateMachineBot(Bot):
-    """
-    Base class for state-machine driven bots.
+    """Base class for state-driven bots with retry logic, transitions, and history tracking."""
 
-    Extends Bot with state machine capabilities. Child classes define:
-    - States (enum)
-    - State metadata (retry limits, timeouts, failover)
-    - State transitions (allowed paths through state machine)
-    - State handlers (implementation of each state)
-
-    Example:
-        class MyBotStates(Enum):
-            IDLE = "idle"
-            WORKING = "working"
-            BANKING = "banking"
-
-        class MyBot(StateMachineBot):
-            def define_states(self):
-                return MyBotStates
-
-            def define_state_metadata(self):
-                return {
-                    MyBotStates.IDLE: StateMetadata("Idle", max_retries=1),
-                    MyBotStates.WORKING: StateMetadata("Working", max_retries=3, timeout=60),
-                    MyBotStates.BANKING: StateMetadata("Banking", max_retries=2)
-                }
-
-            def define_transitions(self):
-                return [
-                    StateTransition(MyBotStates.IDLE, MyBotStates.WORKING),
-                    StateTransition(MyBotStates.WORKING, MyBotStates.BANKING),
-                    StateTransition(MyBotStates.BANKING, MyBotStates.IDLE)
-                ]
-
-            def get_initial_state(self):
-                return MyBotStates.IDLE
-
-            def _handle_working(self, context: StateExecutionContext) -> StateResult:
-                # Implementation
-                return StateResult.SUCCESS
-    """
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, debug_ui: bool = False, **kwargs):
         """Initialize state machine bot."""
         super().__init__(*args, **kwargs)
 
-        # State machine configuration (set by child class)
+        # State config
         self._states: Optional[type[Enum]] = None
         self._state_metadata: Dict[Enum, StateMetadata] = {}
         self._transitions: List[StateTransition] = []
         self._current_state: Optional[Enum] = None
 
-        # State execution tracking
-        self._state_history: deque = deque(maxlen=100)  # Limit history for memory efficiency and cycle detection
+        # Tracking
+        self._state_history: deque = deque(maxlen=100)
         self._retry_counts: Dict[Enum, int] = {}
         self._transition_map: Dict[Enum, List[StateTransition]] = {}
 
         # Flags
         self._initialized = False
 
-    # ==================== Abstract Methods (Child Must Implement) ====================
+        # Debug UI
+        self.debug_ui = None
+        if debug_ui:
+            from osrsbot.app.debug_ui import DebugUI
+            self.debug_ui = DebugUI(bot_instance=self)
+            logger.info("Debug UI enabled")
+
+    # Abstract methods (child must implement)
 
     @abstractmethod
     def define_states(self) -> type[Enum]:
-        """
-        Define the state enum for this bot.
-
-        Returns:
-            Enum class containing all states
-
-        Example:
-            class MyStates(Enum):
-                IDLE = "idle"
-                WORKING = "working"
-            return MyStates
-        """
+        """Define the state enum for this bot."""
         pass
 
     @abstractmethod
     def define_state_metadata(self) -> Dict[Enum, StateMetadata]:
-        """
-        Define metadata for each state.
-
-        Returns:
-            Dictionary mapping state → StateMetadata
-
-        Example:
-            return {
-                MyStates.IDLE: StateMetadata(
-                    name="Idle",
-                    max_retries=1,
-                    timeout=None
-                ),
-                MyStates.WORKING: StateMetadata(
-                    name="Working",
-                    max_retries=3,
-                    timeout=60.0,
-                    failover_state=MyStates.RECOVERY
-                )
-            }
-        """
+        """Define metadata for each state (retries, timeout, failover)."""
         pass
 
     @abstractmethod
     def define_transitions(self) -> List[StateTransition]:
-        """
-        Define allowed state transitions.
-
-        Returns:
-            List of StateTransition objects
-
-        Example:
-            return [
-                StateTransition(MyStates.IDLE, MyStates.WORKING),
-                StateTransition(MyStates.WORKING, MyStates.BANKING),
-                StateTransition(MyStates.BANKING, MyStates.IDLE)
-            ]
-        """
+        """Define allowed state transitions."""
         pass
 
     @abstractmethod
     def get_initial_state(self) -> Enum:
-        """
-        Get the initial state for the state machine.
-
-        Returns:
-            Starting state
-
-        Example:
-            return MyStates.IDLE
-        """
+        """Get the starting state."""
         pass
 
-    # ==================== State Machine Core ====================
+    # State machine core
 
     def initialize_state_machine(self) -> None:
-        """
-        Initialize state machine configuration.
-
-        Calls abstract methods to get states, metadata, and transitions.
-        Must be called before run_cycle().
-        """
+        """Initialize state machine (must be called before run_cycle)."""
         if self._initialized:
             logger.warning("State machine already initialized, skipping")
             return
@@ -230,26 +133,37 @@ class StateMachineBot(Bot):
         if not self._initialized:
             self.initialize_state_machine()
 
+        # Check for scheduled break
+        if hasattr(self, 'actions') and self.actions.anti_ban:
+            if self.actions.anti_ban.should_take_break():
+                logger.info("Anti-ban: Scheduled break triggered")
+                self.actions.anti_ban.execute_break()
+
         logger.info(f"Starting state machine cycle {run_number + 1}")
 
         # Reset retry counts for new cycle
         self._retry_counts.clear()
 
-        # Execute state machine until completion or max states reached
-        max_states = 50  # Safety limit to prevent infinite loops
+        # Execute until completion or max states reached
+        max_states = 50  # Safety limit
         states_executed = 0
 
         while states_executed < max_states:
-<<<<<<< HEAD
-            # Check for scheduled break (anti-ban)
+            # Random idle actions between states
             if hasattr(self, 'actions') and self.actions.anti_ban:
-                if self.actions.anti_ban.should_take_break():
-                    logger.info("Anti-ban: Taking scheduled break")
-                    self.actions.anti_ban.execute_break()
+                if self.actions.anti_ban.should_idle_action():
+                    logger.debug("Anti-ban: Triggering idle action")
+                    self.actions.anti_ban.execute_idle_action(
+                        mouse=self.actions.mouse,
+                        actions=self.actions
+                    )
 
-=======
->>>>>>> origin/main
+            # Execute current state
             result = self._execute_state(self._current_state)
+
+            # Record for pattern detection
+            if hasattr(self, 'actions') and self.actions.anti_ban:
+                self.actions.anti_ban.record_action(f"state_{self._current_state.value}")
 
             # Get next state based on result
             next_state = self._get_next_state(self._current_state, result)
@@ -267,18 +181,10 @@ class StateMachineBot(Bot):
         if states_executed >= max_states:
             logger.error(f"State machine exceeded max states ({max_states}), terminating cycle")
 
-    # ==================== State Execution ====================
+    # State execution
 
     def _execute_state(self, state: Enum) -> StateResult:
-        """
-        Execute a single state with retry logic and timeout handling.
-
-        Args:
-            state: State to execute
-
-        Returns:
-            Final StateResult after retries
-        """
+        """Execute state with retry logic and timeout."""
         metadata = self._state_metadata[state]
         retry_count = self._retry_counts.get(state, 0)
 
@@ -420,18 +326,10 @@ class StateMachineBot(Bot):
         logger.warning(f"No valid transition from {current_state.name}, ending cycle")
         return None
 
-    # ==================== State History & Debugging ====================
+    # History & debugging
 
     def get_state_history(self, last_n: Optional[int] = None) -> List[StateHistoryEntry]:
-        """
-        Get state execution history.
-
-        Args:
-            last_n: Return last N entries (None = all)
-
-        Returns:
-            List of StateHistoryEntry
-        """
+        """Get state execution history (last N entries or all)."""
         if last_n is None:
             return list(self._state_history)
         return list(self._state_history)[-last_n:]
@@ -449,3 +347,25 @@ class StateMachineBot(Bot):
         self._current_state = self.get_initial_state()
         self._retry_counts.clear()
         logger.info(f"State machine reset to {self._current_state.name}")
+
+    def run(self, bank_location: str = "ferox", runs: int = 1) -> None:
+        """
+        Execute the bot for a specified number of runs.
+
+        Overrides Bot.run() to manage debug UI lifecycle.
+
+        Args:
+            bank_location: Bank location for runs
+            runs: Number of runs to execute
+        """
+        # Start debug UI if enabled
+        if self.debug_ui:
+            self.debug_ui.start()
+
+        try:
+            # Call parent run() method
+            super().run(bank_location, runs)
+        finally:
+            # Stop debug UI on exit
+            if self.debug_ui:
+                self.debug_ui.stop()

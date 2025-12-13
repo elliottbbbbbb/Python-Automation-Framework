@@ -1,23 +1,4 @@
-"""
-GameActions - High-level game actions using service layer.
-
-Provides game-specific operations that combine multiple services.
-Uses MouseService, ScreenService, TemplateMatchService, etc.
-
-Organization:
-- Initialization: Setup with service dependencies
-- Utility & Timing: Wait, coordinate conversion, tracking
-- Inventory & UI Management: Slot clicking, inventory detection
-- Core Clicking & Color Detection: Smart clicking, color-based actions
-- Coordinate-Based Actions: Config-driven clicking
-- Game-Specific Actions: Combat, items, movement
-- Banking Actions: Deposit, search
-- Food/Potion Actions: Eating, drinking
-
-Command-Query Separation:
-- GameActions = Commands (actions that change state)
-- GameState = Queries (read-only state checks)
-"""
+"""Game actions - clicking, combat, inventory, banking, etc."""
 import time
 import random
 import logging
@@ -30,25 +11,15 @@ from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.services.click_target_tracker import ClickTargetTracker
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
-from osrsbot.constants import COLOR_DETECTION, GAME_TIMING, TARGET_SELECTION
+from osrsbot.constants import COLOR_DETECTION, GAME_TIMING, TARGET_SELECTION, MINIMAP_NAVIGATION
 
 logger = logging.getLogger(__name__)
 
 
 class GameActions:
-    """
-    High-level game actions that combine services.
+    """High-level game actions combining multiple services."""
 
-    This layer provides game-specific operations that encapsulate
-    multiple service calls and domain logic. For state queries,
-    use the GameState service directly.
-
-    Command-Query Separation:
-    - GameActions = Commands (actions that change state)
-    - GameState = Queries (read-only state checks)
-    """
-
-    # ==================== Initialization ====================
+    # Init
 
     def __init__(
         self,
@@ -57,32 +28,20 @@ class GameActions:
         interface: GameInterface,
         config: Config,
         template_service: Optional[TemplateMatchService] = None,
-        anti_ban_service: Optional[Any] = None
+        anti_ban_service: Optional[Any] = None,
+        loot_detection_service: Optional[Any] = None
     ):
-        """
-        Initialize game actions (Commands in CQRS).
-
-        Args:
-            mouse: MouseService instance
-            screen: ScreenService instance
-            interface: GameInterface for window bounds
-            config: Configuration instance
-            template_service: Optional TemplateMatchService for UI detection
-            anti_ban_service: Optional AntiBanService for behavioral randomization
-
-        Note:
-            GameActions implements the Command side of CQRS (actions that change state).
-            For reading game state, use GameState (Query side) directly.
-        """
+        """Initialize actions with services."""
         self.mouse = mouse
         self.screen = screen
         self.interface = interface
         self.config = config
         self.template_service = template_service
         self.anti_ban = anti_ban_service
+        self.loot_detection = loot_detection_service
         self._target_tracker = ClickTargetTracker()
 
-    # ==================== Utility & Timing ====================
+    # Timing & utils
 
     def wait(self, timing_type: str) -> None:
         delay = self.config.get("timings", timing_type, default=GAME_TIMING.default_wait)
@@ -109,57 +68,37 @@ class GameActions:
 
         time.sleep(actual_delay)
 
-        # Check for micro-break after delay
         if self.anti_ban and self.anti_ban.should_micro_break():
             self.anti_ban.execute_micro_break()
 
     def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
-        """
-        Convert relative coords to absolute screen coordinates.
-
-        Args:
-            x: X coordinate relative to window
-            y: Y coordinate relative to window
-
-        Returns:
-            (abs_x, abs_y) absolute screen coordinates
-        """
+        """Convert relative coords to absolute screen coords."""
         return self.screen.relative_to_absolute(x, y)
 
     def _get_player_position(self) -> Tuple[int, int]:
-        """
-        Get player position in relative window coordinates.
-
-        In OSRS, the player is always at the center of the game window.
-
-        Returns:
-            (x, y) relative coordinates of player position
-        """
+        """Get player position (always center of window)."""
         _, _, width, height = self.interface.get_bounds()
         return (width // 2, height // 2)
+
+    def _get_mouse_speed_multiplier(self) -> float:
+        """Get anti-ban mouse speed variance (0.9-1.1x)."""
+        if self.anti_ban:
+            return self.anti_ban.get_mouse_speed_variance()
+        return 1.0
 
     def reset_click_tracking(self) -> None:
         """Clear click history, target locks, and blacklist."""
         self._target_tracker.reset()
         logger.debug("Click tracking reset")
 
-    # ==================== Inventory & UI Management ====================
+    # Inventory & UI
 
     def click_inventory_slot(
         self,
         slot_num: int,
         move_style: MovementStyle = "curved"
     ) -> bool:
-        """
-        Click an inventory slot using config coordinates.
-
-        Args:
-            slot_num: Slot number (1-28)
-            move_style: Mouse movement style
-
-        Returns:
-            True if clicked, False on error
-        """
+        """Click inventory slot (1-28) using config coords."""
         coord = self.config.get("coordinates", "inventory", f"slot_{slot_num}")
 
         if not coord or "x" not in coord or "y" not in coord:
@@ -175,7 +114,7 @@ class GameActions:
             f"Clicking inventory slot {slot_num} at "
             f"relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})"
         )
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
     def click_inventory_slot_detected(
         self,
@@ -183,21 +122,7 @@ class GameActions:
         move_style: MovementStyle = "curved",
         force_detect: bool = False
     ) -> bool:
-        """
-        Click an inventory slot using template matching detection.
-
-        This method detects the inventory grid position dynamically using
-        OpenCV template matching, then calculates the slot position mathematically.
-        It will attempt to open the inventory if it's closed.
-
-        Args:
-            slot_num: Slot number (1-28)
-            move_style: Mouse movement style
-            force_detect: Force re-detection even if cached
-
-        Returns:
-            True if clicked, False on error
-        """
+        """Click inventory slot using template matching (auto-opens inv if closed)."""
         if not self.template_service:
             logger.error(
                 "TemplateMatchService not available. "
@@ -241,7 +166,7 @@ class GameActions:
             f"relative ({rel_x}, {rel_y}) -> absolute ({abs_x}, {abs_y})"
         )
 
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
     def click_ui_button_detected(
         self,
@@ -249,20 +174,7 @@ class GameActions:
         move_style: MovementStyle = "curved",
         force_detect: bool = False
     ) -> bool:
-        """
-        Click a UI button using template matching detection.
-
-        This method detects UI buttons (prayer, run, logout, etc.) dynamically
-        using OpenCV template matching.
-
-        Args:
-            button_name: Name of button to click (e.g., "prayer_button", "run_button")
-            move_style: Mouse movement style
-            force_detect: Force re-detection even if cached
-
-        Returns:
-            True if clicked, False on error
-        """
+        """Click UI button using template matching."""
         if not self.template_service:
             logger.error("TemplateMatchService not available")
             return False
@@ -294,21 +206,10 @@ class GameActions:
             f"relative ({rel_x}, {rel_y}) -> absolute ({abs_x}, {abs_y})"
         )
 
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
     def ensure_inventory_open(self, max_attempts: int = 3) -> bool:
-        """
-        Ensure the inventory interface is open.
-
-        Attempts to detect the inventory. If not detected, clicks the inventory
-        button or presses ESC to close other interfaces, then retries.
-
-        Args:
-            max_attempts: Maximum number of attempts to open inventory
-
-        Returns:
-            True if inventory is open/detected, False otherwise
-        """
+        """Ensure inventory is open (clicks inv button or presses ESC if needed)."""
         if not self.template_service:
             logger.warning(
                 "TemplateMatchService not available. "
@@ -351,7 +252,208 @@ class GameActions:
         logger.error(f"Failed to open inventory after {max_attempts} attempts")
         return False
 
-    # ==================== Core Clicking & Color Detection ====================
+    # Item dropping
+
+    def drop_item(self, slot: int, shift_drop: bool = False) -> bool:
+        """Drop item from inventory slot."""
+        import keyboard
+
+        if not 1 <= slot <= 28:
+            logger.error(f"Invalid slot: {slot}. Must be 1-28")
+            return False
+
+        # Get slot coordinates (try detected first, fall back to config)
+        if self.template_service:
+            if not self.ensure_inventory_open():
+                return False
+
+            img_gray = self.screen.capture_grayscale()
+            if img_gray and self.template_service.detect_grid("inventory", img_gray):
+                position = self.template_service.get_slot_position("inventory", slot - 1)
+                if position:
+                    x, y = position
+                    abs_x, abs_y = self._to_absolute(x, y)
+                else:
+                    logger.error(f"Failed to get position for slot {slot}")
+                    return False
+            else:
+                # Fall back to config coords
+                coord = self.config.get("coordinates", "inventory", f"slot_{slot}")
+                if not coord or "x" not in coord or "y" not in coord:
+                    logger.error(f"No coordinates for slot {slot}")
+                    return False
+                x, y = coord["x"], coord["y"]
+                abs_x, abs_y = self._to_absolute(x, y)
+        else:
+            # Use config coords
+            coord = self.config.get("coordinates", "inventory", f"slot_{slot}")
+            if not coord or "x" not in coord or "y" not in coord:
+                logger.error(f"No coordinates for slot {slot}")
+                return False
+            x, y = coord["x"], coord["y"]
+            abs_x, abs_y = self._to_absolute(x, y)
+
+        if shift_drop:
+            # Shift-drop method (requires RuneLite plugin)
+            keyboard.press('shift')
+            time.sleep(random.uniform(0.02, 0.05))  # Small delay
+
+            self.mouse.click_at(abs_x, abs_y, move_style="curved", speed_multiplier=self._get_mouse_speed_multiplier())
+
+            time.sleep(random.uniform(0.02, 0.05))
+            keyboard.release('shift')
+
+            # Shorter delay for shift-drop
+            delay = random.uniform(0.25, 0.35)
+            if self.anti_ban:
+                delay *= self.anti_ban.get_timing_variance()
+            time.sleep(delay)
+        else:
+            # Right-click drop method
+            pyautogui.rightClick(abs_x, abs_y)
+
+            # Wait for context menu
+            menu_delay = random.uniform(0.05, 0.1)
+            time.sleep(menu_delay)
+
+            # Click "Drop" option (offset down from right-click position)
+            drop_offset_y = random.uniform(38, 42)  # ~40px down
+            pyautogui.click(abs_x, abs_y + drop_offset_y)
+
+            # Standard drop delay with variance
+            delay = random.uniform(0.5, 0.7)
+            if self.anti_ban:
+                delay *= self.anti_ban.get_timing_variance()
+            time.sleep(delay)
+
+        logger.debug(f"Dropped item from slot {slot} ({'shift-drop' if shift_drop else 'right-click'})")
+
+        # Record action for anti-ban
+        if self.anti_ban:
+            self.anti_ban.record_action(f"drop_slot_{slot}")
+
+        return True
+
+    def drop_all_except(self, keep_slots: Optional[list[int]] = None) -> int:
+        """Drop all items except specified slots (randomized order)."""
+        if keep_slots is None:
+            keep_slots = []
+
+        all_slots = list(range(1, 29))
+        drop_slots = [slot for slot in all_slots if slot not in keep_slots]
+
+        # Randomize drop order for anti-ban
+        random.shuffle(drop_slots)
+
+        dropped = 0
+        for slot in drop_slots:
+            # Small chance of misclick (click wrong slot first)
+            if random.random() < 0.02:  # 2% chance
+                wrong_slot = random.choice([s for s in drop_slots if s != slot])
+                logger.debug(f"Anti-ban: Misclick on slot {wrong_slot}")
+                # Just move mouse there, don't actually click
+                coord = self.config.get("coordinates", "inventory", f"slot_{wrong_slot}")
+                if coord:
+                    abs_x, abs_y = self._to_absolute(coord["x"], coord["y"])
+                    pyautogui.moveTo(abs_x, abs_y, duration=random.uniform(0.1, 0.3))
+                    time.sleep(random.uniform(0.1, 0.2))
+
+            if self.drop_item(slot, shift_drop=False):
+                dropped += 1
+
+        logger.info(f"Dropped {dropped} items (kept slots: {keep_slots})")
+        return dropped
+
+    def drop_until_empty_slots(self, target_empty: int, keep_slots: Optional[list[int]] = None) -> int:
+        """Drop items until we have N empty slots."""
+        if keep_slots is None:
+            keep_slots = []
+
+        total_slots = 28
+        current_filled = total_slots - 0  # Assume full for now
+        current_empty = total_slots - current_filled
+
+        if current_empty >= target_empty:
+            logger.debug(f"Already have {current_empty} empty slots (target: {target_empty})")
+            return 0
+
+        to_drop = target_empty - current_empty
+
+        all_slots = list(range(1, 29))
+        drop_slots = [slot for slot in all_slots if slot not in keep_slots]
+        random.shuffle(drop_slots)
+
+        # Drop only the needed amount
+        dropped = 0
+        for slot in drop_slots[:to_drop]:
+            if self.drop_item(slot, shift_drop=False):
+                dropped += 1
+
+        logger.info(f"Dropped {dropped} items to reach {target_empty} empty slots")
+        return dropped
+
+    # Loot pickup
+
+    def pickup_loot(
+        self,
+        player_pos: Optional[Tuple[int, int]] = None,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        tolerance: int = 30
+    ) -> bool:
+        """
+        Pickup nearest loot item (purple highlight from RuneLite).
+
+        Args:
+            player_pos: Player position (x, y). If None, uses default minimap center (654, 111)
+            region: Optional search region (x, y, w, h)
+            tolerance: Color matching tolerance (0-255, default 30)
+
+        Returns:
+            True if loot was found and clicked, False otherwise
+        """
+        if self.loot_detection is None:
+            logger.error("LootDetectionService not initialized - cannot pickup loot")
+            return False
+
+        # Default player position is minimap center
+        if player_pos is None:
+            player_pos = (654, 111)  # Minimap center where player always is
+
+        # Detect nearest loot
+        loot_pos = self.loot_detection.detect_nearest_loot(
+            player_pos=player_pos,
+            region=region,
+            tolerance=tolerance
+        )
+
+        if not loot_pos:
+            logger.debug("No loot found on screen")
+            return False
+
+        # Click the loot
+        loot_x, loot_y = loot_pos
+        abs_x, abs_y = self._to_absolute(loot_x, loot_y)
+
+        logger.info(f"Picking up loot at ({loot_x}, {loot_y})")
+        self.mouse.click_at(
+            abs_x, abs_y,
+            move_style="curved",
+            speed_multiplier=self._get_mouse_speed_multiplier()
+        )
+
+        # Wait for pickup animation (~0.6s with variance)
+        pickup_delay = random.uniform(0.5, 0.7)
+        if self.anti_ban:
+            pickup_delay *= self.anti_ban.get_timing_variance()
+        time.sleep(pickup_delay)
+
+        # Record action for anti-ban
+        if self.anti_ban:
+            self.anti_ban.record_action("pickup_loot")
+
+        return True
+
+    # Color clicking
 
     def click_color(
         self,
@@ -382,7 +484,7 @@ class GameActions:
             f"Found '{color_name}' at relative ({match.x}, {match.y}) -> "
             f"absolute ({abs_x}, {abs_y})"
         )
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
     def click_color_smart(
         self,
@@ -395,50 +497,22 @@ class GameActions:
         enable_blacklist: bool = True,
         region: Optional[Tuple[int, int, int, int]] = None
     ) -> bool:
-        """
-        Intelligently click a color with distance-based selection, stuck detection,
-        target locking, and blacklisting.
-
-        Features:
-        - Selects closest match to player position
-        - Detects stuck clicking (3 attempts at same location)
-        - Locks onto targets and follows them as they move
-        - Temporarily blacklists inaccessible locations
-
-        Args:
-            color_name: Color name from config
-            player_position: Player position (x, y) relative to window.
-                           Defaults to window center if None.
-            move_style: Mouse movement style
-            tolerance: Color matching tolerance (uses config default if None)
-            enable_target_lock: Enable target locking to follow moving NPCs
-            enable_stuck_detection: Enable stuck detection and auto-blacklisting
-            enable_blacklist: Enable blacklist filtering
-            region: Optional search region (x, y, width, height)
-
-        Returns:
-            True if clicked successfully, False if no valid targets found
-        """
-        # Get color from config
+        """Click color with distance-based selection, target locking, stuck detection, and blacklisting."""
         hex_color = self.config.get("colors", color_name)
         if not hex_color:
             logger.warning(f"Color '{color_name}' not in config")
             return False
 
-        # Get tolerance from config if not specified
         if tolerance is None:
             tolerance = self.config.get(
                 "tolerances", "color_match", default=COLOR_DETECTION.default_tolerance
             )
-            # Ensure tolerance is always an int
             if tolerance is None:
                 tolerance = COLOR_DETECTION.default_tolerance
 
-        # Get player position (default to window center)
         if player_position is None:
             player_position = self._get_player_position()
 
-        # Check for existing target lock
         search_region = region
         target_lock = None
         if enable_target_lock:
@@ -449,7 +523,6 @@ class GameActions:
                     f"Target locked at ({target_lock.x}, {target_lock.y}), "
                     f"searching within {target_lock.search_radius}px"
                 )
-                # Create search region around locked target
                 search_region = (
                     max(0, target_lock.x - target_lock.search_radius),
                     max(0, target_lock.y - target_lock.search_radius),
@@ -533,7 +606,7 @@ class GameActions:
             f"absolute ({abs_x}, {abs_y})"
         )
 
-        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
         if not success:
             return False
 
@@ -549,9 +622,13 @@ class GameActions:
                 max_age=TARGET_SELECTION.target_lock_max_age
             )
 
+        # Record action for anti-ban pattern detection
+        if self.anti_ban:
+            self.anti_ban.record_action(f"click_{color_name}")
+
         return True
 
-    # ==================== Coordinate-Based Actions ====================
+    # Coordinate clicking
 
     def click_coordinate(
         self,
@@ -580,9 +657,9 @@ class GameActions:
             f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> "
             f"absolute ({abs_x}, {abs_y})"
         )
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style)
+        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
-    # ==================== Game-Specific Actions ====================
+    # Game actions
 
     def use_item(self, item_color_name: str) -> bool:
         return self.click_color(item_color_name)
@@ -596,6 +673,48 @@ class GameActions:
 
     def click_minimap(self, location_name: str) -> bool:
         return self.click_coordinate(("minimap", location_name))
+
+    def walk_tiles(
+        self,
+        direction: str,
+        tiles: int = 1,
+        move_style: str = "random",
+        wait_time: Optional[float] = None
+    ) -> bool:
+        """Walk N tiles in a direction on minimap (up/down/left/right)."""
+        if direction not in MINIMAP_NAVIGATION.tile_movements:
+            logger.error(f"Invalid direction: {direction}. Use up/down/left/right")
+            return False
+
+        # Get movement delta for direction
+        dx, dy = MINIMAP_NAVIGATION.tile_movements[direction]
+
+        # Calculate target position on minimap (relative to player center)
+        target_x = MINIMAP_NAVIGATION.player_center_x + (dx * tiles)
+        target_y = MINIMAP_NAVIGATION.player_center_y + (dy * tiles)
+
+        logger.info(f"Walking {tiles} tile(s) {direction} to minimap ({target_x}, {target_y})")
+
+        # Convert to absolute screen coordinates and click
+        abs_x, abs_y = self._to_absolute(target_x, target_y)
+        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+
+        if success:
+            # Use configured wait time or default
+            actual_wait = wait_time if wait_time is not None else MINIMAP_NAVIGATION.default_wait_time
+
+            # Add variance for humanization (up to +1 second)
+            variance = time.time() % 1.0
+            total_wait = actual_wait + variance
+
+            logger.debug(f"Waiting {total_wait:.2f}s after minimap click")
+            time.sleep(total_wait)
+
+            # Record action for anti-ban pattern detection
+            if self.anti_ban:
+                self.anti_ban.record_action(f"walk_{direction}_{tiles}")
+
+        return success
 
     def teleport_varrock(self) -> bool:
         """Double-clicks to handle RuneLite menu behavior."""
@@ -618,7 +737,7 @@ class GameActions:
         self.wait("teleport")
         return True
 
-    # ==================== Banking Actions ====================
+    # Banking
 
     def bank_deposit_all(self) -> bool:
         if not self.click_coordinate(("ui", "bank_deposit_all")):
@@ -653,6 +772,7 @@ class GameActions:
         return self.use_item(potion_color_name)
 
     def close_interface(self) -> bool:
+        """Close interface with ESC (may not work with dialog boxes)."""
         pyautogui.press('escape')
         self.wait("short")
         return True

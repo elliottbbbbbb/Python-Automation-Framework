@@ -16,11 +16,7 @@ to supplement OCR when character recognition alone is insufficient.
 from typing import Tuple
 
 import numpy as np
-<<<<<<< HEAD
 import cv2 as cv
-=======
-from collections import deque as _deque
->>>>>>> origin/main
 from PIL import ImageOps, ImageFilter, Image
 
 
@@ -38,7 +34,6 @@ def preprocess_for_shape_detection(
     th = arr.mean() * 0.5
     bw = (arr > th).astype(np.uint8)
 
-<<<<<<< HEAD
     # Morphological closing to fill tiny gaps (OpenCV optimized - 10-100x faster)
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3))
     closed = cv.morphologyEx(bw, cv.MORPH_CLOSE, kernel)
@@ -57,46 +52,6 @@ def flood_label_components(inv: np.ndarray) -> Tuple[np.ndarray, int]:
     """
     num_labels, labels = cv.connectedComponents(inv.astype(np.uint8))
     return labels, num_labels
-=======
-    # small closing (dilate then erode) to fill tiny gaps
-    padded = np.pad(bw, ((1, 1), (1, 1)), mode='constant', constant_values=0)
-    dil = np.zeros_like(bw)
-    for dy in (-1, 0, 1):
-        for dx in (-1, 0, 1):
-            dil |= padded[1 + dy:1 + dy + bw.shape[0],
-                          1 + dx:1 + dx + bw.shape[1]]
-    padded2 = np.pad(dil, ((1, 1), (1, 1)), mode='constant', constant_values=0)
-    ero = np.ones_like(dil)
-    for dy in (-1, 0, 1):
-        for dx in (-1, 0, 1):
-            ero &= padded2[1 + dy:1 + dy + dil.shape[0],
-                           1 + dx:1 + dx + dil.shape[1]]
-    return ero.astype(np.uint8)
-
-
-def flood_label_components(inv: np.ndarray) -> Tuple[np.ndarray, int]:
-    """Simple BFS label (inv is binary background=1 inside bbox) ->
-    returns labeled array and count."""
-    H, W = inv.shape
-    lbl = np.zeros_like(inv, dtype=np.int32)
-    label = 0
-    for iy in range(H):
-        for ix in range(W):
-            if inv[iy, ix] and lbl[iy, ix] == 0:
-                label += 1
-                dq = _deque()
-                dq.append((iy, ix))
-                lbl[iy, ix] = label
-                while dq:
-                    cy, cx = dq.popleft()
-                    for ny, nx in ((cy - 1, cx), (cy + 1, cx),
-                                   (cy, cx - 1), (cy, cx + 1)):
-                        if (0 <= ny < H and 0 <= nx < W and
-                                inv[ny, nx] and lbl[ny, nx] == 0):
-                            lbl[ny, nx] = label
-                            dq.append((ny, nx))
-    return lbl, label
->>>>>>> origin/main
 
 
 def count_holes_and_tail(binary: np.ndarray) -> Tuple[int, float, float]:
