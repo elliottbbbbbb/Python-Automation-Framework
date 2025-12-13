@@ -13,11 +13,7 @@ import logging
 
 from osrsbot.queries.game_queries import GameState
 from osrsbot.models.config import Config
-<<<<<<< HEAD
 from osrsbot.commands.game_actions import GameActions as Actions
-=======
-from osrsbot.controllers.actions import GameActions as Actions
->>>>>>> origin/main
 from osrsbot.constants import GAME_TIMING
 
 logger = logging.getLogger(__name__)

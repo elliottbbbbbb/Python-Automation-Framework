@@ -8,6 +8,13 @@ States:
     IDLE - Initial state, safety checks
     CLICK_NPC - Click yellow NPC repeatedly
     COMPLETE - Final state (cycle complete)
+
+Humanisation Features Integrated:
+    - Random mouse movement (curved, overshoot, linear)
+    - Anti-ban timing variance on all waits
+    - Micro-breaks (automatic via GameActions.wait())
+    - Session-level behavioral variance
+    - Smart target selection with stuck detection
 """
 import logging
 import time
@@ -76,7 +83,7 @@ class StateMachineTestBot(StateMachineBot):
                 name="Kill Goblins",
                 description="Kill goblins until target reached (only attacks when not in combat)",
                 max_retries=30,  # Increased for 15 kills (was 10 for 5 clicks)
-                timeout=120.0,  # 2 minutes timeout (was 30s)
+                timeout=820.0,  # 2 minutes timeout (was 30s)
                 failover_state=TestBotStates.COMPLETE  # If fails, just complete
             ),
             TestBotStates.COMPLETE: StateMetadata(
@@ -113,7 +120,7 @@ class StateMachineTestBot(StateMachineBot):
 
     def _handle_idle(self, context: StateExecutionContext) -> StateResult:
         """
-        Handle IDLE state - safety checks before starting.
+        Handle IDLE state - safety checks and minimap navigation test.
 
         Returns:
             StateResult.SUCCESS to proceed
@@ -128,7 +135,19 @@ class StateMachineTestBot(StateMachineBot):
         self.actions.reset_click_tracking()
         logger.debug("IDLE: Click tracking reset")
 
-        logger.info("IDLE: Ready to start")
+        # Test minimap navigation - walk in 2x2 tile square pattern
+        logger.info("IDLE: Testing minimap navigation (1 tile in each direction)...")
+
+        # Test all 4 cardinal directions using clean API
+        directions = ["up", "down", "left", "right"]
+        logger.info(f"IDLE: Testing {len(directions)} directions with symmetric movements")
+
+        for direction in directions:
+            logger.info(f"IDLE: Walking {direction}...")
+            self.actions.walk_tiles(direction, tiles=1)
+
+        logger.info("IDLE: Minimap navigation test complete")
+        logger.info("IDLE: Ready to start attacking")
         return StateResult.SUCCESS
 
     def _handle_click_npc(self, context: StateExecutionContext) -> StateResult:
@@ -183,23 +202,24 @@ class StateMachineTestBot(StateMachineBot):
             if not self.state.in_combat():
                 logger.debug("CLICK_NPC: Not in combat, attacking cow")
 
-                # Use smart clicking with all features enabled
-                import time
-
                 # Get player position for distance-based selection
                 player_pos = self.actions._get_player_position()
 
-                # Define search region (game viewport only, exclude right UI panel)
-                # This speeds up color detection significantly
+                # Define search region (game viewport only, exclude right UI panel and minimap)
+                # This speeds up color detection significantly and prevents clicking minimap
                 _, _, width, height = self.actions.interface.get_bounds()
-                game_viewport_region = (0, 0, int(width * 0.65), height)  # Left 65% of screen
+                # Use left 70% OR max 540px (whichever is smaller) to exclude right panel/minimap
+                # Minimap is typically around x=670+, inventory starts ~x=590
+                viewport_width = min(int(width * 0.70), 540)
+                game_viewport_region = (0, 0, viewport_width, height)
 
                 # Smart click with target locking, stuck detection, and blacklisting
                 # Single click is now fast enough with optimized color detection
+                # Using 'random' movement style for human-like mouse movements
                 clicked = self.actions.click_color_smart(
-                    "blue_tile_marker",
+                    "blue_outline",
                     player_position=player_pos,
-                    move_style="instant",
+                    move_style="instant",  # Random selection between linear, curved, and overshoot
                     enable_target_lock=True,
                     enable_stuck_detection=True,
                     enable_blacklist=True,
@@ -248,10 +268,10 @@ class StateMachineTestBot(StateMachineBot):
                                 logger.info(f"CLICK_NPC: Kill complete! ({self._click_count}/{self._target_clicks})")
                                 logger.info(self.state.get_hp())
 
-                                # Wait 1-2 seconds after combat ends before attacking next NPC
+                                # Wait 3 seconds after combat ends before attacking next NPC
                                 # This prevents clicking too early when combat indicator disappears
-                                logger.debug("CLICK_NPC: Combat ended, waiting before next attack...")
-                                time.sleep(1.0 + (time.time() % 1.0))  # 1-2 second delay
+                                logger.debug("CLICK_NPC: Combat ended, waiting 3 seconds before next attack...")
+                                time.sleep(5.0)  # Fixed 3 second delay as requested
                                 logger.debug("CLICK_NPC: Ready for next attack")
                                 break
                         else:

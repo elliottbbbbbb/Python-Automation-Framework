@@ -3,11 +3,7 @@ import sys
 
 from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
-<<<<<<< HEAD
 from osrsbot.core.runner import ScriptRunner
-=======
-from osrsbot.controllers.runner import ScriptRunner
->>>>>>> origin/main
 from osrsbot.scripts.legacy.green_dragons import GreenDragonsBot
 from osrsbot.scripts.legacy.guns import guns_script
 from osrsbot.scripts.legacy.test import test_script
@@ -159,14 +155,22 @@ def main() -> None:
                 print("  - Retry logic (keeps clicking until target reached)")
                 print("  - State history tracking")
                 print("  - Timeout protection (30s per state)")
+                print("  - Real-time debug UI")
+                print("\n📝 Logs will be saved to: bot_debug.log")
                 print("\nMake sure yellow NPCs are visible in-game!")
                 input("\nPress Enter to start...")
 
                 runner = ScriptRunner(window_title)
-                runner.run_script(
-                    StateMachineTestBot,
-                    bank_location="",
-                    runs=runs)
+
+                # Manually instantiate bot with debug UI enabled
+                bot = StateMachineTestBot(
+                    interface=runner.interface,
+                    state=runner.state,
+                    actions=runner.actions,
+                    config=runner.config,
+                    debug_ui=True  # Enable debug UI
+                )
+                bot.run(bank_location="", runs=runs)
             except Exception as e:
                 logger.error(f"State Machine Test Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")

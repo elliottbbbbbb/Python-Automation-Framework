@@ -10,11 +10,7 @@ import logging
 from osrsbot.models.config import Config
 from osrsbot.queries.game_queries import GameState
 from osrsbot.core.game_interface import GameInterface
-<<<<<<< HEAD
 from osrsbot.core.runner import ScriptRunner
-=======
-from osrsbot.controllers.runner import ScriptRunner
->>>>>>> origin/main
 
 logger = logging.getLogger(__name__)
 

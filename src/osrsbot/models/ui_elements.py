@@ -333,7 +333,6 @@ class UIElementGrid:
             index = row * self.num_cols + col
             return self.get_element(index)
         return None
-<<<<<<< HEAD
 
 
 class UIButton:
@@ -471,5 +470,3 @@ class UIButton:
             logger.error(f"Error detecting {self.name}: {e}")
             self.visible = False
             return False
-=======
->>>>>>> origin/main

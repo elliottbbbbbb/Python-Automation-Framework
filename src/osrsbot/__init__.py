@@ -3,15 +3,10 @@ OSRS Bot - Automated OSRS gameplay.
 
 Structure:
 - models: Data and state (Config, GameState)
-<<<<<<< HEAD
 - queries: Read operations (GameState queries, CQRS pattern)
 - commands: Write operations (GameActions, CQRS pattern)
 - core: Core infrastructure (ScriptRunner, GameInterface, base bots)
 - app: Application layer (CLI, calibration)
-=======
-- app: Application layer (CLI, calibration)
-- controllers: Business logic (GameActions, ScriptRunner)
->>>>>>> origin/main
 - services: Infrastructure (mouse, screen, OCR, window)
 - scripts: Bot scripts and use cases
 """
@@ -19,15 +14,10 @@ Structure:
 __version__ = "0.1.0"
 
 # Export main components for convenience
-<<<<<<< HEAD
 from osrsbot.models import Config
 from osrsbot.queries import GameState
 from osrsbot.commands import GameActions
 from osrsbot.core.runner import ScriptRunner
-=======
-from osrsbot.models import Config, GameState
-from osrsbot.controllers import GameActions, ScriptRunner
->>>>>>> origin/main
 from osrsbot.app import Calibrator
 
 __all__ = [

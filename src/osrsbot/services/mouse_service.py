@@ -54,7 +54,8 @@ class MouseService:
         x: int,
         y: int,
         style: MovementStyle = "curved",
-        duration: Optional[float] = None
+        duration: Optional[float] = None,
+        speed_multiplier: float = 1.0
     ) -> bool:
         """
         Move mouse to absolute screen coordinates.
@@ -64,6 +65,7 @@ class MouseService:
             y: Target Y coordinate (absolute screen position)
             style: Movement style to use
             duration: Override automatic duration calculation
+            speed_multiplier: Anti-ban speed variance (1.0 = normal, >1.0 = slower, <1.0 = faster)
 
         Returns:
             True if movement successful
@@ -78,6 +80,9 @@ class MouseService:
                     self.config.min_speed,
                     self.config.max_speed
                 ) * (1 + distance / MOUSE_MOVEMENT.distance_factor)
+
+            # Apply anti-ban speed variance
+            duration *= speed_multiplier
 
             if style == "instant":
                 pyautogui.moveTo(x, y, duration=0)
@@ -158,7 +163,8 @@ class MouseService:
         y: int,
         button: Literal["left", "right", "middle"] = "left",
         move_style: MovementStyle = "curved",
-        variance: bool = True
+        variance: bool = True,
+        speed_multiplier: float = 1.0
     ) -> bool:
         """
         Move and click at absolute coordinates.
@@ -172,11 +178,12 @@ class MouseService:
             button: Mouse button to click
             move_style: How to move to target
             variance: Add random offset to click
+            speed_multiplier: Anti-ban speed variance (1.0 = normal, >1.0 = slower, <1.0 = faster)
 
         Returns:
             True if successful
         """
-        if not self.move_to(x, y, style=move_style):
+        if not self.move_to(x, y, style=move_style, speed_multiplier=speed_multiplier):
             return False
 
         time.sleep(random.uniform(

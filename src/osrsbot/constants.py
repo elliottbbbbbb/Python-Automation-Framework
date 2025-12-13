@@ -551,7 +551,6 @@ class TargetSelectionConfig:
 
 
 # Global target selection configuration
-<<<<<<< HEAD
 TARGET_SELECTION = TargetSelectionConfig()
 
 
@@ -642,6 +641,43 @@ class InventoryConfig:
 
 # Global inventory configuration
 INVENTORY = InventoryConfig()
-=======
-TARGET_SELECTION = TargetSelectionConfig()
->>>>>>> origin/main
+
+
+# ============================================================================
+# MINIMAP NAVIGATION CONSTANTS
+# ============================================================================
+
+@dataclass
+class MinimapNavigationConfig:
+    """
+    Configuration for minimap-based tile navigation.
+
+    The minimap in OSRS is centered on the player character.
+    These constants enable precise tile-based movement.
+    """
+
+    # Player position on minimap (always at center)
+    # Based on actual window measurements with 820px width
+    player_center_x: int = 654
+    player_center_y: int = 111
+
+    # Pixels per tile on minimap (approximate)
+    # Based on empirical measurements - symmetric for easy reversing
+    tile_delta_pixels: int = 8
+
+    # Directional movement deltas (symmetric pairs)
+    # Format: (dx, dy) where positive x = right, positive y = down
+    tile_movements: Dict[str, Tuple[int, int]] = field(default_factory=lambda: {
+        "up": (0, -8),      # North
+        "down": (0, 8),     # South
+        "left": (-8, 0),    # West
+        "right": (8, 0),    # East
+    })
+
+    # Default wait time after minimap click (seconds)
+    # Allows character to start moving before next action
+    default_wait_time: float = 3.0
+
+
+# Global minimap navigation configuration
+MINIMAP_NAVIGATION = MinimapNavigationConfig()
