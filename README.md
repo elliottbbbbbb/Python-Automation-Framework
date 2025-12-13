@@ -1,3 +1,16 @@
+# Python Automation Framework
+
+A 5,000+ line Python automation framework built over 6+ months as a self-directed learning project. The focus of this project is clean architecture, state machines, and computer vision applied to a complex, real-world automation problem.
+
+This repository is intended as a **portfolio piece** demonstrating software engineering practices, not as a commercial or production bot.
+
+---
+
+## Overview
+
+This framework automates interaction with a third-party desktop application using computer vision, OCR, and a state-driven execution engine. The system is designed to be modular, testable, and configuration-driven, applying patterns commonly used in production software.
+
+Key goals:
 
 * Practice scalable system design
 * Apply design patterns to a non-trivial domain
