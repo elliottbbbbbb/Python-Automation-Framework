@@ -1,206 +1,121 @@
 # Python Automation Framework
 
-A comprehensive automation framework demonstrating professional software engineering practices, including computer vision, state machine architecture, and service-oriented design.
+A 5,000+ line Python automation framework built over 6+ months as a self-directed learning project. The focus of this project is clean architecture, state machines, and computer vision applied to a complex, real-world automation problem.
+
+This repository is intended as a **portfolio piece** demonstrating software engineering practices, not as a commercial or production bot.
 
 ---
 
-## Project Summary
+## Overview
 
-**5,000+ lines** of production-quality Python code built from scratch as a self-taught learning project. Demonstrates mastery of software design patterns, computer vision techniques, and professional development practices.
+This framework automates interaction with a third-party desktop application using computer vision, OCR, and a state-driven execution engine. The system is designed to be modular, testable, and configuration-driven, applying patterns commonly used in production software.
 
-**Key Skills Demonstrated**:
-- Advanced Python (OOP, type hints, design patterns)
-- Computer vision (OpenCV, OCR, template matching)
-- Software architecture (CQRS, state machines, dependency injection)
-- Service-oriented design with clean interfaces
-- Configuration-driven behavior
-- Comprehensive error handling and logging
+Key goals:
 
-**Note**: This is an educational project that automates interaction with third-party software. Built purely for learning Python, computer vision, and software architecture - never used commercially.
-
----
-
-## Technical Highlights
-
-### Architecture & Design Patterns
-
-- **Service-Oriented Architecture**: 7 specialized services with single responsibilities
-- **CQRS Pattern**: Clean separation of commands (GameActions) and queries (GameState)
-- **State Machine Framework**: Enum-based states with retry logic, timeouts, and failover
-- **Dependency Injection**: All services injected via constructors for testability
-- **Strategy Pattern**: Multiple OCR preprocessing strategies, mouse movement algorithms
-
-### Computer Vision Pipeline
-
-- **Template Matching**: OpenCV-based UI element detection with configurable thresholds
-- **Multi-Strategy OCR**: 5 different preprocessing strategies for robust text recognition
-- **Color Detection**: HSV color space with tolerance-based matching
-- **Coordinate Mapping**: Pixel-perfect transformation between screen spaces
-- **Region Optimization**: ROI limiting for performance
-
-### Behavioral Systems
-
-- **Mouse Humanization**: Bezier curves, overshoot simulation, randomized speeds
-- **Timing Variance**: Gaussian distribution for natural delays
-- **Micro-Break Scheduling**: Random idle periods to prevent repetitive patterns
-- **Smart Target Selection**: Distance-based prioritization with stuck detection
-- **Blacklisting System**: Automatic filtering of problematic targets
+* Practice scalable system design
+* Apply design patterns to a non-trivial domain
+* Write maintainable, self-documenting Python
+* Manage complexity through clear layering and separation of concerns
 
 ---
 
 ## Architecture
 
-### Layered Design
+Layered architecture with strict responsibility boundaries:
 
 ```
-Application Layer (CLI Menu, Calibration Tools)
-    ↓
-Command/Query Layer (CQRS Pattern)
-    ↓
-Core Layer (Bot Framework, State Machine, Game Interface)
-    ↓
-Services Layer (Mouse, Screen, OCR, Template Matching, Anti-Detection)
-    ↓
-Model Layer (Config, State Types, UI Elements)
+Application Layer (CLI, calibration tools)
+→ Command / Query Layer (CQRS)
+→ Core Layer (State Machine, Bot Framework)
+→ Services Layer (Mouse, Screen, OCR, CV, Anti-detection)
+→ Models & Configuration
 ```
 
-### Project Structure
+**Why this matters:**
+
+* Predictable state mutation via CQRS
+* Testable, replaceable services via dependency injection
+* Clear isolation between behavior, perception, and control
+
+---
+
+## Technical Highlights
+
+### Architecture & Design
+
+* State machine framework with retries, timeouts, and failover states
+* CQRS separation between actions (commands) and state inspection (queries)
+* Full dependency injection via constructors
+* Strategy pattern for OCR preprocessing and mouse movement algorithms
+* Configuration-driven behavior using JSON
+
+### Computer Vision
+
+* OpenCV-based template matching with configurable thresholds
+* Multi-strategy OCR preprocessing for improved recognition accuracy
+* HSV color detection with tolerance-based matching
+* Coordinate transformation between screen spaces
+* Region-of-interest limiting for performance
+
+### Behavioral Systems
+
+* Humanized mouse movement using Bezier curves and overshoot simulation
+* Gaussian-distributed timing variance
+* Randomized micro-break scheduling
+* Distance-based target prioritization with stuck detection
+* Automatic blacklisting of problematic targets
+
+---
+
+## Project Structure
 
 ```
 src/osrsbot/
 ├── core/                    # Framework foundation
-│   ├── base_bot.py         # Abstract bot base class
-│   ├── state_machine_bot.py # State machine implementation
-│   ├── game_interface.py   # Window interaction layer
-│   └── runner.py           # Service initialization & orchestration
-├── services/               # Service layer (7 services)
-│   ├── mouse_service.py    # Mouse control with humanization
-│   ├── screen_service.py   # Screenshot and window management
-│   ├── ocr_service.py      # Text recognition (Tesseract integration)
-│   ├── template_match_service.py # Image matching (OpenCV)
-│   ├── anti_ban_service.py # Behavioral randomization
-│   ├── loot_detection_service.py # Object detection
-│   └── minimap_pathfinding_service.py # Navigation
-├── commands/               # CQRS - Write operations
-│   └── game_actions.py     # All state mutations (750+ lines)
-├── queries/                # CQRS - Read operations
-│   └── game_queries.py     # All state queries
-├── models/                 # Data models & configuration
-│   ├── config.py           # JSON configuration management
-│   ├── state_types.py      # State machine type definitions
-│   └── ui_elements.py      # UI element models
+│   ├── base_bot.py
+│   ├── state_machine_bot.py
+│   ├── game_interface.py
+│   └── runner.py
+├── services/               # Service layer
+│   ├── mouse_service.py
+│   ├── screen_service.py
+│   ├── ocr_service.py
+│   ├── template_match_service.py
+│   ├── anti_ban_service.py
+│   ├── loot_detection_service.py
+│   └── minimap_pathfinding_service.py
+├── commands/               # CQRS - write operations
+│   └── game_actions.py
+├── queries/                # CQRS - read operations
+│   └── game_queries.py
+├── models/                 # Configuration and data models
+│   ├── config.py
+│   ├── state_types.py
+│   └── ui_elements.py
 └── scripts/                # Bot implementations
-    └── test_state_machine_bot.py # Example state machine usage
+    └── test_state_machine_bot.py
 ```
 
 ---
 
-## Code Quality & Recent Improvements
+## Code Quality & Refactoring
 
-### Recent Refactoring (December 2024)
+Recent refactoring focused on long-term maintainability:
 
-Completed comprehensive cleanup to remove AI-generated code patterns:
-- **Removed 900+ lines** of duplicate code
-- **Eliminated verbose docstrings** - kept only domain-specific explanations
-- **Removed explanatory comments** - code is now self-documenting
-- **Resolved 6 TODO/FIXME items** - cleaned up technical debt
-- **Simplified defensive code** - removed unnecessary checks
+* Removed 900+ lines of duplicate code
+* Eliminated AI-generated patterns and verbose boilerplate
+* Reduced defensive checks in favor of clear invariants
+* Resolved all TODO/FIXME items
+* Refactored toward small, self-documenting functions
 
-**Result**: Cleaner, more maintainable codebase with professional quality
-
-### Best Practices
-
-- **Type Hints**: Full type annotations throughout (Python 3.10+)
-- **Error Handling**: Try-catch blocks with specific exception types
-- **Logging**: Comprehensive logging with configurable levels
-- **Configuration**: JSON-based, environment-specific settings
-- **Modularity**: Single responsibility principle, clean interfaces
-- **Documentation**: 400+ docstrings for public APIs
-
----
-
-## Technologies Used
-
-### Core Stack
-
-| Technology | Purpose |
-|------------|---------|
-| **Python 3.10+** | Core language with type hints, dataclasses, enums |
-| **OpenCV** | Computer vision, template matching, image processing |
-| **Tesseract OCR** | Text recognition with custom preprocessing |
-| **NumPy** | Array operations, image manipulation |
-| **Pillow** | Screenshot capture, image handling |
-| **PyAutoGUI** | Mouse/keyboard control |
-| **PyWinCtl** | Window management on Windows |
-
-### Development Tools
-
-- **pytest**: Testing framework (expanding coverage)
-- **black**: Code formatting
-- **ruff**: Fast Python linter
-- **mypy**: Static type checker
-
-### Advanced Techniques
-
-- **Bezier Curves**: Natural mouse movement paths
-- **Gaussian Distribution**: Realistic timing randomization
-- **Multi-scale Template Matching**: Robust UI detection
-- **HSV Color Space**: Reliable color detection
-- **Region-of-Interest Processing**: Performance optimization
-
----
-
-## Skills Demonstrated
-
-### Software Engineering
-
-✅ **Design Patterns**: CQRS, State Machine, Strategy, Dependency Injection, Abstract Factory
-✅ **SOLID Principles**: Single responsibility, dependency inversion, interface segregation
-✅ **Clean Code**: Meaningful names, small functions, minimal comments
-✅ **Error Handling**: Graceful degradation, retry logic, failover states
-✅ **Logging**: Structured logging with appropriate levels
-
-### Python Proficiency
-
-✅ **Advanced OOP**: Abstract base classes, inheritance, composition
-✅ **Type System**: Type hints, generics, TYPE_CHECKING imports
-✅ **Modern Features**: Dataclasses, enums, context managers, decorators
-✅ **Best Practices**: List comprehensions, generators, exception hierarchies
-✅ **Package Organization**: Proper module structure, `__init__.py` usage
-
-### Computer Vision
-
-✅ **Template Matching**: Multi-scale matching with threshold tuning
-✅ **OCR Integration**: Multi-strategy preprocessing for accuracy
-✅ **Color Detection**: HSV color space with tolerance
-✅ **Image Processing**: Preprocessing, filtering, coordinate transforms
-✅ **Performance Optimization**: Caching, region limiting, parallel processing
-
-### Problem Solving
-
-✅ **State Management**: Complex state machines with 10+ states
-✅ **Retry Logic**: Exponential backoff, max retry limits
-✅ **Performance**: Profiling bottlenecks, 5x OCR speedup potential identified
-✅ **Behavioral Algorithms**: Distance-based prioritization, stuck detection
-✅ **Debugging**: Extensive logging, state history tracking
+Result: a significantly cleaner and more maintainable codebase.
 
 ---
 
 ## Example: State Machine Bot
 
 ```python
-from osrsbot.core.state_machine_bot import StateMachineBot
-from osrsbot.core.state_types import StateResult, StateMetadata
-from enum import Enum
-
-class MyBotStates(Enum):
-    IDLE = "idle"
-    WORKING = "working"
-    COMPLETE = "complete"
-
 class MyBot(StateMachineBot):
-    """Example bot demonstrating state machine framework."""
-
     def define_states(self) -> type[Enum]:
         return MyBotStates
 
@@ -208,16 +123,13 @@ class MyBot(StateMachineBot):
         return {
             MyBotStates.WORKING: StateMetadata(
                 name="Working",
-                description="Main work loop",
                 max_retries=5,
                 timeout=300.0,
-                failover_state=MyBotStates.COMPLETE
+                failover_state=MyBotStates.COMPLETE,
             ),
         }
 
     def _handle_working(self, context) -> StateResult:
-        """Handle WORKING state."""
-        # Your logic here
         if work_complete:
             return StateResult.SUCCESS
         return StateResult.RETRY
@@ -225,215 +137,50 @@ class MyBot(StateMachineBot):
 
 ---
 
-## Configuration System
+## Configuration
 
-Everything is configured via JSON for easy customization:
+All behavior is controlled via JSON configuration:
 
-```json
-{
-  "window_title": "Application Window",
-  "mouse": {
-    "min_speed": 0.2,
-    "max_speed": 0.6,
-    "overshoot_chance": 0.15,
-    "overshoot_distance": 20,
-    "click_variance": 3
-  },
-  "anti_ban": {
-    "timing_variance": 0.15,
-    "micro_break_chance": 0.05,
-    "micro_break_duration_range": [2, 8]
-  },
-  "templates": {
-    "my_button": {
-      "path": "templates/button.png",
-      "threshold": 0.8,
-      "grayscale": true
-    }
-  },
-  "coordinates": {
-    "ui": {
-      "button_x": 100,
-      "button_y": 200
-    }
-  }
-}
-```
+* Mouse movement and timing
+* Anti-detection behavior
+* Template matching thresholds
+* Coordinates and UI mappings
+
+This allows rapid tuning without code changes.
 
 ---
 
-## Learning Outcomes
+## Technologies Used
 
-Through 6+ months of building this project, I gained practical experience with:
-
-**Architecture & Design**
-- Designing scalable, maintainable systems from scratch
-- Applying design patterns to real-world problems
-- Refactoring legacy code and managing technical debt
-- Making architectural trade-offs (performance vs maintainability)
-
-**Python Development**
-- Advanced language features (type hints, decorators, context managers)
-- Package structure and module organization
-- Professional coding standards and conventions
-- Debugging complex multi-threaded applications
-
-**Computer Vision**
-- OpenCV template matching algorithms
-- OCR preprocessing and optimization
-- Color space conversions and transformations
-- Performance profiling and optimization
-
-**Software Craftsmanship**
-- Writing clean, self-documenting code
-- Comprehensive error handling strategies
-- Logging best practices for debugging
-- Configuration-driven development
+* Python 3.10+
+* OpenCV
+* Tesseract OCR
+* NumPy, Pillow
+* PyAutoGUI, PyWinCtl
+* pytest, black, ruff, mypy
 
 ---
 
 ## Project Metrics
 
-| Metric | Value |
-|--------|-------|
-| **Lines of Code** | ~5,000 |
-| **Number of Modules** | 44 Python files |
-| **Services** | 7 specialized services |
-| **Design Patterns** | 5+ patterns implemented |
-| **Docstrings** | 400+ comprehensive docstrings |
-| **Development Time** | 6+ months |
-| **Code Quality** | Recently refactored, cleaned up AI patterns |
+| Metric           | Value                             |
+| ---------------- | --------------------------------- |
+| Lines of Code    | ~5,000                            |
+| Python Modules   | 44                                |
+| Services         | 7                                 |
+| Design Patterns  | CQRS, State Machine, Strategy, DI |
+| Development Time | 6+ months                         |
 
 ---
 
-## Quick Start
+## Status
 
-### Prerequisites
+Active learning project. Used as a portfolio demonstration of Python proficiency, software architecture, and problem-solving ability.
 
-- Python 3.10 or higher
-- Windows OS (uses Windows-specific APIs)
-- Tesseract OCR installed
-
-### Installation
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/automation-framework.git
-cd automation-framework
-
-# Create virtual environment
-python -m venv venv
-venv\Scripts\activate
-
-# Install dependencies
-pip install -e .
-
-# Create config file
-cp config.example.json config.json
-# Edit config.json with your settings
-```
-
-### Basic Usage
-
-```python
-from osrsbot.core.runner import ScriptRunner
-from osrsbot.scripts.test_state_machine_bot import StateMachineTestBot
-
-# Initialize runner with window title and config
-runner = ScriptRunner("Application Window", "config.json")
-
-# Create bot instance with dependency injection
-bot = StateMachineTestBot(
-    interface=runner.interface,
-    state=runner.state,
-    actions=runner.actions,
-    config=runner.config
-)
-
-# Run automation
-bot.run(runs=10)
-```
+**Last updated:** December 2024
 
 ---
 
-## Testing
+## Disclaimer
 
-```bash
-# Run all tests
-pytest
-
-# Run with coverage report
-pytest --cov=src/osrsbot --cov-report=html
-
-# Run specific test file
-pytest tests/unit/services/test_mouse_service.py -v
-```
-
-**Note**: Test coverage is currently expanding. Priority focus on unit tests for services layer.
-
----
-
-## Future Improvements
-
-**Planned Enhancements**:
-- Expand test coverage to 60%+ (currently <10%)
-- Implement parallel OCR preprocessing (5x speedup)
-- Add web-based monitoring dashboard
-- Cross-platform support (Linux, macOS)
-- Performance profiling tools
-- Configuration validation schema
-
----
-
-## Why This Project Matters (For Job Applications)
-
-This project demonstrates:
-
-✅ **Self-Taught Initiative**: Built from scratch over 6+ months without formal training
-✅ **Problem-Solving**: Solved complex challenges (state management, computer vision, anti-detection)
-✅ **Professional Standards**: Clean architecture, type hints, error handling, logging
-✅ **Real-World Skills**: Same patterns used in production software (CQRS, dependency injection)
-✅ **Code Quality**: Recently refactored to remove AI-generated patterns and improve maintainability
-✅ **Complexity Management**: 5,000 lines organized into clean, modular architecture
-✅ **Continuous Learning**: Applied advanced concepts (computer vision, state machines, design patterns)
-
-**For Employers**: This project shows I can:
-- Learn independently and build complex systems
-- Write professional, maintainable code
-- Apply software engineering best practices
-- Debug and optimize performance
-- Manage technical debt through refactoring
-
----
-
-## Ethical Note & Disclaimer
-
-This project automates interaction with third-party software in ways that may violate the software's terms of service. It was developed **purely as a learning exercise** in Python, computer vision, and software architecture.
-
-**Key Points**:
-- Never used for commercial purposes
-- Never used to gain unfair advantage
-- Built solely to learn programming concepts
-- Serves as portfolio piece demonstrating technical skills
-- Showcases problem-solving and architectural abilities
-
-The value of this project lies in the **technical skills** and **software engineering practices** demonstrated, not in the specific application.
-
----
-
-## License
-
-Educational and portfolio use only.
-
----
-
-## Contact
-
-**GitHub**: [Your GitHub Profile]
-**LinkedIn**: [Your LinkedIn]
-**Email**: Available upon request
-
----
-
-**Project Status**: Active learning project | **Last Updated**: December 2024
-**Purpose**: Portfolio piece demonstrating Python proficiency and software engineering skills
+This project automates interaction with third-party software and may violate terms of service. It was developed strictly for educational purposes and has never been used commercially.
