@@ -7,7 +7,7 @@ from osrsbot.core.runner import ScriptRunner
 from osrsbot.scripts.legacy.green_dragons import GreenDragonsBot
 from osrsbot.scripts.legacy.guns import guns_script
 from osrsbot.scripts.legacy.test import test_script
-from osrsbot.scripts.test_state_machine_bot import StateMachineTestBot
+from osrsbot.scripts.test_state_machine_bot import ComprehensiveTestBot
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +45,7 @@ def main() -> None:
         print("3. Run Guns Script (Pickpocketing)")
         print("4. Test Script")
         print("5. Test Template Matching - Click All 28 Inventory Slots")
-        print("6. State Machine Test Bot (Click Yellow NPCs)")
+        print("6. Comprehensive Test Bot (Tests All Framework Features)")
 
         choice = input("\nSelect: ").strip()
 
@@ -148,22 +148,23 @@ def main() -> None:
                 runs = get_valid_int(
                     "Number of runs [default: 1]: ", default=1)
 
-                print("\n🤖 State Machine Test Bot")
-                print("This bot will click yellow NPCs 5 times per cycle.")
-                print("It demonstrates Phase 1 state machine features:")
-                print("  - State transitions (IDLE → CLICK_NPC → COMPLETE)")
-                print("  - Retry logic (keeps clicking until target reached)")
-                print("  - State history tracking")
-                print("  - Timeout protection (30s per state)")
-                print("  - Real-time debug UI")
+                print("\n🤖 Comprehensive Test Bot")
+                print("This bot tests ALL framework features in sequence:")
+                print("  1. Minimap Navigation (walking in all directions)")
+                print("  2. Inventory Detection (pixel-based slot checking)")
+                print("  3. Inventory Clicking (template-based slot clicking)")
+                print("  4. Color Detection (smart NPC targeting)")
+                print("  5. Template Matching (UI element detection)")
+                print("  6. OCR (HP and stats reading)")
+                print("  7. Combat Detection (10 NPC kills)")
                 print("\n📝 Logs will be saved to: bot_debug.log")
-                print("\nMake sure yellow NPCs are visible in-game!")
+                print("\nMake sure you have NPCs nearby for combat testing!")
                 input("\nPress Enter to start...")
 
                 runner = ScriptRunner(window_title)
 
                 # Manually instantiate bot with debug UI enabled
-                bot = StateMachineTestBot(
+                bot = ComprehensiveTestBot(
                     interface=runner.interface,
                     state=runner.state,
                     actions=runner.actions,
@@ -172,7 +173,7 @@ def main() -> None:
                 )
                 bot.run(bank_location="", runs=runs)
             except Exception as e:
-                logger.error(f"State Machine Test Bot failed: {e}", exc_info=True)
+                logger.error(f"Comprehensive Test Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
                 sys.exit(1)
 
