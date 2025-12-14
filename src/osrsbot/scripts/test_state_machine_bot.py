@@ -348,7 +348,11 @@ class ComprehensiveTestBot(StateMachineBot):
             logger.info("  Testing smart color detection (blue_outline)...")
 
             player_pos = self.actions._get_player_position()
-            _, _, width, height = self.actions.interface.get_bounds()
+            dims = self.state.debug_get_viewport_dimensions()
+            if not dims:
+                logger.error("Failed to get viewport dimensions")
+                return StateResult.FAILURE
+            width, height = dims
             viewport_width = min(int(width * 0.70), 540)
             game_viewport_region = (0, 0, viewport_width, height)
 
@@ -396,21 +400,17 @@ class ComprehensiveTestBot(StateMachineBot):
 
             # Test inventory grid detection
             logger.info("  Testing inventory grid detection...")
-            img_gray = self.screen.capture_grayscale()
+            img_gray = self.state.debug_capture_screen(grayscale=True)
 
             if img_gray is not None:
-                detected = self.actions.template_service.detect_grid(
-                    "inventory",
-                    img_gray,
-                    force=True
-                )
+                detected = self.state.debug_detect_inventory_grid(force=True)
 
                 if detected:
                     logger.info("  ✓ Inventory grid detected successfully")
-                    grid = self.actions.template_service.get_grid("inventory")
-                    if grid:
-                        logger.info(f"    → Grid visible: {grid.visible}")
-                        logger.info(f"    → Total elements: {len(grid.elements)}")
+                    grid_info = self.state.debug_get_inventory_grid_info()
+                    if grid_info:
+                        logger.info(f"    → Grid visible: {grid_info['visible']}")
+                        logger.info(f"    → Total elements: {grid_info['total_elements']}")
                 else:
                     logger.warning("  ⚠ Inventory grid not detected")
 
@@ -485,7 +485,11 @@ class ComprehensiveTestBot(StateMachineBot):
                 logger.debug("  → Not in combat, attacking NPC...")
 
                 player_pos = self.actions._get_player_position()
-                _, _, width, height = self.actions.interface.get_bounds()
+                dims = self.state.debug_get_viewport_dimensions()
+                if not dims:
+                    logger.error("Failed to get viewport dimensions")
+                    return StateResult.FAILURE
+                width, height = dims
                 viewport_width = min(int(width * 0.70), 540)
                 game_viewport_region = (0, 0, viewport_width, height)
 

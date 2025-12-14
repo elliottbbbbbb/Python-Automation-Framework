@@ -1,7 +1,7 @@
 import logging
 import os
 import pytesseract
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Optional, Any, TYPE_CHECKING, Tuple, Dict
 
 from osrsbot.services.ocr_service import OCRService, OCRRegion
 from osrsbot.models.config import Config
@@ -460,3 +460,156 @@ class GameState:
         except Exception as e:
             logger.error(f"Error checking inventory_full: {e}", exc_info=True)
             return True  # Conservative: assume full on error
+
+    # ==================== Debug/Diagnostic Methods ====================
+    # These methods expose diagnostic capabilities for testing and debugging.
+    # They bypass caching and provide direct access to underlying detection systems.
+
+    def debug_get_viewport_dimensions(self) -> Optional[Tuple[int, int]]:
+        """
+        Get viewport dimensions for diagnostic purposes.
+
+        Returns width and height of game window viewport.
+        Used by test code to calculate game viewport region.
+
+        Returns:
+            (width, height) tuple or None if interface unavailable
+
+        Example:
+            >>> width, height = self.state.debug_get_viewport_dimensions()
+            >>> viewport_region = (0, 0, int(width * 0.70), height)
+        """
+        try:
+            _, _, width, height = self.interface.get_bounds()
+            logger.debug(f"Viewport dimensions: {width}x{height}")
+            return (width, height)
+        except Exception as e:
+            logger.error(f"Failed to get viewport dimensions: {e}")
+            return None
+
+    def debug_capture_screen(self, grayscale: bool = True) -> Optional[Any]:
+        """
+        Capture current screen for diagnostic purposes.
+
+        Bypasses caching and provides direct screen capture capability.
+        Used by test code to verify template detection.
+
+        Args:
+            grayscale: If True, return grayscale numpy array; if False, return PIL Image
+
+        Returns:
+            Grayscale numpy array, PIL Image, or None if capture fails
+
+        Example:
+            >>> img_gray = self.state.debug_capture_screen()
+            >>> if img_gray is not None:
+            >>>     # Perform custom analysis
+        """
+        if not self.screen:
+            logger.warning("ScreenService not available for debug capture")
+            return None
+
+        try:
+            if grayscale:
+                img = self.screen.capture_grayscale()
+                logger.debug(f"Debug screen capture: grayscale {'success' if img is not None else 'failed'}")
+                return img
+            else:
+                img = self.screen.capture()
+                logger.debug("Debug screen capture: color success")
+                return img
+        except Exception as e:
+            logger.error(f"Debug screen capture failed: {e}")
+            return None
+
+    def debug_detect_inventory_grid(self, force: bool = True) -> bool:
+        """
+        Detect inventory grid for diagnostic purposes.
+
+        Forces fresh template detection and returns success status.
+        Used by test code to verify template matching system.
+
+        Args:
+            force: Force fresh detection (default True for diagnostics)
+
+        Returns:
+            True if inventory grid detected, False otherwise
+
+        Example:
+            >>> if self.state.debug_detect_inventory_grid():
+            >>>     logger.info("Template matching working correctly")
+        """
+        if not self.template_service:
+            logger.warning("TemplateMatchService not available for debug detection")
+            return False
+
+        if not self.screen:
+            logger.warning("ScreenService not available for debug detection")
+            return False
+
+        try:
+            img_gray = self.screen.capture_grayscale()
+            if img_gray is None:
+                logger.warning("Debug detection: screen capture failed")
+                return False
+
+            detected = self.template_service.detect_grid("inventory", img_gray, force=force)
+            logger.debug(f"Debug inventory detection: {'detected' if detected else 'not found'}")
+            return detected
+        except Exception as e:
+            logger.error(f"Debug inventory detection failed: {e}")
+            return False
+
+    def debug_get_inventory_grid_info(self) -> Optional[Dict[str, Any]]:
+        """
+        Get inventory grid information for diagnostic purposes.
+
+        Returns detailed information about detected inventory grid.
+        Used by test code to verify grid structure and element count.
+
+        Returns:
+            Dictionary with grid info or None if not available:
+            {
+                "visible": bool,
+                "total_elements": int,
+                "num_rows": int,
+                "num_cols": int,
+                "bounds": (x, y, width, height) or None
+            }
+
+        Example:
+            >>> grid_info = self.state.debug_get_inventory_grid_info()
+            >>> if grid_info and grid_info["visible"]:
+            >>>     logger.info(f"Grid has {grid_info['total_elements']} elements")
+        """
+        if not self.template_service:
+            logger.warning("TemplateMatchService not available")
+            return None
+
+        try:
+            grid = self.template_service.get_grid("inventory")
+            if not grid:
+                logger.debug("Debug: No inventory grid available")
+                return None
+
+            info = {
+                "visible": grid.visible,
+                "total_elements": len(grid.elements),
+                "num_rows": grid.num_rows,
+                "num_cols": grid.num_cols,
+                "bounds": None
+            }
+
+            if grid.element:
+                info["bounds"] = (
+                    grid.element.x,
+                    grid.element.y,
+                    grid.element.width,
+                    grid.element.height
+                )
+
+            logger.debug(f"Debug grid info: visible={info['visible']}, elements={info['total_elements']}")
+            return info
+        except Exception as e:
+            logger.error(f"Failed to get grid info: {e}")
+            return None
