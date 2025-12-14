@@ -177,7 +177,7 @@ This allows rapid tuning without code changes.
 
 Active learning project. Used as a portfolio demonstration of Python proficiency, software architecture, and problem-solving ability.
 
-**Last updated:** December 2024
+**Last updated:** December 2025
 
 ---
 
