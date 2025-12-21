@@ -30,6 +30,7 @@ from enum import Enum
 from typing import Dict, List
 
 from osrsbot.core.state_machine_bot import StateMachineBot
+from osrsbot.core.state_helpers import build_metadata_dict
 from osrsbot.core.state_types import (
     StateResult,
     StateMetadata,
@@ -85,71 +86,61 @@ class ComprehensiveTestBot(StateMachineBot):
 
     def define_state_metadata(self) -> Dict[Enum, StateMetadata]:
         """Define metadata for each state."""
-        return {
-            TestBotStates.IDLE: StateMetadata(
-                name="Idle",
-                description="Initial safety checks",
-                max_retries=1,
-                timeout=None,
-                failover_state=None
-            ),
-            TestBotStates.TEST_MINIMAP: StateMetadata(
-                name="Test Minimap Navigation",
-                description="Test walking in all directions",
-                max_retries=3,
-                timeout=60.0,
-                failover_state=TestBotStates.TEST_INVENTORY_DETECTION
-            ),
-            TestBotStates.TEST_INVENTORY_DETECTION: StateMetadata(
-                name="Test Inventory Detection",
-                description="Test inventory state queries",
-                max_retries=3,
-                timeout=30.0,
-                failover_state=TestBotStates.TEST_INVENTORY_CLICKING
-            ),
-            TestBotStates.TEST_INVENTORY_CLICKING: StateMetadata(
-                name="Test Inventory Clicking",
-                description="Test clicking inventory slots",
-                max_retries=3,
-                timeout=30.0,
-                failover_state=TestBotStates.TEST_COLOR_DETECTION
-            ),
-            TestBotStates.TEST_COLOR_DETECTION: StateMetadata(
-                name="Test Color Detection",
-                description="Test smart color clicking",
-                max_retries=3,
-                timeout=30.0,
-                failover_state=TestBotStates.TEST_TEMPLATE_MATCHING
-            ),
-            TestBotStates.TEST_TEMPLATE_MATCHING: StateMetadata(
-                name="Test Template Matching",
-                description="Test UI button detection",
-                max_retries=3,
-                timeout=30.0,
-                failover_state=TestBotStates.TEST_OCR
-            ),
-            TestBotStates.TEST_OCR: StateMetadata(
-                name="Test OCR",
-                description="Test HP and stats reading",
-                max_retries=3,
-                timeout=30.0,
-                failover_state=TestBotStates.TEST_COMBAT
-            ),
-            TestBotStates.TEST_COMBAT: StateMetadata(
-                name="Test Combat Detection",
-                description="Test combat state detection",
-                max_retries=30,
-                timeout=300.0,
-                failover_state=TestBotStates.COMPLETE
-            ),
-            TestBotStates.COMPLETE: StateMetadata(
-                name="Complete",
-                description="All tests complete",
-                max_retries=1,
-                timeout=None,
-                failover_state=None
-            )
-        }
+        return build_metadata_dict(TestBotStates, {
+            TestBotStates.IDLE: {
+                "name": "Idle",
+                "description": "Initial safety checks",
+                "max_retries": 1,
+            },
+            TestBotStates.TEST_MINIMAP: {
+                "name": "Test Minimap Navigation",
+                "description": "Test walking in all directions",
+                "timeout": 60.0,
+                "failover": TestBotStates.TEST_INVENTORY_DETECTION,
+            },
+            TestBotStates.TEST_INVENTORY_DETECTION: {
+                "name": "Test Inventory Detection",
+                "description": "Test inventory state queries",
+                "timeout": 30.0,
+                "failover": TestBotStates.TEST_INVENTORY_CLICKING,
+            },
+            TestBotStates.TEST_INVENTORY_CLICKING: {
+                "name": "Test Inventory Clicking",
+                "description": "Test clicking inventory slots",
+                "timeout": 30.0,
+                "failover": TestBotStates.TEST_COLOR_DETECTION,
+            },
+            TestBotStates.TEST_COLOR_DETECTION: {
+                "name": "Test Color Detection",
+                "description": "Test smart color clicking",
+                "timeout": 30.0,
+                "failover": TestBotStates.TEST_TEMPLATE_MATCHING,
+            },
+            TestBotStates.TEST_TEMPLATE_MATCHING: {
+                "name": "Test Template Matching",
+                "description": "Test UI button detection",
+                "timeout": 30.0,
+                "failover": TestBotStates.TEST_OCR,
+            },
+            TestBotStates.TEST_OCR: {
+                "name": "Test OCR",
+                "description": "Test HP and stats reading",
+                "timeout": 30.0,
+                "failover": TestBotStates.TEST_COMBAT,
+            },
+            TestBotStates.TEST_COMBAT: {
+                "name": "Test Combat Detection",
+                "description": "Test combat state detection",
+                "max_retries": 30,
+                "timeout": 300.0,
+                "failover": TestBotStates.COMPLETE,
+            },
+            TestBotStates.COMPLETE: {
+                "name": "Complete",
+                "description": "All tests complete",
+                "max_retries": 1,
+            },
+        })
 
     def define_transitions(self) -> List[StateTransition]:
         """Define allowed state transitions."""
@@ -360,7 +351,6 @@ class ComprehensiveTestBot(StateMachineBot):
                 "blue_outline",
                 player_position=player_pos,
                 move_style="curved",
-                enable_target_lock=True,
                 enable_stuck_detection=True,
                 enable_blacklist=True,
                 region=game_viewport_region
@@ -497,7 +487,6 @@ class ComprehensiveTestBot(StateMachineBot):
                     "blue_outline",
                     player_position=player_pos,
                     move_style="instant",
-                    enable_target_lock=True,
                     enable_stuck_detection=True,
                     enable_blacklist=True,
                     region=game_viewport_region

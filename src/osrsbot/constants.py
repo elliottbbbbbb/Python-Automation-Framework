@@ -490,10 +490,6 @@ class TargetSelectionConfig:
     blacklist_duration: float = 12.0  # 12 seconds
     blacklist_radius: int = 25  # 25 pixel radius around failed location
 
-    # Lock onto targets and follow them as they move
-    target_lock_search_radius: int = 60  # Search 60px around locked target (increased for moving NPCs)
-    target_lock_max_age: float = 8.0  # Lock expires after 8 seconds
-
     # Give up after extended period with no valid targets
     no_targets_timeout: float = 45.0  # Give up after 45 seconds
 
