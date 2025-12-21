@@ -19,6 +19,7 @@ from enum import Enum
 from typing import Dict, List
 
 from osrsbot.core.state_machine_bot import StateMachineBot
+from osrsbot.core.state_helpers import build_metadata_dict
 from osrsbot.core.state_types import (
     StateResult,
     StateMetadata,
@@ -55,9 +56,8 @@ class GreenDragonsStateMachineBot(StateMachineBot):
 
         # Add HP threshold variance (Phase 0 anti-detection)
         base_threshold = self.config.get("hp_threshold", default=70)
-        variance = random.choice([-5, -3, 0, 3, 5])
-        self.hp_threshold = base_threshold + variance
-        logger.info(f"HP threshold set to {self.hp_threshold} (base: {base_threshold}, variance: {variance:+d})")
+        self.hp_threshold = self._apply_threshold_variance(base_threshold)
+        logger.info(f"HP threshold set to {self.hp_threshold}")
 
         # Track kills for logging
         self._kills = 0
@@ -74,57 +74,52 @@ class GreenDragonsStateMachineBot(StateMachineBot):
 
         Configures retry limits, timeouts, and failover behavior.
         """
-        return {
-            GreenDragonsStates.IDLE: StateMetadata(
-                name="Idle",
-                description="Initial state, safety checks",
-                max_retries=1,
-                timeout=None,
-                failover_state=None  # No failover for idle
-            ),
-            GreenDragonsStates.TELEPORT_TO_DRAGONS: StateMetadata(
-                name="Teleport to Dragons",
-                description="Use wilderness obelisk teleport",
-                max_retries=2,
-                timeout=30.0,
-                failover_state=GreenDragonsStates.RECOVERY
-            ),
-            GreenDragonsStates.NAVIGATE_TO_SPOT: StateMetadata(
-                name="Navigate to Spot",
-                description="Walk to dragon spawn, drink potions",
-                max_retries=2,
-                timeout=45.0,
-                failover_state=GreenDragonsStates.RECOVERY
-            ),
-            GreenDragonsStates.COMBAT: StateMetadata(
-                name="Combat",
-                description="Kill dragons until inventory full",
-                max_retries=1,
-                timeout=600.0,  # 10 minutes max for combat
-                failover_state=GreenDragonsStates.TELEPORT_TO_BANK  # If stuck, just go bank
-            ),
-            GreenDragonsStates.TELEPORT_TO_BANK: StateMetadata(
-                name="Teleport to Bank",
-                description="Varrock teleport",
-                max_retries=2,
-                timeout=30.0,
-                failover_state=GreenDragonsStates.RECOVERY
-            ),
-            GreenDragonsStates.BANKING: StateMetadata(
-                name="Banking",
-                description="Deposit loot, withdraw food",
-                max_retries=3,
-                timeout=60.0,
-                failover_state=GreenDragonsStates.RECOVERY
-            ),
-            GreenDragonsStates.RECOVERY: StateMetadata(
-                name="Recovery",
-                description="Failover state for error recovery",
-                max_retries=2,
-                timeout=None,
-                failover_state=None  # Recovery has no failover (terminates cycle)
-            )
-        }
+        return build_metadata_dict(GreenDragonsStates, {
+            GreenDragonsStates.IDLE: {
+                "name": "Idle",
+                "description": "Initial state, safety checks",
+                "max_retries": 1,
+            },
+            GreenDragonsStates.TELEPORT_TO_DRAGONS: {
+                "name": "Teleport to Dragons",
+                "description": "Use wilderness obelisk teleport",
+                "max_retries": 2,
+                "timeout": 30.0,
+                "failover": GreenDragonsStates.RECOVERY,
+            },
+            GreenDragonsStates.NAVIGATE_TO_SPOT: {
+                "name": "Navigate to Spot",
+                "description": "Walk to dragon spawn, drink potions",
+                "max_retries": 2,
+                "timeout": 45.0,
+                "failover": GreenDragonsStates.RECOVERY,
+            },
+            GreenDragonsStates.COMBAT: {
+                "name": "Combat",
+                "description": "Kill dragons until inventory full",
+                "max_retries": 1,
+                "timeout": 600.0,
+                "failover": GreenDragonsStates.TELEPORT_TO_BANK,
+            },
+            GreenDragonsStates.TELEPORT_TO_BANK: {
+                "name": "Teleport to Bank",
+                "description": "Varrock teleport",
+                "max_retries": 2,
+                "timeout": 30.0,
+                "failover": GreenDragonsStates.RECOVERY,
+            },
+            GreenDragonsStates.BANKING: {
+                "name": "Banking",
+                "description": "Deposit loot, withdraw food",
+                "timeout": 60.0,
+                "failover": GreenDragonsStates.RECOVERY,
+            },
+            GreenDragonsStates.RECOVERY: {
+                "name": "Recovery",
+                "description": "Failover state for error recovery",
+                "max_retries": 2,
+            },
+        })
 
     def define_transitions(self) -> List[StateTransition]:
         """

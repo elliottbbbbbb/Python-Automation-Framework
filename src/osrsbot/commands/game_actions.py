@@ -492,12 +492,11 @@ class GameActions:
         player_position: Optional[Tuple[int, int]] = None,
         move_style: MovementStyle = "curved",
         tolerance: Optional[int] = None,
-        enable_target_lock: bool = True,
         enable_stuck_detection: bool = True,
         enable_blacklist: bool = True,
         region: Optional[Tuple[int, int, int, int]] = None
     ) -> bool:
-        """Click color with distance-based selection, target locking, stuck detection, and blacklisting."""
+        """Click color with distance-based selection, stuck detection, and blacklisting."""
         hex_color = self.config.get("colors", color_name)
         if not hex_color:
             logger.warning(f"Color '{color_name}' not in config")
@@ -513,23 +512,6 @@ class GameActions:
         if player_position is None:
             player_position = self._get_player_position()
 
-        search_region = region
-        target_lock = None
-        if enable_target_lock:
-            target_lock = self._target_tracker.get_target_lock()
-            if target_lock:
-                # Search near last locked position
-                logger.debug(
-                    f"Target locked at ({target_lock.x}, {target_lock.y}), "
-                    f"searching within {target_lock.search_radius}px"
-                )
-                search_region = (
-                    max(0, target_lock.x - target_lock.search_radius),
-                    max(0, target_lock.y - target_lock.search_radius),
-                    target_lock.search_radius * 2,
-                    target_lock.search_radius * 2
-                )
-
         # Find all color matches sorted by distance from player
         blacklist_checker = None
         if enable_blacklist:
@@ -539,27 +521,12 @@ class GameActions:
             hex_color=hex_color,
             reference_point=player_position,
             tolerance=tolerance,
-            region=search_region,
+            region=region,
             blacklist_checker=blacklist_checker
         )
 
         # Handle no matches found
         if not matches_with_distance:
-            if target_lock:
-                # Lock expired or target moved out of search radius
-                logger.debug("No matches near locked target, clearing lock and retrying")
-                self._target_tracker.clear_target_lock()
-                # Retry without lock constraint
-                return self.click_color_smart(
-                    color_name=color_name,
-                    player_position=player_position,
-                    move_style=move_style,
-                    tolerance=tolerance,
-                    enable_target_lock=False,  # Disable lock for retry
-                    enable_stuck_detection=enable_stuck_detection,
-                    enable_blacklist=enable_blacklist,
-                    region=region
-                )
             logger.debug(f"No valid targets found for '{color_name}'")
             return False
 
@@ -585,15 +552,12 @@ class GameActions:
                 duration=TARGET_SELECTION.blacklist_duration,
                 radius=TARGET_SELECTION.blacklist_radius
             )
-            # Clear target lock since we're switching targets
-            self._target_tracker.clear_target_lock()
             # Retry with blacklist active
             return self.click_color_smart(
                 color_name=color_name,
                 player_position=player_position,
                 move_style=move_style,
                 tolerance=tolerance,
-                enable_target_lock=enable_target_lock,
                 enable_stuck_detection=enable_stuck_detection,
                 enable_blacklist=True,  # Ensure blacklist is active
                 region=region
@@ -612,15 +576,6 @@ class GameActions:
 
         # Record click in history
         self._target_tracker.add_click(best_match.x, best_match.y)
-
-        # Update target lock
-        if enable_target_lock:
-            self._target_tracker.set_target_lock(
-                best_match.x,
-                best_match.y,
-                search_radius=TARGET_SELECTION.target_lock_search_radius,
-                max_age=TARGET_SELECTION.target_lock_max_age
-            )
 
         # Record action for anti-ban pattern detection
         if self.anti_ban:

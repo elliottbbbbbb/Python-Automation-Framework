@@ -1,15 +1,14 @@
 """
-ClickTargetTracker - Track click history, target locks, and blacklisted locations.
+ClickTargetTracker - Track click history and blacklisted locations.
 
 Manages intelligent target selection by tracking:
 - Click history to detect stuck clicking patterns
-- Target locks to follow moving NPCs
 - Blacklisted locations to avoid inaccessible areas
 """
 import time
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 from collections import deque
 
 logger = logging.getLogger(__name__)
@@ -32,23 +31,12 @@ class BlacklistEntry:
     expires_at: float  # Timestamp when blacklist expires
 
 
-@dataclass
-class TargetLock:
-    """Locked target being tracked."""
-    x: int
-    y: int
-    locked_at: float
-    search_radius: int  # How far to search for target movement
-    max_age: float  # How long to maintain lock
-
-
 class ClickTargetTracker:
     """
-    Tracks click history, target locks, and blacklisted locations.
+    Tracks click history and blacklisted locations.
 
     Features:
     - Detects stuck clicking (same location repeatedly)
-    - Maintains target lock to follow moving NPCs
     - Blacklists inaccessible locations temporarily
     """
 
@@ -61,7 +49,6 @@ class ClickTargetTracker:
         """
         self._click_history: deque = deque(maxlen=history_size)
         self._blacklist: List[BlacklistEntry] = []
-        self._target_lock: Optional[TargetLock] = None
 
     def add_click(self, x: int, y: int) -> None:
         """
@@ -205,59 +192,8 @@ class ClickTargetTracker:
         if removed > 0:
             logger.debug(f"Cleaned {removed} expired blacklist entries")
 
-    def set_target_lock(
-        self,
-        x: int,
-        y: int,
-        search_radius: int = 35,
-        max_age: float = 8.0
-    ) -> None:
-        """
-        Lock onto a target location.
-
-        Args:
-            x: Target X coordinate
-            y: Target Y coordinate
-            search_radius: How far to search for target movement
-            max_age: How long to maintain lock (seconds)
-        """
-        self._target_lock = TargetLock(
-            x=x,
-            y=y,
-            locked_at=time.time(),
-            search_radius=search_radius,
-            max_age=max_age
-        )
-        logger.debug(f"Target locked at ({x}, {y}) with {search_radius}px search radius")
-
-    def get_target_lock(self) -> Optional[TargetLock]:
-        """
-        Get current target lock if not expired.
-
-        Returns:
-            TargetLock if active, None if expired or not set
-        """
-        if self._target_lock is None:
-            return None
-
-        # Check if lock has expired
-        age = time.time() - self._target_lock.locked_at
-        if age > self._target_lock.max_age:
-            logger.debug(f"Target lock expired (age: {age:.1f}s)")
-            self._target_lock = None
-            return None
-
-        return self._target_lock
-
-    def clear_target_lock(self) -> None:
-        """Clear the current target lock."""
-        if self._target_lock:
-            logger.debug("Target lock cleared")
-        self._target_lock = None
-
     def reset(self) -> None:
-        """Clear all state (history, locks, blacklist)."""
+        """Clear all state (history, blacklist)."""
         self._click_history.clear()
         self._blacklist.clear()
-        self._target_lock = None
         logger.debug("Click tracker reset")

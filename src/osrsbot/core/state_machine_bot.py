@@ -1,5 +1,6 @@
 """State machine bot - base class for state-driven scripts."""
 import time
+import random
 import logging
 from abc import abstractmethod
 from enum import Enum
@@ -67,6 +68,44 @@ class StateMachineBot(Bot):
     def get_initial_state(self) -> Enum:
         """Get the starting state."""
         pass
+
+    # Utility helpers
+
+    def _apply_threshold_variance(
+        self,
+        base_value: int,
+        variance_options: List[int] = None
+    ) -> int:
+        """
+        Apply random variance to threshold values (anti-detection).
+
+        Adds randomness to numeric thresholds like HP levels to avoid
+        predictable bot behavior patterns.
+
+        Args:
+            base_value: Base threshold value
+            variance_options: List of variance amounts to randomly choose from
+                            (default: [-5, -3, 0, 3, 5])
+
+        Returns:
+            Threshold with variance applied
+
+        Example:
+            base_hp = self.config.get("hp_threshold", default=70)
+            self.hp_threshold = self._apply_threshold_variance(base_hp)
+            # Result: 65, 67, 70, 73, or 75 (randomized each init)
+        """
+        if variance_options is None:
+            variance_options = [-5, -3, 0, 3, 5]
+
+        variance = random.choice(variance_options)
+        result = base_value + variance
+
+        logger.debug(
+            f"Applied threshold variance: {base_value} + {variance:+d} = {result}"
+        )
+
+        return result
 
     # State machine core
 
