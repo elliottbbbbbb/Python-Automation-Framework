@@ -49,11 +49,6 @@ class OCRPreprocessingConfig:
     Values were empirically determined through testing with OSRS UI screenshots.
     """
 
-    # Strategy 1: High contrast with medium threshold
-    # Best for: Standard digits with good visibility
-    # Resize: 5x for good detail preservation
-    # Contrast: 4.0 for strong edges
-    # Threshold: 61 (empirically determined optimal value)
     strategy_1: PreprocessingStrategy = PreprocessingStrategy(
         name="High Contrast",
         resize_multiplier=5,
@@ -61,11 +56,6 @@ class OCRPreprocessingConfig:
         threshold=61
     )
 
-    # Strategy 2: Medium contrast with low threshold
-    # Best for: Faded or thin digits (e.g., when HP is low and text color changes)
-    # Resize: 6x for maximum detail on thin strokes
-    # Contrast: 3.0 for gentler enhancement
-    # Threshold: 40 (lower to catch faint pixels)
     strategy_2: PreprocessingStrategy = PreprocessingStrategy(
         name="Medium Contrast Low Threshold",
         resize_multiplier=6,
@@ -73,11 +63,6 @@ class OCRPreprocessingConfig:
         threshold=40
     )
 
-    # Strategy 3: Medium-high contrast
-    # Best for: Balanced detection across different digit types
-    # Resize: 4x for speed while maintaining quality
-    # Contrast: 3.5 for moderate enhancement
-    # Threshold: 65 (slightly higher than strategy 1)
     strategy_3: PreprocessingStrategy = PreprocessingStrategy(
         name="Medium-High Contrast",
         resize_multiplier=4,
@@ -85,11 +70,6 @@ class OCRPreprocessingConfig:
         threshold=65
     )
 
-    # Strategy 4: Very high contrast
-    # Best for: Noisy backgrounds or difficult lighting conditions
-    # Resize: 5x for detail
-    # Contrast: 5.0 for maximum edge detection
-    # Threshold: 70 (higher to eliminate noise)
     strategy_4: PreprocessingStrategy = PreprocessingStrategy(
         name="Very High Contrast",
         resize_multiplier=5,
@@ -97,11 +77,6 @@ class OCRPreprocessingConfig:
         threshold=70
     )
 
-    # Strategy 5: High threshold for clean extraction
-    # Best for: Eliminating artifacts and ensuring only clear digits pass
-    # Resize: 5x for consistency
-    # Contrast: 4.0 for strong definition
-    # Threshold: 100 (very high to get only the clearest pixels)
     strategy_5: PreprocessingStrategy = PreprocessingStrategy(
         name="High Threshold Clean",
         resize_multiplier=5,
@@ -158,15 +133,10 @@ class ShapeDetectionConfig:
     shape_detection_size: Tuple[int, int] = (140, 140)
 
     # Hole detection thresholds
-    # A "hole" is a closed white region surrounded by black (e.g., center of 9, 8, 6, 0)
     min_hole_count_for_nine: int = 1  # 9 has at least 1 hole (the circular part)
 
-    # Tail fraction threshold
-    # The "tail" is the bottom vertical stroke of a 9
-    # Measured as fraction of total height
     min_tail_fraction_for_nine: float = 0.20  # 20% of height should be tail
 
-    # Aspect ratio threshold
     # 9 is typically taller than it is wide
     min_aspect_ratio_for_nine: float = 1.0  # Height >= width
 
@@ -187,19 +157,15 @@ SHAPE_DETECTION = ShapeDetectionConfig()
 class OCRSmoothingConfig:
     """Configuration for OCR result smoothing and caching."""
 
-    # Default window size for consensus voting
     # Keeps last N readings and returns most common value
     default_window_size: int = 5
 
-    # Default TTL (time-to-live) for cached OCR results in seconds
     # Prevents redundant OCR calls for rapidly repeated checks
     default_ttl_seconds: float = 0.5
 
-    # Maximum allowed jump between readings
     # If new reading differs by more than this, it's likely an OCR error
     max_suspicious_jump: int = 30  # HP can't change by 30+ in one reading
 
-    # Confidence threshold for logging
     # Log confidence percentage when it falls below this
     min_confidence_for_warning: float = 0.5  # 50%
 
@@ -245,7 +211,6 @@ TESSERACT_CONFIG = TesseractConfig()
 class BezierCurveConfig:
     """Configuration for Bezier curve mouse movement."""
 
-    # Control point randomization range
     # Control points are randomly offset by this amount to create natural curves
     control_point_offset_min: int = -100  # pixels
     control_point_offset_max: int = 100   # pixels
@@ -403,23 +368,14 @@ COORDINATES = CoordinateConfig()
 def _get_default_ocr_replacements() -> Dict[str, str]:
     """Factory function for OCR character replacements."""
     return {
-        # Misread as 1
         'i': '1', 'I': '1', 'l': '1', '|': '1',
-        # Misread as 0
         'o': '0', 'O': '0', 'Q': '0', 'D': '0', 'd': '0',
-        # Misread as 5
         'S': '5', 's': '5',
-        # Misread as 2
         'Z': '2', 'z': '2',
-        # Misread as 8
         'B': '8',
-        # Misread as 9
         'g': '9', 'q': '9',
-        # Misread as 6
         'G': '6',
-        # Misread as 4
         'a': '4',
-        # Whitespace removal
         ' ': '', '\n': '', '\r': '', '\t': '',
     }
 
@@ -525,27 +481,22 @@ TEMPLATE_MATCHING = TemplateMatchingConfig()
 class TargetSelectionConfig:
     """Configuration for intelligent color-based target selection."""
 
-    # Stuck detection
     # Detects when bot is repeatedly clicking same location
     stuck_detection_window: int = 3  # Check last 3 clicks
     stuck_threshold_pixels: int = 18  # Within 18 pixels = stuck
 
-    # Blacklisting
     # Temporarily avoid inaccessible locations
     blacklist_threshold: int = 6  # Blacklist after 6 failed attempts
     blacklist_duration: float = 12.0  # 12 seconds
     blacklist_radius: int = 25  # 25 pixel radius around failed location
 
-    # Target locking
     # Lock onto targets and follow them as they move
     target_lock_search_radius: int = 60  # Search 60px around locked target (increased for moving NPCs)
     target_lock_max_age: float = 8.0  # Lock expires after 8 seconds
 
-    # Failure handling
     # Give up after extended period with no valid targets
     no_targets_timeout: float = 45.0  # Give up after 45 seconds
 
-    # Distance calculation
     # Use player position as reference for selecting closest target
     use_player_center: bool = True  # Use player position for distance calc
 
@@ -630,11 +581,9 @@ class InventoryConfig:
     # Cache TTL for inventory state (seconds)
     detection_cache_ttl: float = 1.0
 
-    # Empty slot background color (OSRS default)
     # This is the color at the center of an empty inventory slot
     empty_slot_color: str = "#453c33"
 
-    # Color tolerance for empty slot matching
     # Higher = more lenient, lower = more strict
     color_tolerance: int = 15
 
