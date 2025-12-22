@@ -1,4 +1,4 @@
-# Python Automation Framework
+# OSRS Automation Framework
 
 A 5,000+ line Python automation framework built over 6+ months as a self-directed learning project. The focus of this project is clean architecture, state machines, and computer vision applied to a complex, real-world automation problem.
 
