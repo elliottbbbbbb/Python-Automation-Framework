@@ -33,6 +33,20 @@ The OSRS Bot implements a **layered, service-oriented architecture** with clear 
 └─────────────────────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────┐
+│       ORCHESTRATION LAYER (Dependency Injection)         │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │           ScriptRunner                          │   │
+│  │  - Loads Config                                 │   │
+│  │  - Initializes GameInterface                    │   │
+│  │  - Creates all Services                         │   │
+│  │  - Creates GameState (Queries)                  │   │
+│  │  - Creates GameActions (Commands)               │   │
+│  │  - Injects dependencies into Bots               │   │
+│  └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────┐
 │            COMMAND/QUERY LAYER (CQRS)                    │
 │                                                          │
 │  ┌──────────────────┐      ┌──────────────────┐        │
@@ -44,10 +58,9 @@ The OSRS Bot implements a **layered, service-oriented architecture** with clear 
 ┌─────────────────────────────────────────────────────────┐
 │              CORE LAYER (Business Logic)                 │
 │                                                          │
-│  ┌──────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Bot    │  │StateMachine  │  │ScriptRunner  │     │
-│  │  Base    │  │   Bot        │  │              │     │
-│  └──────────┘  └──────────────┘  └──────────────┘     │
+│  ┌─────────────────────────┐  ┌──────────────────┐     │
+│  │   Bot Base              │  │ StateMachineBot  │     │
+│  └─────────────────────────┘  └──────────────────┘     │
 └─────────────────────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────┐
@@ -62,6 +75,11 @@ The OSRS Bot implements a **layered, service-oriented architecture** with clear 
 │  │Template  │ │Anti-Ban │ │   ClickTargetTracker    │ │
 │  │ Matcher  │ │ Service │ │                          │ │
 │  └──────────┘ └─────────┘ └─────────────────────────┘ │
+│                                                          │
+│  ┌─────────────┐ ┌────────────┐ ┌──────────────────┐  │
+│  │StatusSocket │ │   Walker   │ │  ArduinoMouse    │  │
+│  │  Service    │ │  Service   │ │    Service       │  │
+│  └─────────────┘ └────────────┘ └──────────────────┘  │
 └─────────────────────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────┐
@@ -271,7 +289,7 @@ bot = GreenDragonsBot(interface, state, actions, config)
 
 ### 3.1 Layer Responsibilities
 
-#### Layer 5: Application Layer
+#### Layer 6: Application Layer
 **Location**: [src/osrsbot/app/](../src/osrsbot/app/)
 
 **Responsibility**: User interface and interaction
@@ -281,6 +299,26 @@ bot = GreenDragonsBot(interface, state, actions, config)
 - `calibration.py` - Color and coordinate calibration tool
 
 **Dependencies**: All lower layers
+
+---
+
+#### Layer 5: Orchestration Layer (Dependency Injection)
+**Location**: [src/osrsbot/core/runner.py](../src/osrsbot/core/runner.py)
+
+**Responsibility**: Initialize and wire up all dependencies before bot execution
+
+**Components**:
+- `ScriptRunner` - Dependency injection orchestrator
+  - Loads Config
+  - Initializes GameInterface
+  - Creates all Services (Mouse, Screen, OCR, etc.)
+  - Creates GameState (Queries)
+  - Creates GameActions (Commands)
+  - Injects dependencies into Bots
+
+**Dependencies**: All lower layers
+
+**Key Point**: ScriptRunner runs FIRST, creating the CQRS layer (GameActions/GameState) and all services before any bot logic executes.
 
 ---
 
@@ -296,6 +334,8 @@ bot = GreenDragonsBot(interface, state, actions, config)
 
 **Dependencies**: Core layer, Services layer
 
+**Note**: These are created and initialized by ScriptRunner before being injected into bots.
+
 ---
 
 #### Layer 3: Core Layer
@@ -306,9 +346,8 @@ bot = GreenDragonsBot(interface, state, actions, config)
 **Components**:
 - `Bot` - Abstract base class for all bots
 - `StateMachineBot` - State machine framework
-- `ScriptRunner` - Dependency injection orchestrator
 
-**Dependencies**: Services layer, Model layer
+**Dependencies**: Services layer, Model layer, CQRS layer (via injection)
 
 ---
 
@@ -325,6 +364,9 @@ bot = GreenDragonsBot(interface, state, actions, config)
 - `TemplateMatchService` - UI element detection
 - `AntiBanService` - Behavioral randomization
 - `ClickTargetTracker` - Click verification
+- `StatusSocketService` - Real-time player position/camera data from RuneLite plugin
+- `WalkerService` - Advanced pathfinding with camera rotation compensation
+- `ArduinoMouseService` - Hardware mouse control via serial connection (optional)
 
 **Dependencies**: Model layer only
 
@@ -658,6 +700,164 @@ def get_timing_variance(self, base_timing: float) -> float:
 
 ---
 
+#### StatusSocketService
+**File**: [src/osrsbot/services/status_socket_service.py](../src/osrsbot/services/status_socket_service.py)
+
+**Responsibility**: Real-time player position and camera data from RuneLite Status Socket plugin
+
+**Key Features**:
+- Monitors live_data.json for player state updates
+- File modification time caching (avoids re-parsing unchanged data)
+- Graceful degradation if plugin unavailable
+- Stuck detection (player not moving)
+- World coordinate and camera yaw tracking
+
+**Key Methods**:
+```python
+def get_player_state(self) -> Optional[PlayerState]:
+    """Get current player world position, plane, and camera yaw"""
+
+def is_available(self) -> bool:
+    """Check if Status Socket plugin is active"""
+
+def wait_for_arrival(
+    self, target_x: int, target_y: int,
+    tolerance: int = 2, timeout: float = 10.0
+) -> bool:
+    """Poll until player reaches target coordinates"""
+```
+
+**PlayerState Dataclass**:
+```python
+@dataclass
+class PlayerState:
+    world_x: int          # World X coordinate
+    world_y: int          # World Y coordinate
+    plane: int            # Game plane (0-3)
+    camera_yaw: int       # Camera rotation (0-2048, 0=north)
+    timestamp: float      # Last update time
+    is_moving: bool       # Movement detection
+    animation_id: int     # Current animation ID
+```
+
+**Design Notes**:
+- Required for WalkerService
+- Falls back gracefully if plugin not installed
+- Implements file-based IPC with RuneLite
+
+---
+
+#### WalkerService
+**File**: [src/osrsbot/services/walker_service.py](../src/osrsbot/services/walker_service.py)
+
+**Responsibility**: World coordinate pathfinding with camera rotation compensation
+
+**Key Features**:
+- 2D rotation matrix for camera angle compensation
+- World tiles → minimap pixels conversion
+- Waypoint-based path following
+- Arrival detection with tolerance
+- Distance-based click range limiting
+
+**Key Methods**:
+```python
+def walk_to(
+    self, target_x: int, target_y: int,
+    path: Optional[List[Tuple[int, int]]] = None,
+    move_style: MovementStyle = "curved"
+) -> bool:
+    """Walk to world coordinates. Returns True if arrived."""
+
+def walk_path(
+    self, waypoints: List[Tuple[int, int]],
+    move_style: MovementStyle = "curved"
+) -> bool:
+    """Follow predefined path of world coordinates."""
+
+def world_to_minimap(
+    self, world_x: int, world_y: int,
+    player_x: int, player_y: int, camera_yaw: int
+) -> Optional[Tuple[int, int]]:
+    """Convert world tiles to minimap pixels using rotation matrix."""
+```
+
+**Rotation Matrix Algorithm**:
+```python
+# Convert world delta to minimap pixels
+dx = world_x - player_x
+dy = world_y - player_y
+
+# Convert camera yaw (0-2048) to degrees
+degrees = 360 - (camera_yaw * (360 / 2048))
+theta = radians(degrees)
+
+# Apply 2D rotation matrix
+rotated_x = dx * cos(theta) - dy * sin(theta)
+rotated_y = dx * sin(theta) + dy * cos(theta)
+
+# Scale to minimap pixels (4 pixels per tile)
+pixel_x = rotated_x * 4
+pixel_y = rotated_y * 4
+
+# Translate to minimap center
+minimap_x = center_x + pixel_x
+minimap_y = center_y + pixel_y
+```
+
+**Design Notes**:
+- Depends on StatusSocketService for player position/camera
+- Handles camera rotation automatically
+- Supports intermediate waypoints for long distances
+- Integrates with existing MouseService for clicking
+
+---
+
+#### ArduinoMouseService
+**File**: [src/osrsbot/services/arduino_mouse_service.py](../src/osrsbot/services/arduino_mouse_service.py)
+
+**Responsibility**: Hardware mouse control via Arduino serial connection
+
+**Key Features**:
+- Drop-in replacement for MouseService (identical interface)
+- Serial communication protocol for movement and clicks
+- Multi-pass position correction (up to 2 retries)
+- Automatic fallback to software mouse if Arduino unavailable
+- Windows high-resolution timer for accurate movement timing
+
+**Key Methods**:
+```python
+def move_to(
+    self, x: int, y: int,
+    style: MovementStyle = "curved",
+    duration: Optional[float] = None,
+    speed_multiplier: float = 1.0
+) -> bool:
+    """Move mouse to absolute screen coordinates via Arduino"""
+
+def click_at(
+    self, x: int, y: int,
+    button: Literal["left", "right", "middle"] = "left",
+    move_style: MovementStyle = "curved",
+    variance: bool = True,
+    speed_multiplier: float = 1.0
+) -> bool:
+    """Move to position and click via Arduino"""
+```
+
+**Serial Protocol**:
+- Movement: `"x;y\n"` (e.g., `"1920;1080\n"`)
+- Left click: `"l\n"`
+- Right click: `"r\n"`
+- Middle click: `"m\n"`
+
+**Design Notes**:
+- Optional feature (disabled by default in config)
+- Requires pyserial and Arduino hardware with custom firmware
+- Falls back to MouseService if connection fails
+- Position verification using Windows API (GetCursorPos)
+
+---
+
 ## 5. Data Flow
 
 ### 5.1 Bot Execution Flow
@@ -795,6 +995,89 @@ StateMachineBot.run_cycle()
         │       └─> anti_ban.take_scheduled_break()
         │
         └─> Repeat until terminal state or max iterations
+```
+
+### 5.4 Walker/Pathfinding Flow
+
+**Walking to World Coordinates Example**:
+```
+actions.walk_to_world_coordinate(3185, 3448)  # Varrock West Bank
+        ↓
+GameActions.walk_to_world_coordinate()
+    ├─> Checks if WalkerService initialized
+    │
+    └─> walker.walk_to(3185, 3448)
+            ↓
+        WalkerService.walk_to()
+            ├─> status_socket.get_player_state()
+            │       ↓
+            │   StatusSocketService reads live_data.json
+            │   Returns: PlayerState(world_x=3165, world_y=3486, camera_yaw=1024)
+            │
+            ├─> Calculate distance to target
+            │   distance = sqrt((3185-3165)² + (3448-3486)²) = ~42 tiles
+            │
+            ├─> Loop until arrival:
+            │   │
+            │   ├─> world_to_minimap(3185, 3448, player_x, player_y, camera_yaw)
+            │   │       ↓
+            │   │   Apply 2D rotation matrix:
+            │   │   1. dx = 20, dy = -38
+            │   │   2. Convert yaw 1024 → 180° (facing south)
+            │   │   3. Rotate: rotated_x = 20*cos(180°) - (-38)*sin(180°) = -20
+            │   │              rotated_y = 20*sin(180°) + (-38)*cos(180°) = 38
+            │   │   4. Scale: pixel_x = -20*4 = -80, pixel_y = 38*4 = 152
+            │   │   5. Translate: minimap_x = 654 + (-80) = 574
+            │   │                 minimap_y = 111 + 152 = 263
+            │   │       ↓
+            │   │   Returns: (574, 263)
+            │   │
+            │   ├─> mouse.click_at(574, 263, move_style="curved")
+            │   │       ↓
+            │   │   MouseService moves cursor with Bezier curve
+            │   │   Clicks minimap position
+            │   │
+            │   ├─> status_socket.wait_for_arrival(3185, 3448, tolerance=2)
+            │   │       ↓
+            │   │   Poll player position every 100ms:
+            │   │   - Current: (3170, 3475) → distance = 21 tiles → keep waiting
+            │   │   - Current: (3178, 3460) → distance = 13 tiles → keep waiting
+            │   │   - Current: (3184, 3449) → distance = 1 tile → ARRIVED!
+            │   │       ↓
+            │   │   Returns: True
+            │   │
+            │   └─> Check if arrived (distance <= 2)
+            │       ↓
+            │   SUCCESS - player reached target
+            │
+            └─> Returns: True
+
+**Key Insight**: Camera rotation (yaw) is automatically compensated by the rotation
+matrix, so clicks on the minimap are always accurate regardless of camera angle.
+```
+
+**Path Following Example**:
+```
+path = [(3165, 3486), (3167, 3472), (3185, 3436), (3185, 3448)]
+actions.walk_path(path)
+        ↓
+WalkerService.walk_path(waypoints)
+    ├─> For each waypoint in path:
+    │   │
+    │   ├─> walk_to(waypoint_x, waypoint_y)
+    │   │   [Executes full walk_to flow above]
+    │   │       ↓
+    │   │   Waypoint 1 (3165, 3486): ✓ Reached
+    │   │       ↓
+    │   │   Waypoint 2 (3167, 3472): ✓ Reached
+    │   │       ↓
+    │   │   Waypoint 3 (3185, 3436): ✓ Reached
+    │   │       ↓
+    │   │   Waypoint 4 (3185, 3448): ✓ Reached
+    │   │
+    │   └─> All waypoints completed
+    │
+    └─> Returns: True
 ```
 
 ---
@@ -993,19 +1276,32 @@ The OSRS Bot architecture demonstrates strong software engineering principles wi
 - ✓ **Testability**: Dependency injection enables mocking
 - ✓ **Maintainability**: Clear responsibilities and organization
 - ✓ **Reusability**: Service layer provides reusable components
+- ✓ **Advanced Features**: World coordinate navigation and hardware mouse control
 
 **Key Strengths**:
 - CQRS pattern for clear read/write separation
 - State machine framework for complex workflows
 - Service architecture for modularity
 - Dependency injection for flexibility
+- Advanced pathfinding with 2D rotation matrix mathematics
+- Hardware integration capability (Arduino mouse)
+- Real-time position tracking via external plugin integration
 
-**Areas for Improvement**:
+**Recent Additions (December 2025)**:
+- **StatusSocketService**: Real-time player position and camera data from RuneLite
+- **WalkerService**: Advanced pathfinding with camera rotation compensation using 2D rotation matrices
+- **ArduinoMouseService**: Optional hardware mouse control for enhanced anti-detection
+- Comprehensive test suite covering all 10+ services
+- Detailed technical documentation (WALKER_TECHNICAL_DOCS.md, SERVICE_GUIDE.md)
+
+**Areas for Future Enhancement**:
 - Add Protocol/ABC definitions for service interfaces
 - Extract retry logic to decorator
 - Implement circuit breaker pattern for resilience
+- A* pathfinding for obstacle avoidance
+- Neural network for anti-ban behavior modeling
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: December 12, 2025
+**Document Version**: 2.0
+**Last Updated**: December 22, 2025

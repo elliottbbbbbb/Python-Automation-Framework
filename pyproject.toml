@@ -19,12 +19,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-
-[project.urls]
-Repository = "https://github.com/yourusername/osrsbot"
-Documentation = "https://github.com/yourusername/osrsbot#readme"
-
-# Runtime dependencies
 dependencies = [
   "pyautogui>=0.9.54",
   "PyWinCtl>=0.4; platform_system=='Windows'",
@@ -33,7 +27,15 @@ dependencies = [
   "pytesseract>=0.3.10",
   "Pillow>=10.0",
   "rich>=13.7.0",
+  "opencv-python>=4.8.0",
+  "numpy>=1.24.0",
+  "pyserial>=3.5",
+  "pywin32>=306; platform_system=='Windows'",
 ]
+
+[project.urls]
+Repository = "https://github.com/yourusername/osrsbot"
+Documentation = "https://github.com/yourusername/osrsbot#readme"
 
 # Optional development dependencies
 [project.optional-dependencies]

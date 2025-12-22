@@ -3,7 +3,7 @@ import time
 import random
 import logging
 import pyautogui
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, List
 
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
@@ -29,7 +29,8 @@ class GameActions:
         config: Config,
         template_service: Optional[TemplateMatchService] = None,
         anti_ban_service: Optional[Any] = None,
-        loot_detection_service: Optional[Any] = None
+        loot_detection_service: Optional[Any] = None,
+        walker: Optional[Any] = None
     ):
         """Initialize actions with services."""
         self.mouse = mouse
@@ -39,6 +40,7 @@ class GameActions:
         self.template_service = template_service
         self.anti_ban = anti_ban_service
         self.loot_detection = loot_detection_service
+        self.walker = walker
         self._target_tracker = ClickTargetTracker()
 
     # Timing & utils
@@ -751,3 +753,59 @@ class GameActions:
         )
 
         return match is not None
+
+    # Walker / World Coordinate Navigation
+
+    def walk_to_world_coordinate(
+        self,
+        x: int,
+        y: int,
+        move_style: MovementStyle = "curved"
+    ) -> bool:
+        """
+        Walk to world tile coordinates using advanced walker.
+
+        Args:
+            x: Target world X coordinate
+            y: Target world Y coordinate
+            move_style: Mouse movement style for minimap clicks
+
+        Returns:
+            True if successfully arrived, False otherwise
+        """
+        if not self.walker:
+            logger.error("WalkerService not initialized. Ensure Status Socket plugin is enabled.")
+            return False
+
+        return self.walker.walk_to(x, y, move_style=move_style)
+
+    def walk_path(
+        self,
+        waypoints: List[Tuple[int, int]],
+        move_style: MovementStyle = "random"
+    ) -> bool:
+        """
+        Follow a predefined path of world coordinates.
+
+        Args:
+            waypoints: List of (x, y) world coordinates to visit in order
+            move_style: Mouse movement style for minimap clicks
+
+        Returns:
+            True if completed path successfully, False otherwise
+
+        Example usage:
+            # Walk from GE to Varrock West Bank
+            path = [
+                (3165, 3486),  # GE north entrance
+                (3167, 3472),  # Path north
+                (3185, 3436),  # Varrock square
+                (3185, 3448)   # West bank
+            ]
+            actions.walk_path(path)
+        """
+        if not self.walker:
+            logger.error("WalkerService not initialized. Ensure Status Socket plugin is enabled.")
+            return False
+
+        return self.walker.walk_path(waypoints, move_style=move_style)
