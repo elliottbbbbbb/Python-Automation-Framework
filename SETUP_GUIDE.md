@@ -162,11 +162,93 @@ Bot behavior is controlled via JSON configuration files. See the documentation i
 3. Start with test scripts to verify functionality
 4. Refer to the main [README.md](README.md) for architecture details
 
+## Advanced Features Setup
+
+### Status Socket Plugin (Required for Walker/Pathfinding)
+
+The Status Socket plugin provides real-time player position and camera data from RuneLite. This is **required** for the advanced walker/pathfinding system.
+
+#### Installation (RuneLite Plugin Hub)
+
+1. Open RuneLite
+2. Click the **wrench icon** (Configuration)
+3. Scroll to **"Plugin Hub"**
+4. Search for: **"Status Socket"**
+5. Click **"Install"**
+6. **Restart RuneLite**
+
+#### Configuration
+
+1. In RuneLite Configuration, find **"Status Socket"**
+2. Set **Output File Path** to:
+   ```
+   C:\Users\ellio\Documents\Projects\OSRSbot\Python-Automation-Framework\live_data.json
+   ```
+   *(Adjust path to match your installation directory)*
+3. Set **Update Interval**: `100` ms
+4. Enable: **WorldPoint**, **Camera**, **Animation**, **Movement**
+
+#### Verification
+
+1. Start RuneLite and log into OSRS
+2. Check that `live_data.json` is created in your bot directory
+3. File should contain JSON with `worldPoint` and `camera` data
+4. Move in-game and verify coordinates update in real-time
+5. Run bot and check logs for:
+   ```
+   INFO - StatusSocketService initialized (plugin detected)
+   INFO - WalkerService initialized successfully
+   ```
+
+#### Troubleshooting
+
+- **Plugin not appearing**: Update RuneLite, enable Plugin Hub, restart
+- **File not created**: Check path permissions, verify plugin enabled
+- **Bot not detecting**: Verify `data_file` path in `config.json` matches actual file location
+- **Data stale**: Plugin may have crashed, restart RuneLite
+
+### Arduino Mouse (Optional)
+
+Hardware mouse control via Arduino for enhanced anti-detection. **Optional** and disabled by default.
+
+#### Requirements
+
+- Arduino board (Uno, Nano, Leonardo)
+- `pyserial`: `pip install pyserial`
+- Custom Arduino firmware (not included)
+
+#### Configuration
+
+1. Connect Arduino via USB
+2. Find serial port (Windows: COM3, Linux: /dev/ttyUSB0)
+3. Update `config.json`:
+   ```json
+   "arduino": {
+     "enabled": true,
+     "serial_port": "COM3",
+     "baud_rate": 115200
+   }
+   ```
+
+#### Verification
+
+Logs should show:
+```
+INFO - Arduino connection established successfully
+INFO - ArduinoMouseService initialized
+```
+
+Or fallback:
+```
+WARNING - Arduino not available, falling back to software mouse
+```
+
 ## Support
 
 For issues or questions:
 - Check the [README.md](README.md) for project documentation
 - Review the code in `src/osrsbot/` for implementation details
+- Report issues at: https://github.com/elliottbbbbbb/Python-Automation-Framework/issues
 - This is a portfolio/learning project - use at your own risk
 
 ## Legal Disclaimer

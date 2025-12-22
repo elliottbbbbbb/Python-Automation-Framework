@@ -127,11 +127,51 @@ class ScriptRunner:
 
             logger.info("OCR Service initialized successfully")
 
+            # Initialize Status Socket Service
+            logger.debug("Initializing StatusSocketService")
+            status_socket_config = self.config.get("status_socket", default={})
+            from osrsbot.services.status_socket_service import StatusSocketService
+            self.status_socket = StatusSocketService(
+                data_file=status_socket_config.get("data_file", "live_data.json"),
+                poll_interval=status_socket_config.get("poll_interval", 0.1)
+            )
+
+            if self.status_socket.is_available():
+                logger.info("StatusSocketService initialized (plugin detected)")
+            else:
+                logger.warning(
+                    "Status Socket plugin not detected. Walker disabled. "
+                    "See SETUP_GUIDE.md for installation."
+                )
+
+            # Initialize Walker Service
+            if self.status_socket.is_available():
+                logger.debug("Initializing WalkerService")
+                walker_config_dict = self.config.get("walker", default={})
+                from osrsbot.services.walker_service import WalkerService, WalkerConfig
+                walker_config = WalkerConfig(
+                    minimap_center_x=walker_config_dict.get("minimap_center_x", 654),
+                    minimap_center_y=walker_config_dict.get("minimap_center_y", 111),
+                    tile_size=walker_config_dict.get("tile_size", 4),
+                    arrival_tolerance=walker_config_dict.get("arrival_tolerance", 2),
+                    max_click_distance=walker_config_dict.get("max_click_distance", 15)
+                )
+                self.walker = WalkerService(
+                    config=walker_config,
+                    status_socket=self.status_socket,
+                    mouse=self.mouse,
+                    screen=self.screen,
+                    interface=self.interface
+                )
+                logger.info("WalkerService initialized successfully")
+            else:
+                logger.info("WalkerService disabled (Status Socket not available)")
+                self.walker = None
 
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}", exc_info=True)
             raise
-        
+
 
         try:
             logger.debug("Initializing GameState")
@@ -172,7 +212,8 @@ class ScriptRunner:
                 self.config,
                 self.template_service,
                 self.anti_ban,
-                self.loot_detection
+                self.loot_detection,
+                walker=self.walker
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:

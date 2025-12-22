@@ -157,6 +157,26 @@
     "post_click_delay_min": 0.05,
     "post_click_delay_max": 0.15
   },
+  "status_socket": {
+    "enabled": true,
+    "data_file": "live_data.json",
+    "poll_interval": 0.1
+  },
+  "walker": {
+    "minimap_center_x": 654,
+    "minimap_center_y": 111,
+    "tile_size": 4,
+    "arrival_tolerance": 2,
+    "max_click_distance": 15,
+    "enable_anti_ban_variance": true
+  },
+  "arduino": {
+    "enabled": false,
+    "serial_port": "COM3",
+    "baud_rate": 115200,
+    "fallback_to_software": true,
+    "connection_timeout": 2.0
+  },
   "templates": {
     "ui_grids": {
       "inventory": {

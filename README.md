@@ -49,21 +49,26 @@ Application Layer (CLI, calibration tools)
 * Strategy pattern for OCR preprocessing and mouse movement algorithms
 * Configuration-driven behavior using JSON
 
-### Computer Vision
+### Computer Vision & Navigation
 
 * OpenCV-based template matching with configurable thresholds
 * Multi-strategy OCR preprocessing for improved recognition accuracy
 * HSV color detection with tolerance-based matching
 * Coordinate transformation between screen spaces
 * Region-of-interest limiting for performance
+* **Advanced pathfinding using 2D rotation matrix for camera compensation**
+* **Real-time position tracking via RuneLite Status Socket plugin integration**
+* **World coordinate navigation with automatic waypoint following**
 
-### Behavioral Systems
+### Behavioral Systems & Anti-Detection
 
 * Humanized mouse movement using Bezier curves and overshoot simulation
 * Gaussian-distributed timing variance
 * Randomized micro-break scheduling
 * Distance-based target prioritization with stuck detection
 * Automatic blacklisting of problematic targets
+* **Optional hardware mouse control via Arduino for enhanced anti-detection**
+* **Multi-pass position correction for hardware mouse accuracy**
 
 ---
 
@@ -83,7 +88,10 @@ src/osrsbot/
 │   ├── template_match_service.py
 │   ├── anti_ban_service.py
 │   ├── loot_detection_service.py
-│   └── minimap_pathfinding_service.py
+│   ├── minimap_pathfinding_service.py
+│   ├── status_socket_service.py    # NEW: Real-time position tracking
+│   ├── walker_service.py            # NEW: Advanced pathfinding
+│   └── arduino_mouse_service.py     # NEW: Hardware mouse control
 ├── commands/               # CQRS - write operations
 │   └── game_actions.py
 ├── queries/                # CQRS - read operations
@@ -165,11 +173,12 @@ This allows rapid tuning without code changes.
 
 | Metric           | Value                             |
 | ---------------- | --------------------------------- |
-| Lines of Code    | ~5,000                            |
-| Python Modules   | 44                                |
-| Services         | 7                                 |
+| Lines of Code    | ~6,000+                           |
+| Python Modules   | 31 (active)                       |
+| Services         | 10                                |
 | Design Patterns  | CQRS, State Machine, Strategy, DI |
 | Development Time | 6+ months                         |
+| Test Coverage    | 9 major features tested           |
 
 ---
 

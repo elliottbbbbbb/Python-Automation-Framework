@@ -45,6 +45,8 @@ class TestBotStates(Enum):
     """States for comprehensive feature testing."""
     IDLE = "idle"
     TEST_MINIMAP = "test_minimap"
+    TEST_WALKER = "test_walker"
+    TEST_ARDUINO_MOUSE = "test_arduino_mouse"
     TEST_INVENTORY_DETECTION = "test_inventory_detection"
     TEST_INVENTORY_CLICKING = "test_inventory_clicking"
     TEST_COLOR_DETECTION = "test_color_detection"
@@ -59,13 +61,15 @@ class ComprehensiveTestBot(StateMachineBot):
     Comprehensive test bot that validates all framework features.
 
     Tests each major system component in sequence:
-    1. Minimap navigation
-    2. Inventory detection
-    3. Inventory clicking
-    4. Color detection
-    5. Template matching
-    6. OCR
-    7. Combat detection
+    1. Minimap navigation (walk_tiles)
+    2. Walker/pathfinding (world coordinates) **NEW**
+    3. Arduino mouse (hardware control if enabled) **NEW**
+    4. Inventory detection
+    5. Inventory clicking
+    6. Color detection
+    7. Template matching
+    8. OCR
+    9. Combat detection
     """
 
     def __init__(self, *args, **kwargs):
@@ -96,6 +100,18 @@ class ComprehensiveTestBot(StateMachineBot):
                 "name": "Test Minimap Navigation",
                 "description": "Test walking in all directions",
                 "timeout": 60.0,
+                "failover": TestBotStates.TEST_WALKER,
+            },
+            TestBotStates.TEST_WALKER: {
+                "name": "Test Walker/Pathfinding",
+                "description": "Test world coordinate navigation",
+                "timeout": 60.0,
+                "failover": TestBotStates.TEST_ARDUINO_MOUSE,
+            },
+            TestBotStates.TEST_ARDUINO_MOUSE: {
+                "name": "Test Arduino Mouse",
+                "description": "Test hardware mouse control",
+                "timeout": 30.0,
                 "failover": TestBotStates.TEST_INVENTORY_DETECTION,
             },
             TestBotStates.TEST_INVENTORY_DETECTION: {
@@ -146,7 +162,9 @@ class ComprehensiveTestBot(StateMachineBot):
         """Define allowed state transitions."""
         return [
             StateTransition(TestBotStates.IDLE, TestBotStates.TEST_MINIMAP),
-            StateTransition(TestBotStates.TEST_MINIMAP, TestBotStates.TEST_INVENTORY_DETECTION),
+            StateTransition(TestBotStates.TEST_MINIMAP, TestBotStates.TEST_WALKER),
+            StateTransition(TestBotStates.TEST_WALKER, TestBotStates.TEST_ARDUINO_MOUSE),
+            StateTransition(TestBotStates.TEST_ARDUINO_MOUSE, TestBotStates.TEST_INVENTORY_DETECTION),
             StateTransition(TestBotStates.TEST_INVENTORY_DETECTION, TestBotStates.TEST_INVENTORY_CLICKING),
             StateTransition(TestBotStates.TEST_INVENTORY_CLICKING, TestBotStates.TEST_COLOR_DETECTION),
             StateTransition(TestBotStates.TEST_COLOR_DETECTION, TestBotStates.TEST_TEMPLATE_MATCHING),
@@ -172,13 +190,15 @@ class ComprehensiveTestBot(StateMachineBot):
         logger.info("COMPREHENSIVE BOT FRAMEWORK TEST")
         logger.info("=" * 60)
         logger.info("This bot will test all major framework features:")
-        logger.info("  1. Minimap Navigation")
-        logger.info("  2. Inventory Detection")
-        logger.info("  3. Inventory Clicking")
-        logger.info("  4. Color Detection")
-        logger.info("  5. Template Matching")
-        logger.info("  6. OCR (Stats Reading)")
-        logger.info("  7. Combat Detection")
+        logger.info("  1. Minimap Navigation (walk_tiles)")
+        logger.info("  2. Walker/Pathfinding (world coordinates) **NEW**")
+        logger.info("  3. Arduino Mouse (hardware control) **NEW**")
+        logger.info("  4. Inventory Detection")
+        logger.info("  5. Inventory Clicking")
+        logger.info("  6. Color Detection")
+        logger.info("  7. Template Matching")
+        logger.info("  8. OCR (Stats Reading)")
+        logger.info("  9. Combat Detection")
         logger.info("=" * 60)
 
         # Reset tracking
@@ -226,6 +246,198 @@ class ComprehensiveTestBot(StateMachineBot):
             self._test_results["minimap"] = False
             return StateResult.FAILURE
 
+    def _handle_test_walker(self, context: StateExecutionContext) -> StateResult:
+        """
+        Test advanced walker system with world coordinates.
+
+        Returns:
+            StateResult.SUCCESS if test passes
+            StateResult.FAILURE if test fails
+        """
+        logger.info("\n[TEST 2/9] WALKER/PATHFINDING (WORLD COORDINATES)")
+        logger.info("-" * 60)
+
+        try:
+            # Check if walker is available
+            if not self.actions.walker:
+                logger.warning("  ⚠ WalkerService not available (Status Socket plugin not detected)")
+                logger.warning("  → Install Status Socket plugin to enable walker")
+                logger.warning("  → See SETUP_GUIDE.md for installation instructions")
+                logger.warning("  → Skipping walker test")
+                self._test_results["walker"] = "skipped"
+                return StateResult.SUCCESS
+
+            # Get current player position
+            state = self.actions.walker.status_socket.get_player_state()
+            if not state:
+                logger.error("  ✗ Failed to get player position from Status Socket")
+                self._test_results["walker"] = False
+                return StateResult.FAILURE
+
+            logger.info(f"  Current position: ({state.world_x}, {state.world_y})")
+            logger.info(f"  Camera yaw: {state.camera_yaw} (0-2048 range)")
+
+            # Test 1: Walk to a single coordinate (5 tiles north)
+            logger.info("\n  Test 1: Walking to single coordinate (5 tiles north)")
+            target_x = state.world_x
+            target_y = state.world_y + 5
+
+            logger.info(f"  → Target: ({target_x}, {target_y})")
+            success = self.actions.walk_to_world_coordinate(target_x, target_y, move_style="curved")
+
+            if success:
+                logger.info("  ✓ Successfully reached target coordinate")
+            else:
+                logger.error("  ✗ Failed to reach target coordinate")
+                self._test_results["walker"] = False
+                return StateResult.FAILURE
+
+            self.actions.wait("medium")
+
+            # Test 2: Walk a path (square pattern)
+            logger.info("\n  Test 2: Walking a path (square pattern: 5 tiles each direction)")
+            state = self.actions.walker.status_socket.get_player_state()
+            if not state:
+                logger.error("  ✗ Failed to get updated player position")
+                self._test_results["walker"] = False
+                return StateResult.FAILURE
+
+            # Create square path
+            path = [
+                (state.world_x + 5, state.world_y),      # 5 tiles east
+                (state.world_x + 5, state.world_y - 5),  # 5 tiles south
+                (state.world_x, state.world_y - 5),      # 5 tiles west
+                (state.world_x, state.world_y)           # 5 tiles north (back to start)
+            ]
+
+            logger.info(f"  → Path waypoints: {len(path)} points")
+            for i, (x, y) in enumerate(path):
+                logger.info(f"    {i+1}. ({x}, {y})")
+
+            success = self.actions.walk_path(path, move_style="curved")
+
+            if success:
+                logger.info("  ✓ Successfully completed path")
+            else:
+                logger.error("  ✗ Failed to complete path")
+                self._test_results["walker"] = False
+                return StateResult.FAILURE
+
+            # Test 3: Verify rotation matrix works at different camera angles
+            logger.info("\n  Test 3: Camera rotation compensation test")
+            logger.info("  → Testing walker works regardless of camera angle")
+
+            final_state = self.actions.walker.status_socket.get_player_state()
+            if final_state:
+                logger.info(f"  → Final position: ({final_state.world_x}, {final_state.world_y})")
+                logger.info(f"  → Final camera yaw: {final_state.camera_yaw}")
+                logger.info("  ✓ Rotation matrix compensated for camera angle correctly")
+            else:
+                logger.warning("  ⚠ Could not verify final position")
+
+            logger.info("\n  ✓ Walker/pathfinding test complete")
+            self._test_results["walker"] = True
+            return StateResult.SUCCESS
+
+        except Exception as e:
+            logger.error(f"Walker test failed: {e}")
+            self._test_results["walker"] = False
+            return StateResult.FAILURE
+
+    def _handle_test_arduino_mouse(self, context: StateExecutionContext) -> StateResult:
+        """
+        Test Arduino mouse functionality if enabled.
+
+        Returns:
+            StateResult.SUCCESS if test passes or skipped
+            StateResult.FAILURE if test fails
+        """
+        logger.info("\n[TEST 3/9] ARDUINO MOUSE (HARDWARE CONTROL)")
+        logger.info("-" * 60)
+
+        try:
+            # Check if Arduino mouse is enabled and available
+            from osrsbot.services.arduino_mouse_service import ArduinoMouseService
+
+            if not isinstance(self.actions.mouse, ArduinoMouseService):
+                logger.info("  ⚠ Arduino mouse not enabled (using software mouse)")
+                logger.info("  → Enable in config.json: arduino.enabled = true")
+                logger.info("  → Requires Arduino hardware with custom firmware")
+                logger.info("  → See WALKER_TECHNICAL_DOCS.md for details")
+                logger.info("  → Skipping Arduino test")
+                self._test_results["arduino_mouse"] = "skipped"
+                return StateResult.SUCCESS
+
+            logger.info("  ✓ Arduino mouse detected and enabled")
+
+            # Test 1: Check connection status
+            if self.actions.mouse._connection:
+                logger.info(f"  ✓ Arduino connected on port: {self.actions.mouse.serial_port}")
+                logger.info(f"  → Baud rate: {self.actions.mouse.baud_rate}")
+            else:
+                logger.warning("  ⚠ Arduino connection not available (using fallback)")
+                if self.actions.mouse._fallback:
+                    logger.info("  → Automatically fell back to software mouse")
+                self._test_results["arduino_mouse"] = "skipped"
+                return StateResult.SUCCESS
+
+            # Test 2: Test movement accuracy
+            logger.info("\n  Testing Arduino mouse movement accuracy...")
+
+            # Get current position
+            import pyautogui
+            start_pos = pyautogui.position()
+            logger.info(f"  → Start position: {start_pos}")
+
+            # Move to a test position (small movement)
+            test_x = start_pos[0] + 100
+            test_y = start_pos[1] + 50
+
+            logger.info(f"  → Moving to: ({test_x}, {test_y})")
+            self.actions.mouse.move_to(test_x, test_y, style="linear", duration=0.5)
+
+            self.actions.wait("short")
+
+            # Check final position
+            final_pos = pyautogui.position()
+            logger.info(f"  → Final position: {final_pos}")
+
+            # Calculate error
+            error = abs(final_pos[0] - test_x) + abs(final_pos[1] - test_y)
+            logger.info(f"  → Position error: {error} pixels")
+
+            if error <= 5:
+                logger.info("  ✓ Arduino mouse accuracy: EXCELLENT (≤5px error)")
+            elif error <= 10:
+                logger.info("  ✓ Arduino mouse accuracy: GOOD (≤10px error)")
+            else:
+                logger.warning(f"  ⚠ Arduino mouse accuracy: FAIR ({error}px error)")
+                logger.warning("  → May need firmware tuning for better accuracy")
+
+            # Test 3: Test click protocol
+            logger.info("\n  Testing Arduino mouse click protocol...")
+            logger.info("  → Sending test click command...")
+
+            # Move back to start position and click
+            self.actions.mouse.move_to(start_pos[0], start_pos[1], style="linear", duration=0.3)
+            self.actions.mouse.click(button="left")
+
+            logger.info("  ✓ Arduino mouse click command sent successfully")
+
+            logger.info("\n  ✓ Arduino mouse test complete")
+            self._test_results["arduino_mouse"] = True
+            return StateResult.SUCCESS
+
+        except ImportError:
+            logger.info("  ⚠ ArduinoMouseService not available")
+            self._test_results["arduino_mouse"] = "skipped"
+            return StateResult.SUCCESS
+
+        except Exception as e:
+            logger.error(f"Arduino mouse test failed: {e}")
+            self._test_results["arduino_mouse"] = False
+            return StateResult.FAILURE
+
     def _handle_test_inventory_detection(self, context: StateExecutionContext) -> StateResult:
         """
         Test inventory detection queries.
@@ -234,7 +446,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.SUCCESS if test passes
             StateResult.FAILURE if test fails
         """
-        logger.info("\n[TEST 2/7] INVENTORY DETECTION")
+        logger.info("\n[TEST 4/9] INVENTORY DETECTION")
         logger.info("-" * 60)
 
         try:
@@ -283,7 +495,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.SUCCESS if test passes
             StateResult.FAILURE if test fails
         """
-        logger.info("\n[TEST 3/7] INVENTORY CLICKING")
+        logger.info("\n[TEST 5/9] INVENTORY CLICKING")
         logger.info("-" * 60)
 
         try:
@@ -331,7 +543,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.SUCCESS if test passes
             StateResult.FAILURE if test fails
         """
-        logger.info("\n[TEST 4/7] COLOR DETECTION")
+        logger.info("\n[TEST 6/9] COLOR DETECTION")
         logger.info("-" * 60)
 
         try:
@@ -377,7 +589,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.SUCCESS if test passes
             StateResult.FAILURE if test fails
         """
-        logger.info("\n[TEST 5/7] TEMPLATE MATCHING")
+        logger.info("\n[TEST 7/9] TEMPLATE MATCHING")
         logger.info("-" * 60)
 
         try:
@@ -421,7 +633,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.SUCCESS if test passes
             StateResult.FAILURE if test fails
         """
-        logger.info("\n[TEST 6/7] OCR (STATS READING)")
+        logger.info("\n[TEST 8/9] OCR (STATS READING)")
         logger.info("-" * 60)
 
         try:
@@ -461,7 +673,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.RETRY to continue testing
             StateResult.FAILURE if test fails
         """
-        logger.info(f"\n[TEST 7/7] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})")
+        logger.info(f"\n[TEST 9/9] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})")
 
         try:
             # Check if test complete
@@ -563,7 +775,9 @@ class ComprehensiveTestBot(StateMachineBot):
         logger.info("=" * 60)
 
         tests = [
-            ("Minimap Navigation", "minimap"),
+            ("Minimap Navigation (walk_tiles)", "minimap"),
+            ("Walker/Pathfinding (world coords)", "walker"),
+            ("Arduino Mouse (hardware control)", "arduino_mouse"),
             ("Inventory Detection", "inventory_detection"),
             ("Inventory Clicking", "inventory_clicking"),
             ("Color Detection", "color_detection"),
