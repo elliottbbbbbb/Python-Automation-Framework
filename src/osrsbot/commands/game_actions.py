@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 class GameActions:
     """High-level game actions combining multiple services."""
 
-    # Init
-
     def __init__(
         self,
         mouse: MouseService,
@@ -43,8 +41,6 @@ class GameActions:
         self.walker = walker
         self._target_tracker = ClickTargetTracker()
 
-    # Timing & utils
-
     def wait(self, timing_type: str) -> None:
         delay = self.config.get("timings", timing_type, default=GAME_TIMING.default_wait)
 
@@ -62,7 +58,6 @@ class GameActions:
             )
             actual_delay = GAME_TIMING.default_wait
 
-        # Apply session variance if anti-ban enabled
         if self.anti_ban:
             variance = self.anti_ban.get_timing_variance()
             actual_delay *= variance
@@ -92,8 +87,6 @@ class GameActions:
         """Clear click history, target locks, and blacklist."""
         self._target_tracker.reset()
         logger.debug("Click tracking reset")
-
-    # Inventory & UI
 
     def click_inventory_slot(
         self,
@@ -254,8 +247,6 @@ class GameActions:
         logger.error(f"Failed to open inventory after {max_attempts} attempts")
         return False
 
-    # Item dropping
-
     def drop_item(self, slot: int, shift_drop: bool = False) -> bool:
         """Drop item from inventory slot."""
         import keyboard
@@ -279,7 +270,6 @@ class GameActions:
                     logger.error(f"Failed to get position for slot {slot}")
                     return False
             else:
-                # Fall back to config coords
                 coord = self.config.get("coordinates", "inventory", f"slot_{slot}")
                 if not coord or "x" not in coord or "y" not in coord:
                     logger.error(f"No coordinates for slot {slot}")
@@ -287,7 +277,6 @@ class GameActions:
                 x, y = coord["x"], coord["y"]
                 abs_x, abs_y = self._to_absolute(x, y)
         else:
-            # Use config coords
             coord = self.config.get("coordinates", "inventory", f"slot_{slot}")
             if not coord or "x" not in coord or "y" not in coord:
                 logger.error(f"No coordinates for slot {slot}")
@@ -305,24 +294,19 @@ class GameActions:
             time.sleep(random.uniform(0.02, 0.05))
             keyboard.release('shift')
 
-            # Shorter delay for shift-drop
             delay = random.uniform(0.25, 0.35)
             if self.anti_ban:
                 delay *= self.anti_ban.get_timing_variance()
             time.sleep(delay)
         else:
-            # Right-click drop method
             pyautogui.rightClick(abs_x, abs_y)
 
-            # Wait for context menu
             menu_delay = random.uniform(0.05, 0.1)
             time.sleep(menu_delay)
 
-            # Click "Drop" option (offset down from right-click position)
-            drop_offset_y = random.uniform(38, 42)  # ~40px down
+            drop_offset_y = random.uniform(38, 42)
             pyautogui.click(abs_x, abs_y + drop_offset_y)
 
-            # Standard drop delay with variance
             delay = random.uniform(0.5, 0.7)
             if self.anti_ban:
                 delay *= self.anti_ban.get_timing_variance()
@@ -330,7 +314,6 @@ class GameActions:
 
         logger.debug(f"Dropped item from slot {slot} ({'shift-drop' if shift_drop else 'right-click'})")
 
-        # Record action for anti-ban
         if self.anti_ban:
             self.anti_ban.record_action(f"drop_slot_{slot}")
 
@@ -349,8 +332,7 @@ class GameActions:
 
         dropped = 0
         for slot in drop_slots:
-            # Small chance of misclick (click wrong slot first)
-            if random.random() < 0.02:  # 2% chance
+            if random.random() < 0.02:
                 wrong_slot = random.choice([s for s in drop_slots if s != slot])
                 logger.debug(f"Anti-ban: Misclick on slot {wrong_slot}")
                 # Just move mouse there, don't actually click
@@ -372,7 +354,7 @@ class GameActions:
             keep_slots = []
 
         total_slots = 28
-        current_filled = total_slots - 0  # Assume full for now
+        current_filled = total_slots - 0  # TODO: Implement inventory detection
         current_empty = total_slots - current_filled
 
         if current_empty >= target_empty:
@@ -385,7 +367,6 @@ class GameActions:
         drop_slots = [slot for slot in all_slots if slot not in keep_slots]
         random.shuffle(drop_slots)
 
-        # Drop only the needed amount
         dropped = 0
         for slot in drop_slots[:to_drop]:
             if self.drop_item(slot, shift_drop=False):
@@ -393,8 +374,6 @@ class GameActions:
 
         logger.info(f"Dropped {dropped} items to reach {target_empty} empty slots")
         return dropped
-
-    # Loot pickup
 
     def pickup_loot(
         self,
@@ -417,11 +396,9 @@ class GameActions:
             logger.error("LootDetectionService not initialized - cannot pickup loot")
             return False
 
-        # Default player position is minimap center
         if player_pos is None:
-            player_pos = (654, 111)  # Minimap center where player always is
+            player_pos = (654, 111)
 
-        # Detect nearest loot
         loot_pos = self.loot_detection.detect_nearest_loot(
             player_pos=player_pos,
             region=region,
@@ -432,7 +409,6 @@ class GameActions:
             logger.debug("No loot found on screen")
             return False
 
-        # Click the loot
         loot_x, loot_y = loot_pos
         abs_x, abs_y = self._to_absolute(loot_x, loot_y)
 
@@ -443,19 +419,15 @@ class GameActions:
             speed_multiplier=self._get_mouse_speed_multiplier()
         )
 
-        # Wait for pickup animation (~0.6s with variance)
         pickup_delay = random.uniform(0.5, 0.7)
         if self.anti_ban:
             pickup_delay *= self.anti_ban.get_timing_variance()
         time.sleep(pickup_delay)
 
-        # Record action for anti-ban
         if self.anti_ban:
             self.anti_ban.record_action("pickup_loot")
 
         return True
-
-    # Color clicking
 
     def click_color(
         self,
@@ -476,7 +448,6 @@ class GameActions:
             )
 
         match = self.screen.find_color(hex_color, tolerance, region)
-        logger.debug(f"Found match: {match}")
         if not match:
             logger.debug(f"Color '{color_name}' ({hex_color}) not found")
             return False
@@ -514,7 +485,6 @@ class GameActions:
         if player_position is None:
             player_position = self._get_player_position()
 
-        # Find all color matches sorted by distance from player
         blacklist_checker = None
         if enable_blacklist:
             blacklist_checker = self._target_tracker.is_blacklisted
@@ -527,12 +497,10 @@ class GameActions:
             blacklist_checker=blacklist_checker
         )
 
-        # Handle no matches found
         if not matches_with_distance:
             logger.debug(f"No valid targets found for '{color_name}'")
             return False
 
-        # Select best target (closest to player)
         best_match, distance = matches_with_distance[0]
         logger.debug(
             f"Selected target at ({best_match.x}, {best_match.y}), "
@@ -554,18 +522,16 @@ class GameActions:
                 duration=TARGET_SELECTION.blacklist_duration,
                 radius=TARGET_SELECTION.blacklist_radius
             )
-            # Retry with blacklist active
             return self.click_color_smart(
                 color_name=color_name,
                 player_position=player_position,
                 move_style=move_style,
                 tolerance=tolerance,
                 enable_stuck_detection=enable_stuck_detection,
-                enable_blacklist=True,  # Ensure blacklist is active
+                enable_blacklist=True,
                 region=region
             )
 
-        # Click the target
         abs_x, abs_y = self._to_absolute(best_match.x, best_match.y)
         logger.debug(
             f"Clicking '{color_name}' at relative ({best_match.x}, {best_match.y}) -> "
@@ -576,16 +542,12 @@ class GameActions:
         if not success:
             return False
 
-        # Record click in history
         self._target_tracker.add_click(best_match.x, best_match.y)
 
-        # Record action for anti-ban pattern detection
         if self.anti_ban:
             self.anti_ban.record_action(f"click_{color_name}")
 
         return True
-
-    # Coordinate clicking
 
     def click_coordinate(
         self,
@@ -616,8 +578,6 @@ class GameActions:
         )
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
-    # Game actions
-
     def use_item(self, item_color_name: str) -> bool:
         return self.click_color(item_color_name)
 
@@ -643,31 +603,23 @@ class GameActions:
             logger.error(f"Invalid direction: {direction}. Use up/down/left/right")
             return False
 
-        # Get movement delta for direction
         dx, dy = MINIMAP_NAVIGATION.tile_movements[direction]
-
-        # Calculate target position on minimap (relative to player center)
         target_x = MINIMAP_NAVIGATION.player_center_x + (dx * tiles)
         target_y = MINIMAP_NAVIGATION.player_center_y + (dy * tiles)
 
         logger.info(f"Walking {tiles} tile(s) {direction} to minimap ({target_x}, {target_y})")
 
-        # Convert to absolute screen coordinates and click
         abs_x, abs_y = self._to_absolute(target_x, target_y)
         success = self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
         if success:
-            # Use configured wait time or default
             actual_wait = wait_time if wait_time is not None else MINIMAP_NAVIGATION.default_wait_time
-
-            # Add variance for humanization (up to +1 second)
             variance = time.time() % 1.0
             total_wait = actual_wait + variance
 
             logger.debug(f"Waiting {total_wait:.2f}s after minimap click")
             time.sleep(total_wait)
 
-            # Record action for anti-ban pattern detection
             if self.anti_ban:
                 self.anti_ban.record_action(f"walk_{direction}_{tiles}")
 
@@ -693,8 +645,6 @@ class GameActions:
 
         self.wait("teleport")
         return True
-
-    # Banking
 
     def bank_deposit_all(self) -> bool:
         if not self.click_coordinate(("ui", "bank_deposit_all")):
@@ -753,8 +703,6 @@ class GameActions:
         )
 
         return match is not None
-
-    # Walker / World Coordinate Navigation
 
     def walk_to_world_coordinate(
         self,

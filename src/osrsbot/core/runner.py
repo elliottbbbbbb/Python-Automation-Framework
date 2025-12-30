@@ -6,7 +6,6 @@ import pytesseract
 
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MouseConfig
-from osrsbot.services.virtual_mouse_service import VirtualMouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.ocr_service import OCRService
 from osrsbot.services.template_match_service import TemplateMatchService
@@ -74,7 +73,6 @@ class ScriptRunner:
                 f"Could not find or attach to window '{window_title}'") from e
 
         try:
-            logger.debug("Initializing MouseService")
             mouse_config_dict = self.config.get("mouse", default={})
             mouse_config = MouseConfig(
                 min_speed=mouse_config_dict.get("min_speed", 0.2),
@@ -89,11 +87,29 @@ class ScriptRunner:
                     mouse_config_dict.get("post_click_delay_max", 0.15)
                 )
             )
-            self.mouse = MouseService(mouse_config)
-            logger.info("MouseService initialized successfully")
 
-            # ScreenService uses GameInterface.get_bounds as single source
-            # of truth for window position
+            use_interception = os.getenv("USE_INTERCEPTION", "").lower() in ("1", "true", "yes")
+
+            if use_interception:
+                try:
+                    from osrsbot.services.interception_mouse_service import InterceptionMouseService
+                    logger.debug("Initializing InterceptionMouseService (kernel-level)")
+                    self.mouse = InterceptionMouseService(mouse_config)
+                    logger.info("InterceptionMouseService initialized successfully")
+                except (ImportError, RuntimeError) as e:
+                    logger.warning(
+                        f"InterceptionMouseService not available: {e}. "
+                        "Falling back to MouseService. "
+                        "To use Interception: install driver and reboot system (see INTERCEPTION_SETUP.md)"
+                    )
+                    logger.debug("Initializing MouseService (fallback)")
+                    self.mouse = MouseService(mouse_config)
+                    logger.info("MouseService initialized successfully (fallback)")
+            else:
+                logger.debug("Initializing MouseService")
+                self.mouse = MouseService(mouse_config)
+                logger.info("MouseService initialized successfully")
+
             logger.debug("Initializing ScreenService")
             self.screen = ScreenService(window_getter=self.interface.get_bounds)
             logger.info("ScreenService initialized successfully")
@@ -123,7 +139,7 @@ class ScriptRunner:
 
             self.ocr = OCRService(window_getter=self.interface.get_window_position,
                                           tesseract_path=tesseract_path,
-                                          debug=True)
+                                          debug=False)
 
             logger.info("OCR Service initialized successfully")
 

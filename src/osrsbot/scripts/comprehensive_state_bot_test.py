@@ -227,17 +227,17 @@ class ComprehensiveTestBot(StateMachineBot):
             logger.info(f"Walking {tiles} tiles in each direction: {directions}")
 
             for direction in directions:
-                logger.info(f"  → Walking {direction} ({tiles} tiles)...")
+                logger.info(f"  -> Walking {direction} ({tiles} tiles)...")
                 success = self.actions.walk_tiles(direction, tiles=tiles)
 
                 if not success:
-                    logger.error(f"  ✗ Failed to walk {direction}")
+                    logger.error(f"  X Failed to walk {direction}")
                     self._test_results["minimap"] = False
                     return StateResult.FAILURE
 
                 self.actions.wait("medium")
 
-            logger.info("  ✓ All directions tested successfully")
+            logger.info("  OK All directions tested successfully")
             self._test_results["minimap"] = True
             return StateResult.SUCCESS
 
@@ -260,17 +260,17 @@ class ComprehensiveTestBot(StateMachineBot):
         try:
             # Check if walker is available
             if not self.actions.walker:
-                logger.warning("  ⚠ WalkerService not available (Status Socket plugin not detected)")
-                logger.warning("  → Install Status Socket plugin to enable walker")
-                logger.warning("  → See SETUP_GUIDE.md for installation instructions")
-                logger.warning("  → Skipping walker test")
+                logger.warning("  ! WalkerService not available (Status Socket plugin not detected)")
+                logger.warning("  -> Install Status Socket plugin to enable walker")
+                logger.warning("  -> See SETUP_GUIDE.md for installation instructions")
+                logger.warning("  -> Skipping walker test")
                 self._test_results["walker"] = "skipped"
                 return StateResult.SUCCESS
 
             # Get current player position
             state = self.actions.walker.status_socket.get_player_state()
             if not state:
-                logger.error("  ✗ Failed to get player position from Status Socket")
+                logger.error("  X Failed to get player position from Status Socket")
                 self._test_results["walker"] = False
                 return StateResult.FAILURE
 
@@ -282,13 +282,13 @@ class ComprehensiveTestBot(StateMachineBot):
             target_x = state.world_x
             target_y = state.world_y + 5
 
-            logger.info(f"  → Target: ({target_x}, {target_y})")
+            logger.info(f"  -> Target: ({target_x}, {target_y})")
             success = self.actions.walk_to_world_coordinate(target_x, target_y, move_style="curved")
 
             if success:
-                logger.info("  ✓ Successfully reached target coordinate")
+                logger.info("  OK Successfully reached target coordinate")
             else:
-                logger.error("  ✗ Failed to reach target coordinate")
+                logger.error("  X Failed to reach target coordinate")
                 self._test_results["walker"] = False
                 return StateResult.FAILURE
 
@@ -298,7 +298,7 @@ class ComprehensiveTestBot(StateMachineBot):
             logger.info("\n  Test 2: Walking a path (square pattern: 5 tiles each direction)")
             state = self.actions.walker.status_socket.get_player_state()
             if not state:
-                logger.error("  ✗ Failed to get updated player position")
+                logger.error("  X Failed to get updated player position")
                 self._test_results["walker"] = False
                 return StateResult.FAILURE
 
@@ -310,32 +310,32 @@ class ComprehensiveTestBot(StateMachineBot):
                 (state.world_x, state.world_y)           # 5 tiles north (back to start)
             ]
 
-            logger.info(f"  → Path waypoints: {len(path)} points")
+            logger.info(f"  -> Path waypoints: {len(path)} points")
             for i, (x, y) in enumerate(path):
                 logger.info(f"    {i+1}. ({x}, {y})")
 
             success = self.actions.walk_path(path, move_style="curved")
 
             if success:
-                logger.info("  ✓ Successfully completed path")
+                logger.info("  OK Successfully completed path")
             else:
-                logger.error("  ✗ Failed to complete path")
+                logger.error("  X Failed to complete path")
                 self._test_results["walker"] = False
                 return StateResult.FAILURE
 
             # Test 3: Verify rotation matrix works at different camera angles
             logger.info("\n  Test 3: Camera rotation compensation test")
-            logger.info("  → Testing walker works regardless of camera angle")
+            logger.info("  -> Testing walker works regardless of camera angle")
 
             final_state = self.actions.walker.status_socket.get_player_state()
             if final_state:
-                logger.info(f"  → Final position: ({final_state.world_x}, {final_state.world_y})")
-                logger.info(f"  → Final camera yaw: {final_state.camera_yaw}")
-                logger.info("  ✓ Rotation matrix compensated for camera angle correctly")
+                logger.info(f"  -> Final position: ({final_state.world_x}, {final_state.world_y})")
+                logger.info(f"  -> Final camera yaw: {final_state.camera_yaw}")
+                logger.info("  OK Rotation matrix compensated for camera angle correctly")
             else:
-                logger.warning("  ⚠ Could not verify final position")
+                logger.warning("  ! Could not verify final position")
 
-            logger.info("\n  ✓ Walker/pathfinding test complete")
+            logger.info("\n  OK Walker/pathfinding test complete")
             self._test_results["walker"] = True
             return StateResult.SUCCESS
 
@@ -352,90 +352,75 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.SUCCESS if test passes or skipped
             StateResult.FAILURE if test fails
         """
-        logger.info("\n[TEST 3/9] ARDUINO MOUSE (HARDWARE CONTROL)")
+        logger.info("\n[TEST 3/9] INTERCEPTION MOUSE (KERNEL-LEVEL CONTROL)")
         logger.info("-" * 60)
 
         try:
-            # Check if Arduino mouse is enabled and available
-            from osrsbot.services.arduino_mouse_service import ArduinoMouseService
+            from osrsbot.services.interception_mouse_service import InterceptionMouseService
 
-            if not isinstance(self.actions.mouse, ArduinoMouseService):
-                logger.info("  ⚠ Arduino mouse not enabled (using software mouse)")
-                logger.info("  → Enable in config.json: arduino.enabled = true")
-                logger.info("  → Requires Arduino hardware with custom firmware")
-                logger.info("  → See WALKER_TECHNICAL_DOCS.md for details")
-                logger.info("  → Skipping Arduino test")
-                self._test_results["arduino_mouse"] = "skipped"
+            if not isinstance(self.actions.mouse, InterceptionMouseService):
+                logger.info("  ! Interception mouse not enabled (using standard mouse)")
+                logger.info("  -> Enable with environment variable: USE_INTERCEPTION=1")
+                logger.info("  -> Requires interception-python package")
+                logger.info("  -> Install with: pip install interception-python")
+                logger.info("  -> Requires Interception driver installation")
+                logger.info("  -> Skipping Interception test")
+                self._test_results["interception_mouse"] = "skipped"
                 return StateResult.SUCCESS
 
-            logger.info("  ✓ Arduino mouse detected and enabled")
+            logger.info("  OK Interception mouse detected and enabled")
 
-            # Test 1: Check connection status
-            if self.actions.mouse._connection:
-                logger.info(f"  ✓ Arduino connected on port: {self.actions.mouse.serial_port}")
-                logger.info(f"  → Baud rate: {self.actions.mouse.baud_rate}")
-            else:
-                logger.warning("  ⚠ Arduino connection not available (using fallback)")
-                if self.actions.mouse._fallback:
-                    logger.info("  → Automatically fell back to software mouse")
-                self._test_results["arduino_mouse"] = "skipped"
-                return StateResult.SUCCESS
+            logger.info(f"  -> Driver context initialized: {bool(self.actions.mouse.context)}")
+            logger.info(f"  -> Mouse device ID: {self.actions.mouse.mouse_device}")
 
-            # Test 2: Test movement accuracy
-            logger.info("\n  Testing Arduino mouse movement accuracy...")
+            logger.info("\n  Testing Interception mouse movement accuracy...")
 
-            # Get current position
             import pyautogui
             start_pos = pyautogui.position()
-            logger.info(f"  → Start position: {start_pos}")
+            logger.info(f"  -> Start position: {start_pos}")
 
-            # Move to a test position (small movement)
             test_x = start_pos[0] + 100
             test_y = start_pos[1] + 50
 
-            logger.info(f"  → Moving to: ({test_x}, {test_y})")
+            logger.info(f"  -> Moving to: ({test_x}, {test_y})")
             self.actions.mouse.move_to(test_x, test_y, style="linear", duration=0.5)
 
             self.actions.wait("short")
 
-            # Check final position
             final_pos = pyautogui.position()
-            logger.info(f"  → Final position: {final_pos}")
+            logger.info(f"  -> Final position: {final_pos}")
 
-            # Calculate error
             error = abs(final_pos[0] - test_x) + abs(final_pos[1] - test_y)
-            logger.info(f"  → Position error: {error} pixels")
+            logger.info(f"  -> Position error: {error} pixels")
 
             if error <= 5:
-                logger.info("  ✓ Arduino mouse accuracy: EXCELLENT (≤5px error)")
+                logger.info("  OK Interception mouse accuracy: EXCELLENT (<=5px error)")
             elif error <= 10:
-                logger.info("  ✓ Arduino mouse accuracy: GOOD (≤10px error)")
+                logger.info("  OK Interception mouse accuracy: GOOD (<=10px error)")
             else:
-                logger.warning(f"  ⚠ Arduino mouse accuracy: FAIR ({error}px error)")
-                logger.warning("  → May need firmware tuning for better accuracy")
+                logger.warning(f"  ! Interception mouse accuracy: FAIR ({error}px error)")
 
-            # Test 3: Test click protocol
-            logger.info("\n  Testing Arduino mouse click protocol...")
-            logger.info("  → Sending test click command...")
+            logger.info("\n  Testing Interception mouse click...")
+            logger.info("  -> Sending test click command...")
 
-            # Move back to start position and click
             self.actions.mouse.move_to(start_pos[0], start_pos[1], style="linear", duration=0.3)
             self.actions.mouse.click(button="left")
 
-            logger.info("  ✓ Arduino mouse click command sent successfully")
+            logger.info("  OK Interception mouse click sent successfully")
 
-            logger.info("\n  ✓ Arduino mouse test complete")
-            self._test_results["arduino_mouse"] = True
+            logger.info("\n  OK Interception mouse test complete")
+            logger.info("  -> Kernel-level input provides hardware-level authenticity")
+            self._test_results["interception_mouse"] = True
             return StateResult.SUCCESS
 
         except ImportError:
-            logger.info("  ⚠ ArduinoMouseService not available")
-            self._test_results["arduino_mouse"] = "skipped"
+            logger.info("  ! InterceptionMouseService not available")
+            self._test_results["interception_mouse"] = "skipped"
             return StateResult.SUCCESS
 
         except Exception as e:
-            logger.error(f"Arduino mouse test failed: {e}")
-            self._test_results["arduino_mouse"] = False
+            logger.error(f"Interception mouse test failed: {e}")
+            self._test_results["interception_mouse"] = False
             return StateResult.FAILURE
 
     def _handle_test_inventory_detection(self, context: StateExecutionContext) -> StateResult:
@@ -451,7 +436,7 @@ class ComprehensiveTestBot(StateMachineBot):
 
         try:
             if not self.state.inventory:
-                logger.warning("  ⚠ Inventory system not available (missing services)")
+                logger.warning("  ! Inventory system not available (missing services)")
                 self._test_results["inventory_detection"] = "skipped"
                 return StateResult.SUCCESS
 
@@ -460,25 +445,25 @@ class ComprehensiveTestBot(StateMachineBot):
 
             # Get snapshot
             snapshot = self.state.inventory.get_snapshot(force=True)
-            logger.info(f"  → Total items: {snapshot.total_items}")
-            logger.info(f"  → Filled slots: {len(snapshot.filled_slots)}")
-            logger.info(f"  → Empty slots: {len(snapshot.empty_slots)}")
+            logger.info(f"  -> Total items: {snapshot.total_items}")
+            logger.info(f"  -> Filled slots: {len(snapshot.filled_slots)}")
+            logger.info(f"  -> Empty slots: {len(snapshot.empty_slots)}")
 
             # Test is_full
             is_full = self.state.inventory.is_full(threshold=27)
-            logger.info(f"  → Is full (≥27 items): {is_full}")
+            logger.info(f"  -> Is full (>=27 items): {is_full}")
 
             # Test specific slot
             has_item_slot_0 = self.state.inventory.has_item_in_slot(0)
-            logger.info(f"  → Slot 0 has item: {has_item_slot_0}")
+            logger.info(f"  -> Slot 0 has item: {has_item_slot_0}")
 
             # Get filled/empty slot lists
             filled = self.state.inventory.get_filled_slots()
             empty = self.state.inventory.get_empty_slots()
-            logger.info(f"  → Filled slot indices: {filled[:5]}..." if len(filled) > 5 else f"  → Filled slots: {filled}")
-            logger.info(f"  → Empty slot indices: {empty[:5]}..." if len(empty) > 5 else f"  → Empty slots: {empty}")
+            logger.info(f"  -> Filled slot indices: {filled[:5]}..." if len(filled) > 5 else f"  -> Filled slots: {filled}")
+            logger.info(f"  -> Empty slot indices: {empty[:5]}..." if len(empty) > 5 else f"  -> Empty slots: {empty}")
 
-            logger.info("  ✓ Inventory detection working correctly")
+            logger.info("  OK Inventory detection working correctly")
             self._test_results["inventory_detection"] = True
             return StateResult.SUCCESS
 
@@ -501,9 +486,9 @@ class ComprehensiveTestBot(StateMachineBot):
         try:
             # Check if template service is available
             if not self.actions.template_service:
-                logger.warning("  ⚠ TemplateMatchService not available (missing template images)")
-                logger.warning("  → Create templates/inventory_grid.png to enable this feature")
-                logger.warning("  → Skipping inventory clicking test")
+                logger.warning("  ! TemplateMatchService not available (missing template images)")
+                logger.warning("  -> Create templates/inventory_grid.png to enable this feature")
+                logger.warning("  -> Skipping inventory clicking test")
                 self._test_results["inventory_clicking"] = "skipped"
                 return StateResult.SUCCESS
 
@@ -513,20 +498,20 @@ class ComprehensiveTestBot(StateMachineBot):
             logger.info(f"  Testing clicks on slots: {test_slots}")
 
             for slot in test_slots:
-                logger.info(f"  → Clicking slot {slot}...")
+                logger.info(f"  -> Clicking slot {slot}...")
                 success = self.actions.click_inventory_slot_detected(
                     slot_num=slot,
                     move_style="curved"
                 )
 
                 if success:
-                    logger.info(f"    ✓ Successfully clicked slot {slot}")
+                    logger.info(f"    OK Successfully clicked slot {slot}")
                 else:
-                    logger.warning(f"    ⚠ Failed to click slot {slot}")
+                    logger.warning(f"    ! Failed to click slot {slot}")
 
                 self.actions.wait("short")
 
-            logger.info("  ✓ Inventory clicking test complete")
+            logger.info("  OK Inventory clicking test complete")
             self._test_results["inventory_clicking"] = True
             return StateResult.SUCCESS
 
@@ -569,9 +554,9 @@ class ComprehensiveTestBot(StateMachineBot):
             )
 
             if success:
-                logger.info("  ✓ Color detection successful (clicked blue_outline)")
+                logger.info("  OK Color detection successful (clicked blue_outline)")
             else:
-                logger.warning("  ⚠ No blue_outline found (this is OK if none visible)")
+                logger.warning("  ! No blue_outline found (this is OK if none visible)")
 
             self._test_results["color_detection"] = True
             return StateResult.SUCCESS
@@ -594,9 +579,9 @@ class ComprehensiveTestBot(StateMachineBot):
 
         try:
             if not self.actions.template_service:
-                logger.warning("  ⚠ TemplateMatchService not available (missing template images)")
-                logger.warning("  → Create templates/inventory_grid.png to enable this feature")
-                logger.warning("  → Skipping template matching test")
+                logger.warning("  ! TemplateMatchService not available (missing template images)")
+                logger.warning("  -> Create templates/inventory_grid.png to enable this feature")
+                logger.warning("  -> Skipping template matching test")
                 self._test_results["template_matching"] = "skipped"
                 return StateResult.SUCCESS
 
@@ -608,15 +593,15 @@ class ComprehensiveTestBot(StateMachineBot):
                 detected = self.state.debug_detect_inventory_grid(force=True)
 
                 if detected:
-                    logger.info("  ✓ Inventory grid detected successfully")
+                    logger.info("  OK Inventory grid detected successfully")
                     grid_info = self.state.debug_get_inventory_grid_info()
                     if grid_info:
-                        logger.info(f"    → Grid visible: {grid_info['visible']}")
-                        logger.info(f"    → Total elements: {grid_info['total_elements']}")
+                        logger.info(f"    -> Grid visible: {grid_info['visible']}")
+                        logger.info(f"    -> Total elements: {grid_info['total_elements']}")
                 else:
-                    logger.warning("  ⚠ Inventory grid not detected")
+                    logger.warning("  ! Inventory grid not detected")
 
-            logger.info("  ✓ Template matching test complete")
+            logger.info("  OK Template matching test complete")
             self._test_results["template_matching"] = True
             return StateResult.SUCCESS
 
@@ -642,20 +627,20 @@ class ComprehensiveTestBot(StateMachineBot):
             hp = self.state.get_hp(force=True)
 
             if hp is not None:
-                logger.info(f"  ✓ HP detected: {hp}")
+                logger.info(f"  OK HP detected: {hp}")
             else:
-                logger.warning("  ⚠ HP detection returned None")
+                logger.warning("  ! HP detection returned None")
 
             # Test prayer reading (if available)
             logger.info("  Testing prayer detection...")
             prayer = self.state.get_prayer(force=True)
 
             if prayer is not None:
-                logger.info(f"  ✓ Prayer detected: {prayer}")
+                logger.info(f"  OK Prayer detected: {prayer}")
             else:
-                logger.warning("  ⚠ Prayer detection returned None")
+                logger.warning("  ! Prayer detection returned None")
 
-            logger.info("  ✓ OCR test complete")
+            logger.info("  OK OCR test complete")
             self._test_results["ocr"] = True
             return StateResult.SUCCESS
 
@@ -678,13 +663,13 @@ class ComprehensiveTestBot(StateMachineBot):
         try:
             # Check if test complete
             if self._combat_click_count >= self._combat_target_clicks:
-                logger.info("  ✓ Combat detection test complete")
+                logger.info("  OK Combat detection test complete")
                 self._test_results["combat"] = True
                 return StateResult.SUCCESS
 
             # Only attack if NOT in combat
             if not self.state.in_combat():
-                logger.debug("  → Not in combat, attacking NPC...")
+                logger.info("  -> Not in combat, attacking NPC...")
 
                 player_pos = self.actions._get_player_position()
                 dims = self.state.debug_get_viewport_dimensions()
@@ -707,17 +692,17 @@ class ComprehensiveTestBot(StateMachineBot):
                 if not clicked:
                     if self._no_targets_start_time is None:
                         self._no_targets_start_time = time.time()
-                        logger.warning("  ⚠ No targets found, starting timeout...")
+                        logger.warning("  ! No targets found, starting timeout...")
                     elif time.time() - self._no_targets_start_time > 45.0:
-                        logger.error("  ✗ No targets for 45+ seconds, ending test")
+                        logger.error("  X No targets for 45+ seconds, ending test")
                         return StateResult.FAILURE
 
-                    logger.warning("  ⚠ No valid NPCs found, retrying...")
+                    logger.warning("  ! No valid NPCs found, retrying...")
                     self.actions.wait("short")
                     return StateResult.RETRY
 
                 self._no_targets_start_time = None
-                logger.info("  → Clicked NPC, waiting for combat...")
+                logger.info("  -> Clicked NPC, waiting for combat...")
 
                 # Wait for combat to start
                 combat_started = False
@@ -725,12 +710,12 @@ class ComprehensiveTestBot(StateMachineBot):
                     self.actions.wait("short")
                     if self.state.in_combat():
                         combat_started = True
-                        logger.debug("  → Combat started")
+                        logger.info("  -> Combat started")
                         break
 
                 if combat_started:
                     # Wait for combat to finish
-                    logger.debug("  → Waiting for combat to finish...")
+                    logger.info("  -> Waiting for combat to finish...")
                     combat_ended_count = 0
 
                     for _ in range(30):
@@ -740,20 +725,20 @@ class ComprehensiveTestBot(StateMachineBot):
                             combat_ended_count += 1
                             if combat_ended_count >= 3:
                                 self._combat_click_count += 1
-                                logger.info(f"  ✓ Kill complete! ({self._combat_click_count}/{self._combat_target_clicks})")
+                                logger.info(f"  OK Kill complete! ({self._combat_click_count}/{self._combat_target_clicks})")
 
                                 hp = self.state.get_hp()
                                 if hp:
-                                    logger.info(f"  → Current HP: {hp}")
+                                    logger.info(f"  -> Current HP: {hp}")
 
                                 time.sleep(3.0)
                                 break
                         else:
                             combat_ended_count = 0
                 else:
-                    logger.warning("  ⚠ Combat didn't start, NPC may have moved")
+                    logger.warning("  ! Combat didn't start, NPC may have moved")
             else:
-                logger.debug("  → In combat, waiting...")
+                logger.info("  -> In combat, waiting...")
                 self.actions.wait("short")
 
             return StateResult.RETRY
@@ -790,13 +775,13 @@ class ComprehensiveTestBot(StateMachineBot):
             result = self._test_results.get(test_key, "not run")
 
             if result is True:
-                status = "✓ PASS"
+                status = "OK PASS"
             elif result == "skipped":
-                status = "⚠ SKIPPED"
+                status = "!! SKIPPED"
             elif result is False:
-                status = "✗ FAIL"
+                status = "X  FAIL"
             else:
-                status = "- NOT RUN"
+                status = "-  NOT RUN"
 
             logger.info(f"  {status:12} {test_name}")
 

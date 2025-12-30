@@ -1,10 +1,10 @@
 {
-  "account_name": "61grouphunt",
+  "account_name": "mweow rawr",
   "window_title": "RuneLite - 61grouphunt",
   "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
   "colors": {
     "yellow_tile_marker": "#fcfc01",
-    "blue_outline": "#0002cd",
+    "blue_outline": "#00ffff",
     "purple_item_outline": "#7d00ff",
     "red_outline": "#FF0000",
     "green_dragon": "#00ffff",
@@ -114,6 +114,12 @@
       "hp_region": {
         "x": 527,
         "y": 79,
+        "width": 35,
+        "height": 20
+      },
+      "prayer_region": {
+        "x": 527,
+        "y": 121,
         "width": 35,
         "height": 20
       }

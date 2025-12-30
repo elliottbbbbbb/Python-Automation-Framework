@@ -26,6 +26,7 @@ from osrsbot.constants import (
     TESSERACT_CONFIG,
     OCR_CHAR_REPLACEMENTS
 )
+from osrsbot.services.digit_classifier import get_digit_classifier
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +62,12 @@ class OCRService:
         self,
         window_getter: Optional[Callable[[], Optional[Tuple[int, int, int, int]]]] = None,
         tesseract_path: Optional[str] = None,
-        debug: bool = True
+        debug: bool = True,
+        use_cnn: bool = False
     ):
         self._window_getter = window_getter
         self.debug = debug
+        self.use_cnn = use_cnn
 
         if tesseract_path:
             pytesseract.pytesseract.tesseract_cmd = tesseract_path
@@ -73,6 +76,18 @@ class OCRService:
         self._caches = {}  # region_name -> deque of readings
         self._last_valid = {}  # region_name -> last valid value
         self._last_read_time = {}  # region_name -> timestamp
+
+        # Load CNN classifier
+        self._classifier = None
+        if use_cnn:
+            try:
+                self._classifier = get_digit_classifier()
+                if self._classifier.is_available():
+                    logger.info("CNN digit classifier loaded successfully")
+                else:
+                    logger.warning("CNN classifier not available, falling back to Tesseract")
+            except Exception as e:
+                logger.warning(f"Failed to load CNN classifier: {e}, using Tesseract")
 
     def get_window_position(self) -> Optional[Tuple[int, int, int, int]]:
         if self._window_getter is not None:
@@ -191,6 +206,24 @@ class OCRService:
         )
 
         screenshot = pyautogui.screenshot(region=abs_region)
+
+        # Try CNN classifier first (much more accurate, no heuristics needed)
+        if self._classifier and self._classifier.is_available():
+            try:
+                # Use max_digits=3 to handle values up to 999 (max HP is 99, but other stats can be higher)
+                cnn_result = self._classifier.predict_number(screenshot, max_digits=3)
+                if cnn_result is not None and min_value <= cnn_result <= max_value:
+                    logger.debug(f"{region.name}: CNN predicted {cnn_result}")
+                    return cnn_result
+                elif cnn_result is not None:
+                    logger.debug(
+                        f"{region.name}: CNN predicted {cnn_result} "
+                        f"(out of range {min_value}-{max_value}), falling back to Tesseract"
+                    )
+            except Exception as e:
+                logger.debug(f"{region.name}: CNN prediction failed: {e}, falling back to Tesseract")
+
+        # Fallback to Tesseract OCR with preprocessing strategies
         strategies = self._preprocess_for_numbers(screenshot)
 
         if self.debug:

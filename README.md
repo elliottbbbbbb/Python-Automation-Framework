@@ -88,10 +88,9 @@ src/osrsbot/
 │   ├── template_match_service.py
 │   ├── anti_ban_service.py
 │   ├── loot_detection_service.py
-│   ├── minimap_pathfinding_service.py
-│   ├── status_socket_service.py    # NEW: Real-time position tracking
-│   ├── walker_service.py            # NEW: Advanced pathfinding
-│   └── arduino_mouse_service.py     # NEW: Hardware mouse control
+│   ├── status_socket_service.py    # Real-time position tracking
+│   ├── walker_service.py            # Advanced pathfinding
+│   └── interception_mouse_service.py # Optional: Kernel-level mouse
 ├── commands/               # CQRS - write operations
 │   └── game_actions.py
 ├── queries/                # CQRS - read operations
@@ -174,8 +173,8 @@ This allows rapid tuning without code changes.
 | Metric           | Value                             |
 | ---------------- | --------------------------------- |
 | Lines of Code    | ~6,000+                           |
-| Python Modules   | 31 (active)                       |
-| Services         | 10                                |
+| Python Modules   | 28 (active)                       |
+| Services         | 11                                |
 | Design Patterns  | CQRS, State Machine, Strategy, DI |
 | Development Time | 6+ months                         |
 | Test Coverage    | 9 major features tested           |

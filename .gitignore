@@ -135,6 +135,7 @@ dmypy.json
 # Project specific
 config.json
 ocr_debug/
+segmentation_debug/
 *.png
 *.jpg
 *.jpeg
@@ -163,6 +164,12 @@ templates/*.png
 templates/*.jpg
 templates/*.jpeg
 !templates/.gitkeep
+
+# Neural network models (users should download)
+src/osrsbot/models/*.onnx
+src/osrsbot/models/*.pt
+src/osrsbot/models/*.h5
+!src/osrsbot/models/.gitkeep
 
 # OS files
 .DS_Store
