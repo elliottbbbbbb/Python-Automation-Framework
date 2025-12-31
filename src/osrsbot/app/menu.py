@@ -9,6 +9,7 @@ from osrsbot.app.calibration import Calibrator
 from osrsbot.core.runner import ScriptRunner
 from osrsbot.scripts.comprehensive_state_bot_test import ComprehensiveTestBot
 from osrsbot.scripts.hp_tracker import HPTrackerBot
+from osrsbot.scripts.test_inventory_clicks import test_inventory_clicks
 logger = logging.getLogger(__name__)
 
 
@@ -44,6 +45,7 @@ def main() -> None:
         print("\n1. Calibrate Colors & Coordinates")
         print("2. Comprehensive Test Bot (Tests All Framework Features)")
         print("3. Stats Tracker (HP/Prayer/Run/Spec OCR Comparison)")
+        print("4. Template Click Test (Test All Template-Matched UI Elements)")
 
         choice = input("\nSelect: ").strip()
 
@@ -126,6 +128,32 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"HP Tracker Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "4":
+            logger.info("Starting Template Click Test")
+            try:
+                print("\n🎯 Template Click Test")
+                print("This test will:")
+                print("  1. Detect all UI grids (inventory, minimap, chat)")
+                print("  2. Detect all UI buttons (logout, autoretal, clicks)")
+                print("  3. Click all detected elements to verify accuracy")
+                print("\nMake sure:")
+                print("  • RuneLite is open and visible")
+                print("  • Inventory tab is selected")
+                print("  • Camera is not moving")
+                print("\nNOTE: Only visible UI elements will be tested")
+                input("\nPress Enter to start...")
+
+                success = test_inventory_clicks()
+                if success:
+                    print("\n✅ Test completed successfully!")
+                else:
+                    print("\n❌ Test failed. Check logs for details.")
+                    sys.exit(1)
+            except Exception as e:
+                logger.error(f"Template Click Test failed: {e}", exc_info=True)
+                print(f"❌ Test error: {e}")
                 sys.exit(1)
 
         else:

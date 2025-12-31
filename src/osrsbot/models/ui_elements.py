@@ -283,11 +283,18 @@ class UIElementGrid:
         self.elements = []
         for row in range(self.num_rows):
             for col in range(self.num_cols):
-                # Calculate cell bounds with padding
-                x0 = int(grid_x + col * cell_w + self.padding)
-                y0 = int(grid_y + row * cell_h + self.padding)
-                x1 = int(grid_x + (col + 1) * cell_w - self.padding)
-                y1 = int(grid_y + (row + 1) * cell_h - self.padding)
+                # Calculate cell center first (more accurate)
+                center_x = grid_x + (col + 0.5) * cell_w
+                center_y = grid_y + (row + 0.5) * cell_h
+
+                # Calculate bounds from center with padding
+                half_w = (cell_w / 2) - self.padding
+                half_h = (cell_h / 2) - self.padding
+
+                x0 = int(center_x - half_w)
+                y0 = int(center_y - half_h)
+                x1 = int(center_x + half_w)
+                y1 = int(center_y + half_h)
 
                 element = UIElement(x0, y0, x1, y1)
                 self.elements.append(element)
