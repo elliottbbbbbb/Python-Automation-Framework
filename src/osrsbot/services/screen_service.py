@@ -59,6 +59,28 @@ class ScreenService:
             logger.exception("Failed to get window bounds from window_getter")
             return None
 
+    def get_viewport_dimensions(self) -> Optional[Tuple[int, int]]:
+        """
+        Get viewport dimensions (width, height).
+
+        Returns the game window dimensions for calculating viewport regions.
+        Used by queries/commands that need to know game window size.
+
+        Returns:
+            (width, height) tuple or None if window unavailable
+
+        Example:
+            >>> dims = screen_service.get_viewport_dimensions()
+            >>> if dims:
+            >>>     width, height = dims
+            >>>     viewport_region = (0, 0, int(width * 0.70), height)
+        """
+        bounds = self._get_bounds()
+        if bounds:
+            _, _, width, height = bounds
+            return (width, height)
+        return None
+
     def relative_to_absolute(self, x: int, y: int) -> Tuple[int, int]:
         """
         Convert coordinates relative to window to absolute screen coordinates.

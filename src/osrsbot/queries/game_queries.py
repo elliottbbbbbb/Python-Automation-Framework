@@ -1,9 +1,8 @@
 import logging
-import os
-import pytesseract
 from typing import Optional, Any, TYPE_CHECKING, Tuple, Dict
+from PIL import Image
 
-from osrsbot.services.ocr_service import OCRService, OCRRegion
+from osrsbot.services.template_ocr_service import TemplateOCRService, ORB_GREEN, ORB_RED, CYAN, YELLOW
 from osrsbot.models.config import Config
 from osrsbot.utils.color_helpers import hex_to_rgb
 from osrsbot.constants import COLOR_DETECTION
@@ -20,17 +19,17 @@ class GameState:
     """
     Manages game state checks like HP and combat status.
 
-    Uses OCRService for reading stats from the game UI.
+    Uses TemplateOCRService for reading stats from the game UI.
     """
 
     def __init__(
             self,
             interface: Any,
             config: Config,
-            ocr_service: Any,
+            ocr_service: TemplateOCRService,
             screen_service: Optional["ScreenService"] = None,
             template_service: Optional[Any] = None) -> None:
-        self.interface = interface
+        self._interface = interface  # Private: use services layer instead
         self.config = config
         self.ocr_service = ocr_service
         self.screen: Optional["ScreenService"] = screen_service
@@ -46,10 +45,6 @@ class GameState:
         else:
             self.inventory: Optional["InventoryState"] = None
             logger.debug("InventoryState not initialized (missing services)")
-
-        self._hp_ttl = float(self.config.get("ocr", "hp_ttl", default=0.5))
-        self._ocr_window_size = self.config.get(
-            "ocr", "window_size", default=5)
 
     def _verify_click_color_is_red(self, button_name: str) -> bool:
         """
@@ -270,31 +265,35 @@ class GameState:
     def get_hp(self, force: bool = False) -> Optional[int]:
         """
         Args:
-            force: If True, bypass cache and force new OCR reading
+            force: Currently ignored (Template OCR is fast enough to read every time)
 
         Returns:
             Current HP value or None if OCR failed
         """
+        if not self.screen:
+            logger.error("ScreenService not available")
+            return None
+
         hp_region_config = self.config.get("coordinates", "ocr", "hp_region")
         if not hp_region_config:
             logger.error("hp_region not in config")
             return None
 
-        hp_region = OCRRegion(
-            x=hp_region_config["x"],
-            y=hp_region_config["y"],
-            width=hp_region_config["width"],
-            height=hp_region_config["height"],
-            name="hp"
-        )
+        # Capture the HP orb region
+        x, y = hp_region_config["x"], hp_region_config["y"]
+        width, height = hp_region_config["width"], hp_region_config["height"]
 
-        hp = self.ocr_service.read_number(
-            region=hp_region,
-            min_value=1,
-            max_value=99,
-            smooth=not force,
-            window_size=self._ocr_window_size,
-            ttl=self._hp_ttl if not force else 0
+        img = self.screen.capture(region=(x, y, width, height), relative=True)
+        if img is None:
+            logger.debug("get_hp: Failed to capture screen region")
+            return None
+
+        # Extract HP using template matching (supports green/yellow/red orb colors)
+        hp = self.ocr_service.extract_number(
+            img,
+            font_name="plain11",
+            colors=[ORB_GREEN, ORB_RED],
+            correlation_threshold=0.95
         )
 
         if hp is None:
@@ -311,32 +310,36 @@ class GameState:
     def get_prayer(self, force: bool = False) -> Optional[int]:
         """
         Args:
-            force: If True, bypass cache and force new OCR reading
+            force: Currently ignored (Template OCR is fast enough to read every time)
 
         Returns:
             Current prayer points or None if OCR failed
         """
+        if not self.screen:
+            logger.error("ScreenService not available")
+            return None
+
         prayer_region_config = self.config.get(
             "coordinates", "ocr", "prayer_region")
         if not prayer_region_config:
             logger.warning("prayer_region not in config")
             return None
 
-        prayer_region = OCRRegion(
-            x=prayer_region_config["x"],
-            y=prayer_region_config["y"],
-            width=prayer_region_config["width"],
-            height=prayer_region_config["height"],
-            name="prayer"
-        )
+        # Capture the prayer orb region
+        x, y = prayer_region_config["x"], prayer_region_config["y"]
+        width, height = prayer_region_config["width"], prayer_region_config["height"]
 
-        prayer = self.ocr_service.read_number(
-            region=prayer_region,
-            min_value=0,
-            max_value=99,
-            smooth=not force,
-            window_size=self._ocr_window_size,
-            ttl=self._hp_ttl if not force else 0
+        img = self.screen.capture(region=(x, y, width, height), relative=True)
+        if img is None:
+            logger.debug("get_prayer: Failed to capture screen region")
+            return None
+
+        # Extract prayer using template matching (cyan orb color)
+        prayer = self.ocr_service.extract_number(
+            img,
+            font_name="plain11",
+            colors=[CYAN],
+            correlation_threshold=0.95
         )
 
         if prayer is None:
@@ -349,32 +352,36 @@ class GameState:
     def get_run_energy(self, force: bool = False) -> Optional[int]:
         """
         Args:
-            force: If True, bypass cache and force new OCR reading
+            force: Currently ignored (Template OCR is fast enough to read every time)
 
         Returns:
             Current run energy (0-100) or None if OCR failed
         """
+        if not self.screen:
+            logger.error("ScreenService not available")
+            return None
+
         run_region_config = self.config.get(
             "coordinates", "ocr", "run_energy_region")
         if not run_region_config:
             logger.warning("run_energy_region not in config")
             return None
 
-        run_region = OCRRegion(
-            x=run_region_config["x"],
-            y=run_region_config["y"],
-            width=run_region_config["width"],
-            height=run_region_config["height"],
-            name="run_energy"
-        )
+        # Capture the run energy orb region
+        x, y = run_region_config["x"], run_region_config["y"]
+        width, height = run_region_config["width"], run_region_config["height"]
 
-        energy = self.ocr_service.read_number(
-            region=run_region,
-            min_value=0,
-            max_value=100,
-            smooth=not force,
-            window_size=self._ocr_window_size,
-            ttl=self._hp_ttl if not force else 0
+        img = self.screen.capture(region=(x, y, width, height), relative=True)
+        if img is None:
+            logger.debug("get_run_energy: Failed to capture screen region")
+            return None
+
+        # Extract run energy using template matching (yellow orb color)
+        energy = self.ocr_service.extract_number(
+            img,
+            font_name="plain11",
+            colors=[YELLOW],
+            correlation_threshold=0.95
         )
 
         if energy is None:
@@ -473,16 +480,25 @@ class GameState:
         Used by test code to calculate game viewport region.
 
         Returns:
-            (width, height) tuple or None if interface unavailable
+            (width, height) tuple or None if screen service unavailable
 
         Example:
             >>> width, height = self.state.debug_get_viewport_dimensions()
             >>> viewport_region = (0, 0, int(width * 0.70), height)
         """
+        if not self.screen:
+            logger.error("ScreenService not available for viewport dimensions")
+            return None
+
         try:
-            _, _, width, height = self.interface.get_bounds()
-            logger.debug(f"Viewport dimensions: {width}x{height}")
-            return (width, height)
+            dims = self.screen.get_viewport_dimensions()
+            if dims:
+                width, height = dims
+                logger.debug(f"Viewport dimensions: {width}x{height}")
+                return dims
+            else:
+                logger.error("Failed to get viewport dimensions from ScreenService")
+                return None
         except Exception as e:
             logger.error(f"Failed to get viewport dimensions: {e}")
             return None

@@ -8,6 +8,7 @@ from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
 from osrsbot.core.runner import ScriptRunner
 from osrsbot.scripts.comprehensive_state_bot_test import ComprehensiveTestBot
+from osrsbot.scripts.hp_tracker import HPTrackerBot
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +43,7 @@ def main() -> None:
         print("=" * 60)
         print("\n1. Calibrate Colors & Coordinates")
         print("2. Comprehensive Test Bot (Tests All Framework Features)")
+        print("3. Stats Tracker (HP/Prayer/Run/Spec OCR Comparison)")
 
         choice = input("\nSelect: ").strip()
 
@@ -95,6 +97,34 @@ def main() -> None:
                 bot.run(bank_location="", runs=runs)
             except Exception as e:
                 logger.error(f"Comprehensive Test Bot failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "3":
+            logger.info("Starting Stats Tracker Bot")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+
+                print("\n📊 Stats Tracker Bot")
+                print("Tracks HP, Prayer, Run Energy, and Special Attack")
+                print("Compares Tesseract OCR vs Template Matching OCR")
+                print("\nPress Ctrl+C to stop and see final results.")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+
+                # Instantiate HP Tracker bot
+                bot = HPTrackerBot(
+                    interface=runner.interface,
+                    state=runner.state,
+                    actions=runner.actions,
+                    config=runner.config,
+                    debug_ui=False
+                )
+                bot.run(bank_location="", runs=1)
+            except Exception as e:
+                logger.error(f"HP Tracker Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
                 sys.exit(1)
 

@@ -2,12 +2,10 @@ import logging
 import os
 from typing import Any, Callable, Union, TYPE_CHECKING
 
-import pytesseract
-
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MouseConfig
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.ocr_service import OCRService
+from osrsbot.services.template_ocr_service import TemplateOCRService
 from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.services.anti_ban_service import AntiBanService
 from osrsbot.services.loot_detection_service import LootDetectionService
@@ -127,21 +125,9 @@ class ScriptRunner:
                 )
                 self.template_service = None
 
-            tesseract_path = self.config.get("tesseract_path")
-            if tesseract_path:
-                pytesseract.pytesseract.tesseract_cmd = tesseract_path
-                logger.info(f"Using Tesseract from config: {tesseract_path}")
-            elif os.getenv("TESSERACT_PATH"):
-                pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_PATH")
-                logger.info(f"Using Tesseract from env: {os.getenv('TESSERACT_PATH')}")
-            else:
-                logger.info("Using default Tesseract path (system)")
-
-            self.ocr = OCRService(window_getter=self.interface.get_window_position,
-                                          tesseract_path=tesseract_path,
-                                          debug=False)
-
-            logger.info("OCR Service initialized successfully")
+            logger.debug("Initializing TemplateOCRService")
+            self.ocr = TemplateOCRService()
+            logger.info("TemplateOCRService initialized successfully")
 
             # Initialize Status Socket Service
             logger.debug("Initializing StatusSocketService")

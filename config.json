@@ -1,6 +1,6 @@
 {
   "account_name": "mweow rawr",
-  "window_title": "RuneLite - 61grouphunt",
+  "window_title": "RuneLite - mweow rawr",
   "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
   "colors": {
     "yellow_tile_marker": "#fcfc01",
@@ -119,7 +119,19 @@
       },
       "prayer_region": {
         "x": 527,
-        "y": 121,
+        "y": 111,
+        "width": 45,
+        "height": 30
+      },
+      "run_energy_region": {
+        "x": 530,
+        "y": 143,
+        "width": 35,
+        "height": 20
+      },
+      "special_attack_region": {
+        "x": 557,
+        "y": 169,
         "width": 35,
         "height": 20
       }
@@ -186,44 +198,56 @@
   "templates": {
     "ui_grids": {
       "inventory": {
-        "path": "templates/inventory.png",
+        "path": "src/osrsbot/images/bot/ui_templates/inv.png",
         "rows": 7,
         "cols": 4,
         "threshold": 0.65,
         "sticky": true,
         "padding": 5,
         "border_offset": 3
+      },
+      "minimap": {
+        "path": "src/osrsbot/images/bot/ui_templates/minimap.png",
+        "rows": 1,
+        "cols": 1,
+        "threshold": 0.70,
+        "sticky": true
+      },
+      "chat": {
+        "path": "src/osrsbot/images/bot/ui_templates/chat.png",
+        "rows": 1,
+        "cols": 1,
+        "threshold": 0.70,
+        "sticky": true
       }
     },
     "ui_buttons": {
       "logout": {
-        "path": "templates/logout.png",
+        "path": "src/osrsbot/images/bot/settings/runelite_logout.png",
         "threshold": 0.68
       },
-      "special_attack": {
-        "path": "templates/special_attack.png",
-        "threshold": 0.68
+      "autoretal_on": {
+        "path": "src/osrsbot/images/bot/combat/autoretal_on.png",
+        "threshold": 0.70
       },
-      "combat_indicator": {
-        "path": "templates/in_combat.png",
-        "threshold": 0.654,
-        "sticky": false,
-        "ttl_seconds": 0.5
+      "autoretal_off": {
+        "path": "src/osrsbot/images/bot/combat/autoretal_off.png",
+        "threshold": 0.70
       },
       "good_click_1": {
-        "path": "templates/red_1.png",
+        "path": "src/osrsbot/images/bot/mouse_clicks/red_1.png",
         "threshold": 0.49
       },
       "good_click_2": {
-        "path": "templates/red_2.png",
+        "path": "src/osrsbot/images/bot/mouse_clicks/red_2.png",
         "threshold": 0.49
       },
       "good_click_3": {
-        "path": "templates/red_3.png",
+        "path": "src/osrsbot/images/bot/mouse_clicks/red_3.png",
         "threshold": 0.49
       },
       "good_click_4": {
-        "path": "templates/red_4.png",
+        "path": "src/osrsbot/images/bot/mouse_clicks/red_4.png",
         "threshold": 0.49
       }
     }

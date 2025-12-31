@@ -74,7 +74,11 @@ class GameActions:
 
     def _get_player_position(self) -> Tuple[int, int]:
         """Get player position (always center of window)."""
-        _, _, width, height = self.interface.get_bounds()
+        dims = self.screen.get_viewport_dimensions()
+        if not dims:
+            logger.warning("Failed to get viewport dimensions, using fallback")
+            return (400, 300)  # Reasonable fallback for typical OSRS window
+        width, height = dims
         return (width // 2, height // 2)
 
     def _get_mouse_speed_multiplier(self) -> float:
