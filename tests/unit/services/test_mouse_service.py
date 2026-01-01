@@ -4,9 +4,11 @@ Unit tests for MouseService.
 Tests mouse movement, clicking, and humanization with heavy mocking.
 """
 
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, patch, call
-from osrsbot.services.mouse_service import MouseService, MouseConfig
+
+from osrsbot.services.mouse_service import MouseConfig, MouseService
 
 
 @pytest.fixture
@@ -69,7 +71,7 @@ def mouse_service():
         overshoot_chance=0.15,
         overshoot_distance=20,
         click_variance=3,
-        post_click_delay=(0.05, 0.15)
+        post_click_delay=(0.05, 0.15),
     )
     return MouseService(config)
 
@@ -94,7 +96,7 @@ class TestMouseServiceInit:
 
     def test_pyautogui_failsafe_enabled(self, mock_pyautogui):
         """Test PyAutoGUI failsafe is enabled."""
-        service = MouseService()
+        MouseService()
 
         assert mock_pyautogui.FAILSAFE == True
 
@@ -140,7 +142,9 @@ class TestMoveToLinear:
 class TestMoveToCurved:
     """Test curved (Bezier) mouse movement."""
 
-    def test_curved_movement(self, mouse_service, mock_pyautogui, mock_random, mock_time):
+    def test_curved_movement(
+        self, mouse_service, mock_pyautogui, mock_random, mock_time
+    ):
         """Test curved movement uses Bezier algorithm."""
         result = mouse_service.move_to(200, 200, style="curved", duration=0.1)
 
@@ -148,7 +152,9 @@ class TestMoveToCurved:
         # Bezier should call moveTo multiple times (for each step)
         assert mock_pyautogui.moveTo.call_count > 1
 
-    def test_bezier_curve_generation(self, mouse_service, mock_pyautogui, mock_random, mock_time):
+    def test_bezier_curve_generation(
+        self, mouse_service, mock_pyautogui, mock_random, mock_time
+    ):
         """Test Bezier curve generates multiple points."""
         mouse_service.move_to(200, 200, style="curved", duration=0.1)
 
@@ -159,7 +165,9 @@ class TestMoveToCurved:
 class TestMoveToOvershoot:
     """Test overshoot mouse movement."""
 
-    def test_overshoot_movement(self, mouse_service, mock_pyautogui, mock_random, mock_time):
+    def test_overshoot_movement(
+        self, mouse_service, mock_pyautogui, mock_random, mock_time
+    ):
         """Test overshoot movement style."""
         # Mock random to trigger overshoot
         mock_random.random.return_value = 0.1  # < overshoot_chance (0.15)
@@ -170,7 +178,9 @@ class TestMoveToOvershoot:
         # Overshoot should involve multiple movements
         assert mock_pyautogui.moveTo.call_count > 1
 
-    def test_overshoot_calculation(self, mouse_service, mock_pyautogui, mock_random, mock_time):
+    def test_overshoot_calculation(
+        self, mouse_service, mock_pyautogui, mock_random, mock_time
+    ):
         """Test overshoot calculates correct overshoot point."""
         mock_random.random.return_value = 0.1  # Trigger overshoot
         mock_random.randint.return_value = 10
@@ -205,20 +215,26 @@ class TestClick:
         assert result == True
         mock_pyautogui.click.assert_called_once_with(button="left")
 
-    def test_click_with_button(self, mouse_service, mock_pyautogui, mock_time, mock_random):
+    def test_click_with_button(
+        self, mouse_service, mock_pyautogui, mock_time, mock_random
+    ):
         """Test click with different button."""
         mouse_service.click(button="right")
 
         mock_pyautogui.click.assert_called_with(button="right")
 
-    def test_click_with_coordinates(self, mouse_service, mock_pyautogui, mock_time, mock_random):
+    def test_click_with_coordinates(
+        self, mouse_service, mock_pyautogui, mock_time, mock_random
+    ):
         """Test click at specific coordinates."""
         mouse_service.click(x=100, y=200, variance=False)
 
         mock_pyautogui.moveTo.assert_called_once_with(100, 200)
         mock_pyautogui.click.assert_called_once()
 
-    def test_click_with_variance(self, mouse_service, mock_pyautogui, mock_time, mock_random):
+    def test_click_with_variance(
+        self, mouse_service, mock_pyautogui, mock_time, mock_random
+    ):
         """Test click adds variance offset."""
         mock_random.randint.return_value = 2
 
@@ -228,7 +244,9 @@ class TestClick:
         # With randint returning 2, final position should be (102, 202)
         mock_pyautogui.moveTo.assert_called_with(102, 202)
 
-    def test_click_delay_after(self, mouse_service, mock_pyautogui, mock_time, mock_random):
+    def test_click_delay_after(
+        self, mouse_service, mock_pyautogui, mock_time, mock_random
+    ):
         """Test click adds delay after clicking."""
         mock_random.uniform.return_value = 0.1
 
@@ -241,7 +259,9 @@ class TestClick:
 class TestClickAt:
     """Test move and click composite operation."""
 
-    def test_click_at_coordinates(self, mouse_service, mock_pyautogui, mock_time, mock_random):
+    def test_click_at_coordinates(
+        self, mouse_service, mock_pyautogui, mock_time, mock_random
+    ):
         """Test click_at moves then clicks."""
         result = mouse_service.click_at(200, 300, move_style="instant")
 
@@ -250,7 +270,9 @@ class TestClickAt:
         assert mock_pyautogui.moveTo.called
         assert mock_pyautogui.click.called
 
-    def test_uses_movement_style(self, mouse_service, mock_pyautogui, mock_time, mock_random):
+    def test_uses_movement_style(
+        self, mouse_service, mock_pyautogui, mock_time, mock_random
+    ):
         """Test click_at uses specified movement style."""
         mouse_service.click_at(200, 300, move_style="linear")
 
@@ -279,9 +301,7 @@ class TestDragTo:
         mouse_service.drag_to(150, 150, button="right")
 
         # Should calculate relative offset (150-50, 150-50)
-        mock_pyautogui.drag.assert_called_with(
-            100, 100, duration=0.5, button="right"
-        )
+        mock_pyautogui.drag.assert_called_with(100, 100, duration=0.5, button="right")
 
 
 class TestGetPosition:
@@ -299,7 +319,9 @@ class TestGetPosition:
 class TestRandomMovement:
     """Test random mouse movement."""
 
-    def test_random_movement(self, mouse_service, mock_pyautogui, mock_random, mock_time):
+    def test_random_movement(
+        self, mouse_service, mock_pyautogui, mock_random, mock_time
+    ):
         """Test random movement within radius."""
         mock_pyautogui.position.return_value = (100, 100)
         # randint is used for offset AND Bezier control points, so return fixed value

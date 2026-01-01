@@ -17,17 +17,18 @@ class Config:
     def _load_config(self) -> dict:
         if self.config_file.exists():
             try:
-                with open(self.config_file, 'r') as f:
+                with open(self.config_file, "r") as f:
                     return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"Failed to load config: {e}")
 
         logger.info(
             f"Config file not found, creating default at {
-                self.config_file}")
+                self.config_file}"
+        )
         config = self._default_config()
         try:
-            with open(self.config_file, 'w') as f:
+            with open(self.config_file, "w") as f:
                 json.dump(config, f, indent=2)
             logger.info(f"Created default config file: {self.config_file}")
         except IOError as e:
@@ -49,37 +50,30 @@ class Config:
             "account_name": "YourAccountName",
             "window_title": "RuneLite - ",
             "tesseract_path": tesseract_default,
-
             "colors": {
                 # Marker
                 "yellow_tile_marker": "#FFFF00",
                 "blue_outline": "#0002cd",
-
                 # Item outlines
                 "purple_item_outline": "#7d00ff",
                 "red_outline": "#FF0000",
-
                 # NPCs
                 "green_dragon": "#00ffff",
                 "guns_npc": "#00ffff",
                 "banker": "#00FFFF",
-
                 # Items
                 "manta_ray": "#765C45",
                 "sandwich": "#A81522",
                 "extended_antifire": "#b392cb",
                 "super_combat": "#1e6c0e",
-
                 # Equipment
                 "ardy_cloak": "#7d666e",
                 "mythical_cape": "#aea2a3",
-
                 # UI State Colors
                 "empty_inventory_slot": "#4B423A",
                 "combat_indicator_green": "#078B36",
                 "combat_indicator_red": "#63150D",
             },
-
             "coordinates": {
                 # Inventory slots (28 total)
                 "inventory": {
@@ -89,7 +83,6 @@ class Config:
                     "slot_4": {"x": 715, "y": 258},
                     "last_slot": {"x": 715, "y": 470},
                 },
-
                 # UI elements
                 "ui": {
                     "settings": {"x": 689, "y": 506},
@@ -100,48 +93,40 @@ class Config:
                     "bank_close": {"x": 497, "y": 51},
                     "ge_collect": {"x": 466, "y": 93},
                 },
-
                 # Minimap locations
                 "minimap": {
                     "green_dragons": {"x": 673, "y": 135},
                 },
-
                 # World interactions
                 "world": {
                     "ge_clerk": {"x": 273, "y": 151},
                     "varrock_fountain": {"x": 594, "y": 85},
                     "bank_booth": {"x": 463, "y": 143},
                 },
-
                 # State checks
                 "checks": {
                     "combat_indicator": {"x": 30, "y": 81},
                     "health_bar": {"x": 530, "y": 68, "w": 27, "h": 30},
                 },
-
                 # OCR regions
                 "ocr": {
                     "hp_region": {"x": 527, "y": 79, "width": 35, "height": 20},
-                }
+                },
             },
-
             "timings": {
                 "short": 0.5,
                 "medium": 1.0,
                 "long": 3.0,
                 "teleport": 12.0,
             },
-
             "tolerances": {
                 "color_match": 5,
                 "click_offset": (0, 0),
             },
-
             "ocr": {
                 "hp_ttl": 0.5,
                 "window_size": 5,
             },
-
             "mouse": {
                 "min_speed": 0.2,
                 "max_speed": 0.6,
@@ -150,12 +135,12 @@ class Config:
                 "click_variance": 3,
                 "post_click_delay_min": 0.05,
                 "post_click_delay_max": 0.15,
-            }
+            },
         }
 
     def save(self) -> bool:
         try:
-            with open(self.config_file, 'w') as f:
+            with open(self.config_file, "w") as f:
                 json.dump(self.data, f, indent=2)
             return True
         except IOError as e:

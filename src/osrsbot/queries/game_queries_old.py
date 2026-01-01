@@ -1,16 +1,19 @@
 import logging
-from typing import Optional, Any, TYPE_CHECKING, Tuple, Dict
-from PIL import Image
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
-from osrsbot.services.template_ocr_service import TemplateOCRService, ORB_GREEN, ORB_RED, CYAN, YELLOW
-from osrsbot.models.config import Config
-from osrsbot.utils.color_helpers import hex_to_rgb
 from osrsbot.constants import COLOR_DETECTION
+from osrsbot.models.config import Config
+from osrsbot.services.template_ocr_service import (
+    CYAN,
+    ORB_GREEN,
+    ORB_RED,
+    YELLOW,
+    TemplateOCRService,
+)
+from osrsbot.utils.color_helpers import hex_to_rgb
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
-    from osrsbot.services.template_match_service import TemplateMatchService
-    from osrsbot.queries.inventory_queries import InventoryState
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +26,13 @@ class GameState:
     """
 
     def __init__(
-            self,
-            interface: Any,
-            config: Config,
-            ocr_service: TemplateOCRService,
-            screen_service: Optional["ScreenService"] = None,
-            template_service: Optional[Any] = None) -> None:
+        self,
+        interface: Any,
+        config: Config,
+        ocr_service: TemplateOCRService,
+        screen_service: Optional["ScreenService"] = None,
+        template_service: Optional[Any] = None,
+    ) -> None:
         self._interface = interface  # Private: use services layer instead
         self.config = config
         self.ocr_service = ocr_service
@@ -38,6 +42,7 @@ class GameState:
         # Initialize inventory detection if services available
         if template_service and screen_service:
             from osrsbot.queries.inventory_queries import InventoryState
+
             self.inventory: Optional["InventoryState"] = InventoryState(
                 template_service, screen_service, config
             )
@@ -76,11 +81,19 @@ class GameState:
         # Sample pixels around the center of the detected click
         # Use a larger sampling area since the click cursor is very small
         sample_offsets = [
-            (0, 0),    # Center
-            (-3, -3), (-3, 0), (-3, 3),  # Left column
-            (0, -3), (0, 3),              # Top and bottom center
-            (3, -3), (3, 0), (3, 3),      # Right column
-            (-5, 0), (5, 0), (0, -5), (0, 5)  # Far edges
+            (0, 0),  # Center
+            (-3, -3),
+            (-3, 0),
+            (-3, 3),  # Left column
+            (0, -3),
+            (0, 3),  # Top and bottom center
+            (3, -3),
+            (3, 0),
+            (3, 3),  # Right column
+            (-5, 0),
+            (5, 0),
+            (0, -5),
+            (0, 5),  # Far edges
         ]
         red_pixels = 0
         yellow_pixels = 0
@@ -100,7 +113,10 @@ class GameState:
                 logger.info(f"Sampled pixel at ({x}, {y}): RGB({r}, {g}, {b})")
 
                 # Distinguish red from yellow by checking green channel
-                if r > COLOR_DETECTION.red_channel_min and b < COLOR_DETECTION.blue_channel_max:
+                if (
+                    r > COLOR_DETECTION.red_channel_min
+                    and b < COLOR_DETECTION.blue_channel_max
+                ):
                     if g < COLOR_DETECTION.green_channel_max_red:
                         red_pixels += 1
                         logger.info(
@@ -169,24 +185,36 @@ class GameState:
             # Refresh image each try
             img_gray = self.screen.capture_grayscale()
             if img_gray is None:
-                logger.debug(f"Click check attempt {attempt + 1}: Failed to capture screenshot")
+                logger.debug(
+                    f"Click check attempt {attempt + 1}: Failed to capture screenshot"
+                )
                 continue
 
             # Check if ANY of the red click templates match
             for button_name in buttons:
-                if self.template_service.detect_button(button_name, img_gray, force=True):
+                if self.template_service.detect_button(
+                    button_name, img_gray, force=True
+                ):
                     detections += 1
-                    logger.debug(f"Click check attempt {attempt + 1}: Click template '{button_name}' detected")
+                    logger.debug(
+                        f"Click check attempt {
+                            attempt +
+                            1}: Click template '{button_name}' detected"
+                    )
                     break
 
             # Early exit if we already have majority
             if detections > tries // 2:
-                logger.info(f"Click success confirmed ({detections}/{attempt + 1} frames)")
+                logger.info(
+                    f"Click success confirmed ({detections}/{attempt + 1} frames)"
+                )
                 return True
 
         # Return True if majority of attempts detected a click
         success = detections > tries // 2
-        logger.info(f"Click check complete: {detections}/{tries} frames detected click (success={success})")
+        logger.info(
+            f"Click check complete: {detections}/{tries} frames detected click (success={success})"
+        )
         return success
 
     def in_combat(self) -> bool:
@@ -199,8 +227,7 @@ class GameState:
         Returns:
             True if in combat, False otherwise
         """
-    # Try template matching first (preferred method)
-
+        # Try template matching first (preferred method)
 
         # Fallback to pixel-based detection (legacy method)
         logger.debug("Template service unavailable, using pixel-based combat check")
@@ -213,20 +240,15 @@ class GameState:
             logger.error("ScreenService not available for combat check")
             return False
 
-        color = self.screen.get_pixel_color(
-            coord['x'], coord['y'], relative=True)
+        color = self.screen.get_pixel_color(coord["x"], coord["y"], relative=True)
 
         combat_green_hex = self.config.get("colors", "combat_indicator_green")
         combat_red_hex = self.config.get("colors", "combat_indicator_red")
 
         if combat_green_hex and combat_red_hex:
-            combat_colors = [
-                hex_to_rgb(combat_green_hex),
-                hex_to_rgb(combat_red_hex)
-            ]
+            combat_colors = [hex_to_rgb(combat_green_hex), hex_to_rgb(combat_red_hex)]
         else:
-            logger.warning(
-                "Combat indicator colors not in config, using fallback")
+            logger.warning("Combat indicator colors not in config, using fallback")
             combat_colors = [(7, 139, 54), (99, 21, 19)]
 
         tolerance = self.config.get("tolerances", "color_match", default=10)
@@ -267,7 +289,7 @@ class GameState:
             img,
             font_name="plain11",
             colors=[ORB_GREEN, ORB_RED],
-            correlation_threshold=0.95
+            correlation_threshold=0.95,
         )
 
         if hp is None:
@@ -293,8 +315,7 @@ class GameState:
             logger.error("ScreenService not available")
             return None
 
-        prayer_region_config = self.config.get(
-            "coordinates", "ocr", "prayer_region")
+        prayer_region_config = self.config.get("coordinates", "ocr", "prayer_region")
         if not prayer_region_config:
             logger.warning("prayer_region not in config")
             return None
@@ -310,10 +331,7 @@ class GameState:
 
         # Extract prayer using template matching (cyan orb color)
         prayer = self.ocr_service.extract_number(
-            img,
-            font_name="plain11",
-            colors=[CYAN],
-            correlation_threshold=0.95
+            img, font_name="plain11", colors=[CYAN], correlation_threshold=0.95
         )
 
         if prayer is None:
@@ -335,8 +353,7 @@ class GameState:
             logger.error("ScreenService not available")
             return None
 
-        run_region_config = self.config.get(
-            "coordinates", "ocr", "run_energy_region")
+        run_region_config = self.config.get("coordinates", "ocr", "run_energy_region")
         if not run_region_config:
             logger.warning("run_energy_region not in config")
             return None
@@ -352,10 +369,7 @@ class GameState:
 
         # Extract run energy using template matching (yellow orb color)
         energy = self.ocr_service.extract_number(
-            img,
-            font_name="plain11",
-            colors=[YELLOW],
-            correlation_threshold=0.95
+            img, font_name="plain11", colors=[YELLOW], correlation_threshold=0.95
         )
 
         if energy is None:
@@ -388,7 +402,9 @@ class GameState:
 
         # Legacy fallback (backward compatibility)
         if not self.template_service:
-            logger.warning("TemplateMatchService not available, assuming inventory full")
+            logger.warning(
+                "TemplateMatchService not available, assuming inventory full"
+            )
             return True  # Conservative: assume full if can't check
 
         if not self.screen:
@@ -400,7 +416,9 @@ class GameState:
             img_gray = self.screen.capture_grayscale()
 
             # Detect inventory grid
-            inventory_detected = self.template_service.detect_grid("inventory", img_gray)
+            inventory_detected = self.template_service.detect_grid(
+                "inventory", img_gray
+            )
 
             if not inventory_detected:
                 logger.debug("Inventory grid not detected, assuming inventory full")
@@ -416,7 +434,9 @@ class GameState:
                 return True
 
             # Check each of the 28 inventory slots for items
-            purple_hex = self.config.get("colors", "purple_item_outline", default="#ff00ff")
+            purple_hex = self.config.get(
+                "colors", "purple_item_outline", default="#ff00ff"
+            )
             purple_rgb = hex_to_rgb(purple_hex)
             tolerance = self.config.get("tolerances", "color_match", default=10)
 
@@ -425,17 +445,20 @@ class GameState:
                 if element:
                     # Check center pixel of slot for purple outline
                     pixel_color = self.screen.get_pixel_color(
-                        element.center_x,
-                        element.center_y,
-                        relative=True
+                        element.center_x, element.center_y, relative=True
                     )
 
                     # Check if pixel matches purple (item present)
-                    if all(abs(pixel_color[i] - purple_rgb[i]) <= tolerance for i in range(3)):
+                    if all(
+                        abs(pixel_color[i] - purple_rgb[i]) <= tolerance
+                        for i in range(3)
+                    ):
                         filled_slots += 1
 
             is_full = filled_slots >= threshold
-            logger.debug(f"Inventory check (legacy): {filled_slots}/28 slots filled (threshold: {threshold}, full: {is_full})")
+            logger.debug(
+                f"Inventory check (legacy): {filled_slots}/28 slots filled (threshold: {threshold}, full: {is_full})"
+            )
             return is_full
 
         except Exception as e:
@@ -502,7 +525,10 @@ class GameState:
         try:
             if grayscale:
                 img = self.screen.capture_grayscale()
-                logger.debug(f"Debug screen capture: grayscale {'success' if img is not None else 'failed'}")
+                logger.debug(
+                    f"Debug screen capture: grayscale {
+                        'success' if img is not None else 'failed'}"
+                )
                 return img
             else:
                 img = self.screen.capture()
@@ -543,8 +569,12 @@ class GameState:
                 logger.warning("Debug detection: screen capture failed")
                 return False
 
-            detected = self.template_service.detect_grid("inventory", img_gray, force=force)
-            logger.debug(f"Debug inventory detection: {'detected' if detected else 'not found'}")
+            detected = self.template_service.detect_grid(
+                "inventory", img_gray, force=force
+            )
+            logger.debug(
+                f"Debug inventory detection: {'detected' if detected else 'not found'}"
+            )
             return detected
         except Exception as e:
             logger.error(f"Debug inventory detection failed: {e}")
@@ -587,7 +617,7 @@ class GameState:
                 "total_elements": len(grid.elements),
                 "num_rows": grid.num_rows,
                 "num_cols": grid.num_cols,
-                "bounds": None
+                "bounds": None,
             }
 
             if grid.element:
@@ -595,10 +625,14 @@ class GameState:
                     grid.element.x,
                     grid.element.y,
                     grid.element.width,
-                    grid.element.height
+                    grid.element.height,
                 )
 
-            logger.debug(f"Debug grid info: visible={info['visible']}, elements={info['total_elements']}")
+            logger.debug(
+                f"Debug grid info: visible={
+                    info['visible']}, elements={
+                    info['total_elements']}"
+            )
             return info
         except Exception as e:
             logger.error(f"Failed to get grid info: {e}")

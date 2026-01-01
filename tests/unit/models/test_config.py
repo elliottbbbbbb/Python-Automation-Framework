@@ -4,8 +4,9 @@ Unit tests for Config model.
 Tests configuration loading, nested access, and defaults.
 """
 
-import pytest
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import mock_open, patch
+
+
 from osrsbot.models.config import Config
 
 
@@ -29,11 +30,7 @@ class TestConfigBasics:
     def test_get_nested_key(self):
         """Test getting nested keys with path."""
         config = Config.__new__(Config)
-        config.data = {
-            "parent": {
-                "child": "value"
-            }
-        }
+        config.data = {"parent": {"child": "value"}}
         assert config.get("parent", "child") == "value"
 
     def test_get_with_default(self):
@@ -55,33 +52,19 @@ class TestConfigPaths:
     def test_coordinate_path(self):
         """Test accessing coordinate paths."""
         config = Config.__new__(Config)
-        config.data = {
-            "coordinates": {
-                "hp": {"x": 100, "y": 50}
-            }
-        }
+        config.data = {"coordinates": {"hp": {"x": 100, "y": 50}}}
         assert config.get("coordinates", "hp", "x") == 100
         assert config.get("coordinates", "hp", "y") == 50
 
     def test_color_path(self):
         """Test accessing color paths."""
         config = Config.__new__(Config)
-        config.data = {
-            "colors": {
-                "combat_red": "#FF0000"
-            }
-        }
+        config.data = {"colors": {"combat_red": "#FF0000"}}
         assert config.get("colors", "combat_red") == "#FF0000"
 
     def test_timing_path(self):
         """Test accessing timing paths."""
         config = Config.__new__(Config)
-        config.data = {
-            "timings": {
-                "wait": {
-                    "short": [0.1, 0.3]
-                }
-            }
-        }
+        config.data = {"timings": {"wait": {"short": [0.1, 0.3]}}}
         result = config.get("timings", "wait", "short")
         assert result == [0.1, 0.3]

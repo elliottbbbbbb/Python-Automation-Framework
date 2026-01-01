@@ -1,19 +1,20 @@
 """State machine bot - base class for state-driven scripts."""
-import time
-import random
+
 import logging
+import random
+import time
 from abc import abstractmethod
-from enum import Enum
-from typing import Dict, List, Optional, Callable
 from collections import deque
+from enum import Enum
+from typing import Callable, Dict, List, Optional
 
 from osrsbot.core.base_bot import Bot
 from osrsbot.core.state_types import (
-    StateResult,
-    StateMetadata,
-    StateTransition,
+    StateExecutionContext,
     StateHistoryEntry,
-    StateExecutionContext
+    StateMetadata,
+    StateResult,
+    StateTransition,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ class StateMachineBot(Bot):
         self.debug_ui = None
         if debug_ui:
             from osrsbot.app.debug_ui import DebugUI
+
             self.debug_ui = DebugUI(bot_instance=self)
             logger.info("Debug UI enabled")
 
@@ -52,29 +54,23 @@ class StateMachineBot(Bot):
     @abstractmethod
     def define_states(self) -> type[Enum]:
         """Define the state enum for this bot."""
-        pass
 
     @abstractmethod
     def define_state_metadata(self) -> Dict[Enum, StateMetadata]:
         """Define metadata for each state (retries, timeout, failover)."""
-        pass
 
     @abstractmethod
     def define_transitions(self) -> List[StateTransition]:
         """Define allowed state transitions."""
-        pass
 
     @abstractmethod
     def get_initial_state(self) -> Enum:
         """Get the starting state."""
-        pass
 
     # Utility helpers
 
     def _apply_threshold_variance(
-        self,
-        base_value: int,
-        variance_options: List[int] = None
+        self, base_value: int, variance_options: List[int] = None
     ) -> int:
         """
         Apply random variance to threshold values (anti-detection).
@@ -155,9 +151,13 @@ class StateMachineBot(Bot):
         # Check transitions reference valid states
         for transition in self._transitions:
             if transition.from_state not in self._states:
-                raise ValueError(f"Transition from_state {transition.from_state} not in states enum")
+                raise ValueError(
+                    f"Transition from_state {transition.from_state} not in states enum"
+                )
             if transition.to_state not in self._states:
-                raise ValueError(f"Transition to_state {transition.to_state} not in states enum")
+                raise ValueError(
+                    f"Transition to_state {transition.to_state} not in states enum"
+                )
 
     def run_cycle(self, bank_location: str, run_number: int) -> None:
         """
@@ -173,7 +173,7 @@ class StateMachineBot(Bot):
             self.initialize_state_machine()
 
         # Check for scheduled break
-        if hasattr(self, 'actions') and self.actions.anti_ban:
+        if hasattr(self, "actions") and self.actions.anti_ban:
             if self.actions.anti_ban.should_take_break():
                 logger.info("Anti-ban: Scheduled break triggered")
                 self.actions.anti_ban.execute_break()
@@ -189,36 +189,43 @@ class StateMachineBot(Bot):
 
         while states_executed < max_states:
             # Random idle actions between states
-            if hasattr(self, 'actions') and self.actions.anti_ban:
+            if hasattr(self, "actions") and self.actions.anti_ban:
                 if self.actions.anti_ban.should_idle_action():
                     logger.debug("Anti-ban: Triggering idle action")
                     self.actions.anti_ban.execute_idle_action(
-                        mouse=self.actions.mouse,
-                        actions=self.actions
+                        mouse=self.actions.mouse, actions=self.actions
                     )
 
             # Execute current state
             result = self._execute_state(self._current_state)
 
             # Record for pattern detection
-            if hasattr(self, 'actions') and self.actions.anti_ban:
-                self.actions.anti_ban.record_action(f"state_{self._current_state.value}")
+            if hasattr(self, "actions") and self.actions.anti_ban:
+                self.actions.anti_ban.record_action(
+                    f"state_{self._current_state.value}"
+                )
 
             # Get next state based on result
             next_state = self._get_next_state(self._current_state, result)
 
             if next_state is None:
                 # No more transitions, cycle complete
-                logger.info(f"State machine cycle complete after {states_executed + 1} states")
+                logger.info(
+                    f"State machine cycle complete after {states_executed + 1} states"
+                )
                 break
 
             # Transition to next state
-            logger.info(f"Transitioning: {self._current_state.name} → {next_state.name}")
+            logger.info(
+                f"Transitioning: {self._current_state.name} → {next_state.name}"
+            )
             self._current_state = next_state
             states_executed += 1
 
         if states_executed >= max_states:
-            logger.error(f"State machine exceeded max states ({max_states}), terminating cycle")
+            logger.error(
+                f"State machine exceeded max states ({max_states}), terminating cycle"
+            )
 
     # State execution
 
@@ -233,10 +240,7 @@ class StateMachineBot(Bot):
         )
 
         # Create execution context
-        context = StateExecutionContext(
-            current_state=state,
-            retry_count=retry_count
-        )
+        context = StateExecutionContext(current_state=state, retry_count=retry_count)
 
         start_time = time.time()
         result = StateResult.FAILURE
@@ -259,7 +263,9 @@ class StateMachineBot(Bot):
 
             # Check for timeout
             if context.has_timed_out(metadata.timeout):
-                logger.warning(f"State {state.name} timed out after {metadata.timeout}s")
+                logger.warning(
+                    f"State {state.name} timed out after {metadata.timeout}s"
+                )
                 result = StateResult.TIMEOUT
                 error_message = f"Timeout after {metadata.timeout}s"
 
@@ -276,7 +282,7 @@ class StateMachineBot(Bot):
             result=result,
             duration=duration,
             retry_count=retry_count,
-            error_message=error_message
+            error_message=error_message,
         )
         self._state_history.append(history_entry)
 
@@ -291,20 +297,30 @@ class StateMachineBot(Bot):
             if retry_count < metadata.max_retries:
                 # Retry state
                 self._retry_counts[state] = retry_count + 1
-                logger.info(f"Retrying state {state.name} (attempt {retry_count + 2}/{metadata.max_retries + 1})")
+                logger.info(
+                    f"Retrying state {state.name} (attempt {retry_count + 2}/{metadata.max_retries + 1})"
+                )
                 return self._execute_state(state)  # Recursive retry
             else:
                 # Max retries reached, check for failover
                 if metadata.failover_state:
                     logger.warning(
-                        f"State {state.name} failed after {metadata.max_retries + 1} attempts, "
-                        f"failing over to {metadata.failover_state.name}"
+                        f"State {
+                            state.name} failed after {
+                            metadata.max_retries +
+                            1} attempts, "
+                        f"failing over to {
+                            metadata.failover_state.name}"
                     )
                     self._current_state = metadata.failover_state
                     self._retry_counts[state] = 0  # Reset retry count
-                    return StateResult.FAILURE  # Return failure, next cycle will execute failover
+                    return (
+                        StateResult.FAILURE
+                    )  # Return failure, next cycle will execute failover
                 else:
-                    logger.error(f"State {state.name} failed with no failover state defined")
+                    logger.error(
+                        f"State {state.name} failed with no failover state defined"
+                    )
 
         # Reset retry count on success
         if result == StateResult.SUCCESS:
@@ -312,7 +328,9 @@ class StateMachineBot(Bot):
 
         return result
 
-    def _get_state_handler(self, state: Enum) -> Callable[[StateExecutionContext], StateResult]:
+    def _get_state_handler(
+        self, state: Enum
+    ) -> Callable[[StateExecutionContext], StateResult]:
         """
         Get the handler method for a state.
 
@@ -338,7 +356,9 @@ class StateMachineBot(Bot):
 
         return handler
 
-    def _get_next_state(self, current_state: Enum, result: StateResult) -> Optional[Enum]:
+    def _get_next_state(
+        self, current_state: Enum, result: StateResult
+    ) -> Optional[Enum]:
         """
         Determine next state based on current state and result.
 
@@ -367,7 +387,9 @@ class StateMachineBot(Bot):
 
     # History & debugging
 
-    def get_state_history(self, last_n: Optional[int] = None) -> List[StateHistoryEntry]:
+    def get_state_history(
+        self, last_n: Optional[int] = None
+    ) -> List[StateHistoryEntry]:
         """Get state execution history (last N entries or all)."""
         if last_n is None:
             return list(self._state_history)

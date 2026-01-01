@@ -4,30 +4,31 @@ Simple HP tracking script - Continuously monitors HP using both OCR methods.
 Compares Tesseract OCR vs Template Matching OCR in real-time.
 Press Ctrl+C to stop.
 """
-import time
+
 import logging
+import sys
+import time
+from pathlib import Path
+
 import cv2
 import numpy as np
 import pyautogui
-from pathlib import Path
-import sys
 
 # Add src to path (go up 2 levels from tests/manual/)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
-from osrsbot.services.ocr_service import OCRService, OCRRegion
+from osrsbot.services.ocr_service import OCRRegion, OCRService
 from osrsbot.services.template_ocr_service import (
-    get_template_ocr_service,
     ORB_GREEN,
     ORB_RED,
+    get_template_ocr_service,
 )
-from osrsbot.core.game_interface import GameInterface
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def track_hp():
     tesseract_ocr = OCRService(
         window_getter=lambda: interface.get_absolute_bounds(),
         debug=False,
-        use_cnn=False
+        use_cnn=False,
     )
     template_ocr = get_template_ocr_service()
 
@@ -70,11 +71,13 @@ def track_hp():
         y=hp_region_config["y"],
         width=hp_region_config["width"],
         height=hp_region_config["height"],
-        name="hp"
+        name="hp",
     )
 
-    print(f"HP Region: x={hp_region.x}, y={hp_region.y}, "
-          f"width={hp_region.width}, height={hp_region.height}\n")
+    print(
+        f"HP Region: x={hp_region.x}, y={hp_region.y}, "
+        f"width={hp_region.width}, height={hp_region.height}\n"
+    )
 
     # Tracking stats
     total_reads = 0
@@ -98,10 +101,7 @@ def track_hp():
 
             # === Tesseract OCR ===
             hp_tesseract = tesseract_ocr.read_number(
-                region=hp_region,
-                min_value=1,
-                max_value=99,
-                smooth=False
+                region=hp_region, min_value=1, max_value=99, smooth=False
             )
 
             # === Template Matching OCR ===
@@ -116,7 +116,7 @@ def track_hp():
                 img_np,
                 font_name="plain11",
                 colors=[ORB_GREEN, ORB_RED],
-                correlation_threshold=0.98
+                correlation_threshold=0.98,
             )
 
             # Debug: Save image if template matching fails
@@ -151,8 +151,10 @@ def track_hp():
             tesseract_str = f"{hp_tesseract:2d}" if hp_tesseract is not None else "XX"
             template_str = f"{hp_template:2d}" if hp_template is not None else "XX"
 
-            print(f"[{total_reads:4d}] Tesseract: {tesseract_str} | "
-                  f"Template: {template_str} | {status}")
+            print(
+                f"[{total_reads:4d}] Tesseract: {tesseract_str} | "
+                f"Template: {template_str} | {status}"
+            )
 
             # Show stats every 10 reads
             if total_reads % 10 == 0:
@@ -160,10 +162,14 @@ def track_hp():
                 print("=" * 70)
                 print(f"STATISTICS (after {total_reads} reads)")
                 print("-" * 70)
-                print(f"Tesseract Success Rate: {tesseract_successes}/{total_reads} "
-                      f"({100*tesseract_successes/total_reads:.1f}%)")
-                print(f"Template Success Rate:  {template_successes}/{total_reads} "
-                      f"({100*template_successes/total_reads:.1f}%)")
+                print(
+                    f"Tesseract Success Rate: {tesseract_successes}/{total_reads} "
+                    f"({100*tesseract_successes/total_reads:.1f}%)"
+                )
+                print(
+                    f"Template Success Rate:  {template_successes}/{total_reads} "
+                    f"({100*template_successes/total_reads:.1f}%)"
+                )
                 print(f"Matches:                {matches}")
                 print(f"Mismatches:             {mismatches}")
                 print(f"Tesseract Failures:     {tesseract_failures}")
@@ -179,10 +185,14 @@ def track_hp():
         print("FINAL STATISTICS")
         print("=" * 70)
         print(f"Total Reads:            {total_reads}")
-        print(f"Tesseract Successes:    {tesseract_successes} "
-              f"({100*tesseract_successes/total_reads:.1f}%)")
-        print(f"Template Successes:     {template_successes} "
-              f"({100*template_successes/total_reads:.1f}%)")
+        print(
+            f"Tesseract Successes:    {tesseract_successes} "
+            f"({100*tesseract_successes/total_reads:.1f}%)"
+        )
+        print(
+            f"Template Successes:     {template_successes} "
+            f"({100*template_successes/total_reads:.1f}%)"
+        )
         print(f"Matches:                {matches}")
         print(f"Mismatches:             {mismatches}")
         print(f"Tesseract Failures:     {tesseract_failures}")

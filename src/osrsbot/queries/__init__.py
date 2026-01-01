@@ -7,4 +7,4 @@ Separates read operations (queries) from write operations (commands/actions).
 
 from osrsbot.queries.game_queries import GameState
 
-__all__ = ['GameState']
+__all__ = ["GameState"]

@@ -19,19 +19,17 @@ Migration path:
 """
 
 import logging
-from typing import Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
-from osrsbot.services.template_ocr_service import TemplateOCRService
 from osrsbot.models.config import Config
 
 # Import new focused modules
 from osrsbot.queries.combat_queries import CombatQueries
 from osrsbot.queries.stat_queries import StatQueries
+from osrsbot.services.template_ocr_service import TemplateOCRService
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
-    from osrsbot.services.template_match_service import TemplateMatchService
-    from osrsbot.queries.inventory_queries import InventoryState
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +47,7 @@ class GameState:
         config: Config,
         ocr_service: TemplateOCRService,
         screen_service: Optional["ScreenService"] = None,
-        template_service: Optional[Any] = None
+        template_service: Optional[Any] = None,
     ) -> None:
         """Initialize game state queries."""
         self._interface = interface  # Keep for backward compatibility
@@ -60,16 +58,21 @@ class GameState:
 
         # Initialize focused query modules
         if screen_service:
-            self.combat_queries = CombatQueries(screen_service, config, template_service)
+            self.combat_queries = CombatQueries(
+                screen_service, config, template_service
+            )
             self.stat_queries = StatQueries(screen_service, ocr_service, config)
         else:
             self.combat_queries = None
             self.stat_queries = None
-            logger.warning("ScreenService not available - combat and stat queries unavailable")
+            logger.warning(
+                "ScreenService not available - combat and stat queries unavailable"
+            )
 
         # Initialize inventory detection (already exists)
         if template_service and screen_service:
             from osrsbot.queries.inventory_queries import InventoryState
+
             self.inventory = InventoryState(template_service, screen_service, config)
             logger.debug("InventoryState initialized successfully")
         else:
@@ -151,7 +154,9 @@ class GameState:
                 # Fall through to conservative default
 
         # Fallback: assume full (conservative)
-        logger.warning("InventoryState not available - assuming inventory is full (conservative)")
+        logger.warning(
+            "InventoryState not available - assuming inventory is full (conservative)"
+        )
         return True
 
     # --- Debug methods (keep unchanged) ---
@@ -161,9 +166,9 @@ class GameState:
             logger.error("StatQueries not available for debugging")
             return
 
-        logger.info(f"\n{'='*50}")
+        logger.info(f"\n{'=' * 50}")
         logger.info(f"HP OCR Debug - Taking {num_samples} samples")
-        logger.info(f"{'='*50}")
+        logger.info(f"{'=' * 50}")
 
         successful_reads = 0
         failed_reads = 0
@@ -174,23 +179,25 @@ class GameState:
             if hp is not None:
                 successful_reads += 1
                 values.append(hp)
-                logger.info(f"[{i+1:2d}/{num_samples}] HP: {hp}")
+                logger.info(f"[{i + 1:2d}/{num_samples}] HP: {hp}")
             else:
                 failed_reads += 1
-                logger.warning(f"[{i+1:2d}/{num_samples}] HP: FAILED")
+                logger.warning(f"[{i + 1:2d}/{num_samples}] HP: FAILED")
 
         success_rate = (100 * successful_reads / num_samples) if num_samples > 0 else 0
 
-        logger.info(f"\n{'='*50}")
-        logger.info(f"Results:")
-        logger.info(f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)")
+        logger.info(f"\n{'=' * 50}")
+        logger.info("Results:")
+        logger.info(
+            f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)"
+        )
         logger.info(f"  Failed:     {failed_reads}/{num_samples}")
         if values:
             logger.info(f"  Values:     {values}")
             logger.info(f"  Min:        {min(values)}")
             logger.info(f"  Max:        {max(values)}")
             logger.info(f"  Most common: {max(set(values), key=values.count)}")
-        logger.info(f"{'='*50}\n")
+        logger.info(f"{'=' * 50}\n")
 
     def debug_prayer_ocr(self, num_samples: int = 20) -> None:
         """Debug Prayer OCR by taking multiple samples."""
@@ -198,9 +205,9 @@ class GameState:
             logger.error("StatQueries not available for debugging")
             return
 
-        logger.info(f"\n{'='*50}")
+        logger.info(f"\n{'=' * 50}")
         logger.info(f"Prayer OCR Debug - Taking {num_samples} samples")
-        logger.info(f"{'='*50}")
+        logger.info(f"{'=' * 50}")
 
         successful_reads = 0
         failed_reads = 0
@@ -211,23 +218,25 @@ class GameState:
             if prayer is not None:
                 successful_reads += 1
                 values.append(prayer)
-                logger.info(f"[{i+1:2d}/{num_samples}] Prayer: {prayer}")
+                logger.info(f"[{i + 1:2d}/{num_samples}] Prayer: {prayer}")
             else:
                 failed_reads += 1
-                logger.warning(f"[{i+1:2d}/{num_samples}] Prayer: FAILED")
+                logger.warning(f"[{i + 1:2d}/{num_samples}] Prayer: FAILED")
 
         success_rate = (100 * successful_reads / num_samples) if num_samples > 0 else 0
 
-        logger.info(f"\n{'='*50}")
-        logger.info(f"Results:")
-        logger.info(f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)")
+        logger.info(f"\n{'=' * 50}")
+        logger.info("Results:")
+        logger.info(
+            f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)"
+        )
         logger.info(f"  Failed:     {failed_reads}/{num_samples}")
         if values:
             logger.info(f"  Values:     {values}")
             logger.info(f"  Min:        {min(values)}")
             logger.info(f"  Max:        {max(values)}")
             logger.info(f"  Most common: {max(set(values), key=values.count)}")
-        logger.info(f"{'='*50}\n")
+        logger.info(f"{'=' * 50}\n")
 
     def debug_run_energy_ocr(self, num_samples: int = 20) -> None:
         """Debug Run Energy OCR by taking multiple samples."""
@@ -235,9 +244,9 @@ class GameState:
             logger.error("StatQueries not available for debugging")
             return
 
-        logger.info(f"\n{'='*50}")
+        logger.info(f"\n{'=' * 50}")
         logger.info(f"Run Energy OCR Debug - Taking {num_samples} samples")
-        logger.info(f"{'='*50}")
+        logger.info(f"{'=' * 50}")
 
         successful_reads = 0
         failed_reads = 0
@@ -248,23 +257,25 @@ class GameState:
             if energy is not None:
                 successful_reads += 1
                 values.append(energy)
-                logger.info(f"[{i+1:2d}/{num_samples}] Run Energy: {energy}")
+                logger.info(f"[{i + 1:2d}/{num_samples}] Run Energy: {energy}")
             else:
                 failed_reads += 1
-                logger.warning(f"[{i+1:2d}/{num_samples}] Run Energy: FAILED")
+                logger.warning(f"[{i + 1:2d}/{num_samples}] Run Energy: FAILED")
 
         success_rate = (100 * successful_reads / num_samples) if num_samples > 0 else 0
 
-        logger.info(f"\n{'='*50}")
-        logger.info(f"Results:")
-        logger.info(f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)")
+        logger.info(f"\n{'=' * 50}")
+        logger.info("Results:")
+        logger.info(
+            f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)"
+        )
         logger.info(f"  Failed:     {failed_reads}/{num_samples}")
         if values:
             logger.info(f"  Values:     {values}")
             logger.info(f"  Min:        {min(values)}")
             logger.info(f"  Max:        {max(values)}")
             logger.info(f"  Most common: {max(set(values), key=values.count)}")
-        logger.info(f"{'='*50}\n")
+        logger.info(f"{'=' * 50}\n")
 
     def debug_get_viewport_dimensions(self) -> Optional[tuple]:
         """
@@ -322,7 +333,10 @@ class GameState:
         try:
             if grayscale:
                 img = self.screen.capture_grayscale()
-                logger.debug(f"Debug screen capture: grayscale {'success' if img is not None else 'failed'}")
+                logger.debug(
+                    f"Debug screen capture: grayscale {
+                        'success' if img is not None else 'failed'}"
+                )
                 return img
             else:
                 img = self.screen.capture()

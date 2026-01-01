@@ -12,12 +12,19 @@ Responsibilities:
 """
 
 import logging
-from typing import Optional, TYPE_CHECKING
-import numpy as np
-import cv2
+from typing import TYPE_CHECKING, Optional
 
-from osrsbot.services.template_ocr_service import TemplateOCRService, ORB_GREEN, ORB_RED, CYAN, YELLOW
+import cv2
+import numpy as np
+
 from osrsbot.models.config import Config
+from osrsbot.services.template_ocr_service import (
+    CYAN,
+    ORB_GREEN,
+    ORB_RED,
+    YELLOW,
+    TemplateOCRService,
+)
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
@@ -33,10 +40,7 @@ class StatQueries:
     """
 
     def __init__(
-        self,
-        screen: 'ScreenService',
-        ocr_service: TemplateOCRService,
-        config: Config
+        self, screen: "ScreenService", ocr_service: TemplateOCRService, config: Config
     ):
         self.screen = screen
         self.ocr = ocr_service
@@ -72,7 +76,7 @@ class StatQueries:
             img_np,
             font_name="plain11",
             colors=[ORB_GREEN, ORB_RED],
-            correlation_threshold=0.95
+            correlation_threshold=0.95,
         )
 
         if hp is None:
@@ -109,10 +113,7 @@ class StatQueries:
         img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
         prayer = self.ocr.extract_number(
-            img_np,
-            font_name="plain11",
-            colors=[CYAN],
-            correlation_threshold=0.95
+            img_np, font_name="plain11", colors=[CYAN], correlation_threshold=0.95
         )
 
         if prayer is None:
@@ -149,10 +150,7 @@ class StatQueries:
         img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
         energy = self.ocr.extract_number(
-            img_np,
-            font_name="plain11",
-            colors=[YELLOW],
-            correlation_threshold=0.95
+            img_np, font_name="plain11", colors=[YELLOW], correlation_threshold=0.95
         )
 
         if energy is None:

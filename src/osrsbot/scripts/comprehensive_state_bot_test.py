@@ -26,18 +26,19 @@ States:
 
 This comprehensive test ensures all framework features work correctly.
 """
+
 import logging
 import time
 from enum import Enum
 from typing import Dict, List
 
-from osrsbot.core.state_machine_bot import StateMachineBot
 from osrsbot.core.state_helpers import build_metadata_dict
+from osrsbot.core.state_machine_bot import StateMachineBot
 from osrsbot.core.state_types import (
-    StateResult,
+    StateExecutionContext,
     StateMetadata,
+    StateResult,
     StateTransition,
-    StateExecutionContext
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 class TestBotStates(Enum):
     """States for comprehensive feature testing."""
+
     IDLE = "idle"
     TEST_MINIMAP = "test_minimap"
     TEST_WALKER = "test_walker"
@@ -93,94 +95,111 @@ class ComprehensiveTestBot(StateMachineBot):
 
     def define_state_metadata(self) -> Dict[Enum, StateMetadata]:
         """Define metadata for each state."""
-        return build_metadata_dict(TestBotStates, {
-            TestBotStates.IDLE: {
-                "name": "Idle",
-                "description": "Initial safety checks",
-                "max_retries": 1,
+        return build_metadata_dict(
+            TestBotStates,
+            {
+                TestBotStates.IDLE: {
+                    "name": "Idle",
+                    "description": "Initial safety checks",
+                    "max_retries": 1,
+                },
+                TestBotStates.TEST_MINIMAP: {
+                    "name": "Test Minimap Navigation",
+                    "description": "Test walking in all directions",
+                    "timeout": 60.0,
+                    "failover": TestBotStates.TEST_WALKER,
+                },
+                TestBotStates.TEST_WALKER: {
+                    "name": "Test Walker/Pathfinding",
+                    "description": "Test world coordinate navigation",
+                    "timeout": 60.0,
+                    "failover": TestBotStates.TEST_ARDUINO_MOUSE,
+                },
+                TestBotStates.TEST_ARDUINO_MOUSE: {
+                    "name": "Test Arduino Mouse",
+                    "description": "Test hardware mouse control",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_INVENTORY_DETECTION,
+                },
+                TestBotStates.TEST_INVENTORY_DETECTION: {
+                    "name": "Test Inventory Detection",
+                    "description": "Test inventory state queries",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_INVENTORY_CLICKING,
+                },
+                TestBotStates.TEST_INVENTORY_CLICKING: {
+                    "name": "Test Inventory Clicking",
+                    "description": "Test clicking inventory slots",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_COLOR_DETECTION,
+                },
+                TestBotStates.TEST_COLOR_DETECTION: {
+                    "name": "Test Color Detection",
+                    "description": "Test smart color clicking",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_TEMPLATE_MATCHING,
+                },
+                TestBotStates.TEST_TEMPLATE_MATCHING: {
+                    "name": "Test Template Matching",
+                    "description": "Test UI button detection",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_OCR,
+                },
+                TestBotStates.TEST_OCR: {
+                    "name": "Test OCR",
+                    "description": "Test HP and stats reading",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_PRAYER,
+                },
+                TestBotStates.TEST_PRAYER: {
+                    "name": "Test Prayer System",
+                    "description": "Test prayer tab and prayer toggling",
+                    "timeout": 30.0,
+                    "failover": TestBotStates.TEST_COMBAT,
+                },
+                TestBotStates.TEST_COMBAT: {
+                    "name": "Test Combat Detection",
+                    "description": "Test combat state detection",
+                    "max_retries": 30,
+                    "timeout": 300.0,
+                    "failover": TestBotStates.COMPLETE,
+                },
+                TestBotStates.COMPLETE: {
+                    "name": "Complete",
+                    "description": "All tests complete",
+                    "max_retries": 1,
+                },
             },
-            TestBotStates.TEST_MINIMAP: {
-                "name": "Test Minimap Navigation",
-                "description": "Test walking in all directions",
-                "timeout": 60.0,
-                "failover": TestBotStates.TEST_WALKER,
-            },
-            TestBotStates.TEST_WALKER: {
-                "name": "Test Walker/Pathfinding",
-                "description": "Test world coordinate navigation",
-                "timeout": 60.0,
-                "failover": TestBotStates.TEST_ARDUINO_MOUSE,
-            },
-            TestBotStates.TEST_ARDUINO_MOUSE: {
-                "name": "Test Arduino Mouse",
-                "description": "Test hardware mouse control",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_INVENTORY_DETECTION,
-            },
-            TestBotStates.TEST_INVENTORY_DETECTION: {
-                "name": "Test Inventory Detection",
-                "description": "Test inventory state queries",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_INVENTORY_CLICKING,
-            },
-            TestBotStates.TEST_INVENTORY_CLICKING: {
-                "name": "Test Inventory Clicking",
-                "description": "Test clicking inventory slots",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_COLOR_DETECTION,
-            },
-            TestBotStates.TEST_COLOR_DETECTION: {
-                "name": "Test Color Detection",
-                "description": "Test smart color clicking",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_TEMPLATE_MATCHING,
-            },
-            TestBotStates.TEST_TEMPLATE_MATCHING: {
-                "name": "Test Template Matching",
-                "description": "Test UI button detection",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_OCR,
-            },
-            TestBotStates.TEST_OCR: {
-                "name": "Test OCR",
-                "description": "Test HP and stats reading",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_PRAYER,
-            },
-            TestBotStates.TEST_PRAYER: {
-                "name": "Test Prayer System",
-                "description": "Test prayer tab and prayer toggling",
-                "timeout": 30.0,
-                "failover": TestBotStates.TEST_COMBAT,
-            },
-            TestBotStates.TEST_COMBAT: {
-                "name": "Test Combat Detection",
-                "description": "Test combat state detection",
-                "max_retries": 30,
-                "timeout": 300.0,
-                "failover": TestBotStates.COMPLETE,
-            },
-            TestBotStates.COMPLETE: {
-                "name": "Complete",
-                "description": "All tests complete",
-                "max_retries": 1,
-            },
-        })
+        )
 
     def define_transitions(self) -> List[StateTransition]:
         """Define allowed state transitions."""
         return [
             StateTransition(TestBotStates.IDLE, TestBotStates.TEST_MINIMAP),
             StateTransition(TestBotStates.TEST_MINIMAP, TestBotStates.TEST_WALKER),
-            StateTransition(TestBotStates.TEST_WALKER, TestBotStates.TEST_ARDUINO_MOUSE),
-            StateTransition(TestBotStates.TEST_ARDUINO_MOUSE, TestBotStates.TEST_INVENTORY_DETECTION),
-            StateTransition(TestBotStates.TEST_INVENTORY_DETECTION, TestBotStates.TEST_INVENTORY_CLICKING),
-            StateTransition(TestBotStates.TEST_INVENTORY_CLICKING, TestBotStates.TEST_COLOR_DETECTION),
-            StateTransition(TestBotStates.TEST_COLOR_DETECTION, TestBotStates.TEST_TEMPLATE_MATCHING),
-            StateTransition(TestBotStates.TEST_TEMPLATE_MATCHING, TestBotStates.TEST_OCR),
+            StateTransition(
+                TestBotStates.TEST_WALKER, TestBotStates.TEST_ARDUINO_MOUSE
+            ),
+            StateTransition(
+                TestBotStates.TEST_ARDUINO_MOUSE, TestBotStates.TEST_INVENTORY_DETECTION
+            ),
+            StateTransition(
+                TestBotStates.TEST_INVENTORY_DETECTION,
+                TestBotStates.TEST_INVENTORY_CLICKING,
+            ),
+            StateTransition(
+                TestBotStates.TEST_INVENTORY_CLICKING,
+                TestBotStates.TEST_COLOR_DETECTION,
+            ),
+            StateTransition(
+                TestBotStates.TEST_COLOR_DETECTION, TestBotStates.TEST_TEMPLATE_MATCHING
+            ),
+            StateTransition(
+                TestBotStates.TEST_TEMPLATE_MATCHING, TestBotStates.TEST_OCR
+            ),
             StateTransition(TestBotStates.TEST_OCR, TestBotStates.TEST_PRAYER),
             StateTransition(TestBotStates.TEST_PRAYER, TestBotStates.TEST_COMBAT),
-            StateTransition(TestBotStates.TEST_COMBAT, TestBotStates.COMPLETE)
+            StateTransition(TestBotStates.TEST_COMBAT, TestBotStates.COMPLETE),
         ]
 
     def get_initial_state(self) -> Enum:
@@ -270,7 +289,9 @@ class ComprehensiveTestBot(StateMachineBot):
         try:
             # Check if walker is available
             if not self.actions.walker:
-                logger.warning("  ! WalkerService not available (Status Socket plugin not detected)")
+                logger.warning(
+                    "  ! WalkerService not available (Status Socket plugin not detected)"
+                )
                 logger.warning("  -> Install Status Socket plugin to enable walker")
                 logger.warning("  -> See SETUP_GUIDE.md for installation instructions")
                 logger.warning("  -> Skipping walker test")
@@ -293,7 +314,9 @@ class ComprehensiveTestBot(StateMachineBot):
             target_y = state.world_y + 5
 
             logger.info(f"  -> Target: ({target_x}, {target_y})")
-            success = self.actions.walk_to_world_coordinate(target_x, target_y, move_style="curved")
+            success = self.actions.walk_to_world_coordinate(
+                target_x, target_y, move_style="curved"
+            )
 
             if success:
                 logger.info("  OK Successfully reached target coordinate")
@@ -305,7 +328,9 @@ class ComprehensiveTestBot(StateMachineBot):
             self.actions.wait("medium")
 
             # Test 2: Walk a path (square pattern)
-            logger.info("\n  Test 2: Walking a path (square pattern: 5 tiles each direction)")
+            logger.info(
+                "\n  Test 2: Walking a path (square pattern: 5 tiles each direction)"
+            )
             state = self.actions.walker.status_socket.get_player_state()
             if not state:
                 logger.error("  X Failed to get updated player position")
@@ -314,15 +339,15 @@ class ComprehensiveTestBot(StateMachineBot):
 
             # Create square path
             path = [
-                (state.world_x + 5, state.world_y),      # 5 tiles east
+                (state.world_x + 5, state.world_y),  # 5 tiles east
                 (state.world_x + 5, state.world_y - 5),  # 5 tiles south
-                (state.world_x, state.world_y - 5),      # 5 tiles west
-                (state.world_x, state.world_y)           # 5 tiles north (back to start)
+                (state.world_x, state.world_y - 5),  # 5 tiles west
+                (state.world_x, state.world_y),  # 5 tiles north (back to start)
             ]
 
             logger.info(f"  -> Path waypoints: {len(path)} points")
             for i, (x, y) in enumerate(path):
-                logger.info(f"    {i+1}. ({x}, {y})")
+                logger.info(f"    {i + 1}. ({x}, {y})")
 
             success = self.actions.walk_path(path, move_style="curved")
 
@@ -339,9 +364,13 @@ class ComprehensiveTestBot(StateMachineBot):
 
             final_state = self.actions.walker.status_socket.get_player_state()
             if final_state:
-                logger.info(f"  -> Final position: ({final_state.world_x}, {final_state.world_y})")
+                logger.info(
+                    f"  -> Final position: ({final_state.world_x}, {final_state.world_y})"
+                )
                 logger.info(f"  -> Final camera yaw: {final_state.camera_yaw}")
-                logger.info("  OK Rotation matrix compensated for camera angle correctly")
+                logger.info(
+                    "  OK Rotation matrix compensated for camera angle correctly"
+                )
             else:
                 logger.warning("  ! Could not verify final position")
 
@@ -366,7 +395,9 @@ class ComprehensiveTestBot(StateMachineBot):
         logger.info("-" * 60)
 
         try:
-            from osrsbot.services.interception_mouse_service import InterceptionMouseService
+            from osrsbot.services.interception_mouse_service import (
+                InterceptionMouseService,
+            )
 
             if not isinstance(self.actions.mouse, InterceptionMouseService):
                 logger.info("  ! Interception mouse not enabled (using standard mouse)")
@@ -380,12 +411,15 @@ class ComprehensiveTestBot(StateMachineBot):
 
             logger.info("  OK Interception mouse detected and enabled")
 
-            logger.info(f"  -> Driver context initialized: {bool(self.actions.mouse.context)}")
+            logger.info(
+                f"  -> Driver context initialized: {bool(self.actions.mouse.context)}"
+            )
             logger.info(f"  -> Mouse device ID: {self.actions.mouse.mouse_device}")
 
             logger.info("\n  Testing Interception mouse movement accuracy...")
 
             import pyautogui
+
             start_pos = pyautogui.position()
             logger.info(f"  -> Start position: {start_pos}")
 
@@ -408,12 +442,16 @@ class ComprehensiveTestBot(StateMachineBot):
             elif error <= 10:
                 logger.info("  OK Interception mouse accuracy: GOOD (<=10px error)")
             else:
-                logger.warning(f"  ! Interception mouse accuracy: FAIR ({error}px error)")
+                logger.warning(
+                    f"  ! Interception mouse accuracy: FAIR ({error}px error)"
+                )
 
             logger.info("\n  Testing Interception mouse click...")
             logger.info("  -> Sending test click command...")
 
-            self.actions.mouse.move_to(start_pos[0], start_pos[1], style="linear", duration=0.3)
+            self.actions.mouse.move_to(
+                start_pos[0], start_pos[1], style="linear", duration=0.3
+            )
             self.actions.mouse.click(button="left")
 
             logger.info("  OK Interception mouse click sent successfully")
@@ -433,7 +471,9 @@ class ComprehensiveTestBot(StateMachineBot):
             self._test_results["interception_mouse"] = False
             return StateResult.FAILURE
 
-    def _handle_test_inventory_detection(self, context: StateExecutionContext) -> StateResult:
+    def _handle_test_inventory_detection(
+        self, context: StateExecutionContext
+    ) -> StateResult:
         """
         Test inventory detection queries.
 
@@ -470,8 +510,16 @@ class ComprehensiveTestBot(StateMachineBot):
             # Get filled/empty slot lists
             filled = self.state.inventory.get_filled_slots()
             empty = self.state.inventory.get_empty_slots()
-            logger.info(f"  -> Filled slot indices: {filled[:5]}..." if len(filled) > 5 else f"  -> Filled slots: {filled}")
-            logger.info(f"  -> Empty slot indices: {empty[:5]}..." if len(empty) > 5 else f"  -> Empty slots: {empty}")
+            logger.info(
+                f"  -> Filled slot indices: {filled[:5]}..."
+                if len(filled) > 5
+                else f"  -> Filled slots: {filled}"
+            )
+            logger.info(
+                f"  -> Empty slot indices: {empty[:5]}..."
+                if len(empty) > 5
+                else f"  -> Empty slots: {empty}"
+            )
 
             logger.info("  OK Inventory detection working correctly")
             self._test_results["inventory_detection"] = True
@@ -482,7 +530,9 @@ class ComprehensiveTestBot(StateMachineBot):
             self._test_results["inventory_detection"] = False
             return StateResult.FAILURE
 
-    def _handle_test_inventory_clicking(self, context: StateExecutionContext) -> StateResult:
+    def _handle_test_inventory_clicking(
+        self, context: StateExecutionContext
+    ) -> StateResult:
         """
         Test clicking inventory slots using template detection.
 
@@ -496,8 +546,12 @@ class ComprehensiveTestBot(StateMachineBot):
         try:
             # Check if template service is available
             if not self.actions.template_service:
-                logger.warning("  ! TemplateMatchService not available (missing template images)")
-                logger.warning("  -> Create templates/inventory_grid.png to enable this feature")
+                logger.warning(
+                    "  ! TemplateMatchService not available (missing template images)"
+                )
+                logger.warning(
+                    "  -> Create templates/inventory_grid.png to enable this feature"
+                )
                 logger.warning("  -> Skipping inventory clicking test")
                 self._test_results["inventory_clicking"] = "skipped"
                 return StateResult.SUCCESS
@@ -523,16 +577,22 @@ class ComprehensiveTestBot(StateMachineBot):
                 # Use direct template matching without ensure_inventory_open
                 img_gray = self.state.screen.capture_grayscale()
                 if img_gray is None:
-                    logger.warning(f"    ! Failed to capture screenshot for slot {slot}")
+                    logger.warning(
+                        f"    ! Failed to capture screenshot for slot {slot}"
+                    )
                     continue
 
                 # Detect inventory grid
-                if not self.actions.template_service.detect_grid("inventory", img_gray, force=True):
+                if not self.actions.template_service.detect_grid(
+                    "inventory", img_gray, force=True
+                ):
                     logger.warning(f"    ! Inventory grid not detected for slot {slot}")
                     continue
 
                 # Get slot position
-                position = self.actions.template_service.get_slot_position("inventory", slot - 1)
+                position = self.actions.template_service.get_slot_position(
+                    "inventory", slot - 1
+                )
                 if not position:
                     logger.warning(f"    ! Failed to get position for slot {slot}")
                     continue
@@ -541,9 +601,10 @@ class ComprehensiveTestBot(StateMachineBot):
                 rel_x, rel_y = position
                 abs_x, abs_y = self.actions._to_absolute(rel_x, rel_y)
                 success = self.actions.mouse.click_at(
-                    abs_x, abs_y,
+                    abs_x,
+                    abs_y,
                     move_style="curved",
-                    speed_multiplier=self.actions._get_mouse_speed_multiplier()
+                    speed_multiplier=self.actions._get_mouse_speed_multiplier(),
                 )
 
                 if success:
@@ -562,7 +623,9 @@ class ComprehensiveTestBot(StateMachineBot):
             self._test_results["inventory_clicking"] = False
             return StateResult.FAILURE
 
-    def _handle_test_color_detection(self, context: StateExecutionContext) -> StateResult:
+    def _handle_test_color_detection(
+        self, context: StateExecutionContext
+    ) -> StateResult:
         """
         Test color detection by clicking a colored object once.
 
@@ -592,7 +655,7 @@ class ComprehensiveTestBot(StateMachineBot):
                 move_style="curved",
                 enable_stuck_detection=True,
                 enable_blacklist=True,
-                region=game_viewport_region
+                region=game_viewport_region,
             )
 
             if success:
@@ -608,7 +671,9 @@ class ComprehensiveTestBot(StateMachineBot):
             self._test_results["color_detection"] = False
             return StateResult.FAILURE
 
-    def _handle_test_template_matching(self, context: StateExecutionContext) -> StateResult:
+    def _handle_test_template_matching(
+        self, context: StateExecutionContext
+    ) -> StateResult:
         """
         Test template matching for UI elements.
 
@@ -621,8 +686,12 @@ class ComprehensiveTestBot(StateMachineBot):
 
         try:
             if not self.actions.template_service:
-                logger.warning("  ! TemplateMatchService not available (missing template images)")
-                logger.warning("  -> Create templates/inventory_grid.png to enable this feature")
+                logger.warning(
+                    "  ! TemplateMatchService not available (missing template images)"
+                )
+                logger.warning(
+                    "  -> Create templates/inventory_grid.png to enable this feature"
+                )
                 logger.warning("  -> Skipping template matching test")
                 self._test_results["template_matching"] = "skipped"
                 return StateResult.SUCCESS
@@ -639,7 +708,9 @@ class ComprehensiveTestBot(StateMachineBot):
                     grid_info = self.state.debug_get_inventory_grid_info()
                     if grid_info:
                         logger.info(f"    -> Grid visible: {grid_info['visible']}")
-                        logger.info(f"    -> Total elements: {grid_info['total_elements']}")
+                        logger.info(
+                            f"    -> Total elements: {grid_info['total_elements']}"
+                        )
                 else:
                     logger.warning("  ! Inventory grid not detected")
 
@@ -667,11 +738,11 @@ class ComprehensiveTestBot(StateMachineBot):
         try:
             import cv2
             import numpy as np
-            import pyautogui
+
             from osrsbot.services.template_ocr_service import (
-                get_template_ocr_service,
                 ORB_GREEN,
                 ORB_RED,
+                get_template_ocr_service,
             )
 
             # ===== METHOD 1: Tesseract OCR (current method) =====
@@ -709,7 +780,9 @@ class ComprehensiveTestBot(StateMachineBot):
                 # Get HP region config
                 hp_region_config = self.config.get("coordinates", "ocr", "hp_region")
                 if not hp_region_config:
-                    logger.warning("  ! hp_region not in config, cannot test template OCR")
+                    logger.warning(
+                        "  ! hp_region not in config, cannot test template OCR"
+                    )
                 else:
                     # Use ScreenService.capture with relative coordinates
                     hp_x = hp_region_config["x"]
@@ -717,12 +790,13 @@ class ComprehensiveTestBot(StateMachineBot):
                     hp_w = hp_region_config["width"]
                     hp_h = hp_region_config["height"]
 
-                    logger.info(f"  Capturing HP region (relative): ({hp_x}, {hp_y}) {hp_w}x{hp_h}")
+                    logger.info(
+                        f"  Capturing HP region (relative): ({hp_x}, {hp_y}) {hp_w}x{hp_h}"
+                    )
 
                     # Capture using ScreenService (proper public API)
                     pil_img = self.state.screen.capture(
-                        region=(hp_x, hp_y, hp_w, hp_h),
-                        relative=True
+                        region=(hp_x, hp_y, hp_w, hp_h), relative=True
                     )
 
                     # Convert to numpy array (BGR for OpenCV)
@@ -733,7 +807,7 @@ class ComprehensiveTestBot(StateMachineBot):
                         img_np,
                         font_name="plain11",
                         colors=[ORB_GREEN, ORB_RED],
-                        correlation_threshold=0.98
+                        correlation_threshold=0.98,
                     )
 
                     if hp_template is not None:
@@ -749,55 +823,77 @@ class ComprehensiveTestBot(StateMachineBot):
                             )
                         else:
                             logger.info(
-                                f"  -> Template OCR succeeded where Tesseract failed"
+                                "  -> Template OCR succeeded where Tesseract failed"
                             )
                     else:
-                        logger.warning("  -> Template HP: None (template matching failed)")
+                        logger.warning(
+                            "  -> Template HP: None (template matching failed)"
+                        )
 
                         # Test prayer with template matching
-                        prayer_region_config = self.config.get("coordinates", "ocr", "prayer_region")
+                        prayer_region_config = self.config.get(
+                            "coordinates", "ocr", "prayer_region"
+                        )
                         if prayer_region_config:
-                            prayer_x = win_x + prayer_region_config["x"]
-                            prayer_y = win_y + prayer_region_config["y"]
+                            prayer_x = prayer_region_config["x"]
+                            prayer_y = prayer_region_config["y"]
                             prayer_w = prayer_region_config["width"]
                             prayer_h = prayer_region_config["height"]
 
-                            screenshot = pyautogui.screenshot(region=(prayer_x, prayer_y, prayer_w, prayer_h))
-                            img_np = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+                            pil_img = self.state.screen.capture(
+                                region=(prayer_x, prayer_y, prayer_w, prayer_h),
+                                relative=True,
+                            )
+                            img_np = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
                             # Prayer uses cyan color
                             from osrsbot.services.template_ocr_service import CYAN
+
                             prayer_template = template_ocr.extract_number(
                                 img_np,
                                 font_name="plain11",
                                 colors=[CYAN],
-                                correlation_threshold=0.98
+                                correlation_threshold=0.98,
                             )
 
                             if prayer_template is not None:
                                 logger.info(f"  -> Template Prayer: {prayer_template}")
 
-                                if prayer_tesseract is not None and prayer_tesseract == prayer_template:
-                                    logger.info(f"  ✓ MATCH! Both methods agree: {prayer_template}")
+                                if (
+                                    prayer_tesseract is not None
+                                    and prayer_tesseract == prayer_template
+                                ):
+                                    logger.info(
+                                        f"  ✓ MATCH! Both methods agree: {prayer_template}"
+                                    )
                                 elif prayer_tesseract is not None:
                                     logger.warning(
                                         f"  ! MISMATCH! Tesseract={prayer_tesseract}, "
                                         f"Template={prayer_template}"
                                     )
                             else:
-                                logger.warning("  -> Template Prayer: None (template matching failed)")
+                                logger.warning(
+                                    "  -> Template Prayer: None (template matching failed)"
+                                )
 
             except Exception as e:
                 logger.error(f"  Template OCR test failed: {e}")
                 import traceback
+
                 traceback.print_exc()
 
             # ===== COMPARISON SUMMARY =====
             logger.info("\n  " + "=" * 58)
             logger.info("  OCR COMPARISON SUMMARY")
             logger.info("  " + "=" * 58)
-            logger.info(f"  Tesseract HP:      {hp_tesseract if hp_tesseract is not None else 'FAILED'}")
-            logger.info(f"  Template HP:       {hp_template if hp_template is not None else 'FAILED'}")
+            logger.info(
+                f"  Tesseract HP:      {
+                    hp_tesseract if hp_tesseract is not None else 'FAILED'}"
+            )
+            logger.info(
+                f"  Template HP:       {
+                    hp_template if hp_template is not None else 'FAILED'}"
+            )
             logger.info("  " + "-" * 58)
             logger.info("  Template Matching Advantages:")
             logger.info("    - No heavy preprocessing needed")
@@ -813,6 +909,7 @@ class ComprehensiveTestBot(StateMachineBot):
         except Exception as e:
             logger.error(f"OCR test failed: {e}")
             import traceback
+
             traceback.print_exc()
             self._test_results["ocr"] = False
             return StateResult.FAILURE
@@ -901,6 +998,7 @@ class ComprehensiveTestBot(StateMachineBot):
         except Exception as e:
             logger.error(f"Prayer test failed: {e}")
             import traceback
+
             traceback.print_exc()
             self._test_results["prayer"] = False
             return StateResult.FAILURE
@@ -914,7 +1012,9 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.RETRY to continue testing
             StateResult.FAILURE if test fails
         """
-        logger.info(f"\n[TEST 10/10] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})")
+        logger.info(
+            f"\n[TEST 10/10] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})"
+        )
 
         try:
             # Check if test complete
@@ -942,7 +1042,7 @@ class ComprehensiveTestBot(StateMachineBot):
                     move_style="instant",
                     enable_stuck_detection=True,
                     enable_blacklist=True,
-                    region=game_viewport_region
+                    region=game_viewport_region,
                 )
 
                 if not clicked:
@@ -981,7 +1081,9 @@ class ComprehensiveTestBot(StateMachineBot):
                             combat_ended_count += 1
                             if combat_ended_count >= 3:
                                 self._combat_click_count += 1
-                                logger.info(f"  OK Kill complete! ({self._combat_click_count}/{self._combat_target_clicks})")
+                                logger.info(
+                                    f"  OK Kill complete! ({self._combat_click_count}/{self._combat_target_clicks})"
+                                )
 
                                 hp = self.state.get_hp()
                                 if hp:
@@ -1024,7 +1126,7 @@ class ComprehensiveTestBot(StateMachineBot):
             ("Color Detection", "color_detection"),
             ("Template Matching", "template_matching"),
             ("OCR (Stats Reading)", "ocr"),
-            ("Combat Detection", "combat")
+            ("Combat Detection", "combat"),
         ]
 
         for test_name, test_key in tests:
@@ -1042,7 +1144,9 @@ class ComprehensiveTestBot(StateMachineBot):
             logger.info(f"  {status:12} {test_name}")
 
         logger.info("=" * 60)
-        logger.info(f"Combat Kills: {self._combat_click_count}/{self._combat_target_clicks}")
+        logger.info(
+            f"Combat Kills: {self._combat_click_count}/{self._combat_target_clicks}"
+        )
         logger.info("=" * 60)
 
         # Print state history

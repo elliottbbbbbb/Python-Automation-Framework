@@ -1,12 +1,11 @@
-import time
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from osrsbot.queries.game_queries import GameState
-from osrsbot.models.config import Config
 from osrsbot.commands.game_actions import GameActions as Actions
 from osrsbot.constants import GAME_TIMING
+from osrsbot.models.config import Config
+from osrsbot.queries.game_queries import GameState
 
 if TYPE_CHECKING:
     from osrsbot.core.game_interface import GameInterface
@@ -28,7 +27,7 @@ class Bot(ABC):
         state: GameState,
         actions: Actions,
         config: Config,
-        script_name: str = "Base Bot"
+        script_name: str = "Base Bot",
     ):
         self.interface = interface
         self.state = state
@@ -47,15 +46,14 @@ class Bot(ABC):
             bank_location: The bank location to use for this cycle
             run_number: The current run number (0-indexed)
         """
-        pass
 
-    def run(self, bank_location: str = "varrock", runs: int = GAME_TIMING.default_runs) -> None:
+    def run(
+        self, bank_location: str = "varrock", runs: int = GAME_TIMING.default_runs
+    ) -> None:
         """
         The main execution loop, handling iterations, logging, and error control.
         """
-        logger.info(
-            f"Starting {self.script_name}: {runs} runs, bank: {bank_location}"
-        )
+        logger.info(f"Starting {self.script_name}: {runs} runs, bank: {bank_location}")
         print(f"\nðŸš€ {self.script_name} ({runs} runs)")
 
         for run in range(runs):
@@ -69,9 +67,7 @@ class Bot(ABC):
                 logger.warning("Script interrupted by user")
                 raise
             except Exception as e:
-                logger.error(
-                    f"Run {run + 1} failed: {e}", exc_info=True
-                )
+                logger.error(f"Run {run + 1} failed: {e}", exc_info=True)
                 print(f"âŒ Run {run + 1} failed: {e}")
 
         logger.info(f"{self.script_name} complete")

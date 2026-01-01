@@ -11,12 +11,14 @@ It NO LONGER handles:
 - Color detection (use ScreenService)
 - Screenshots (use ScreenService)
 """
-import logging
-import pywinctl as gw
-from typing import Tuple, Optional
 
-from osrsbot.models.config import Config
+import logging
+from typing import Optional, Tuple
+
+import pywinctl as gw
+
 from osrsbot.constants import COORDINATES
+from osrsbot.models.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +80,7 @@ class GameInterface:
             return False
 
     def get_bounds(self) -> Tuple[int, int, int, int]:
-        if not self.window or not hasattr(self.window, 'topleft'):
+        if not self.window or not hasattr(self.window, "topleft"):
             raise RuntimeError("Window no longer available")
 
         left, top = self.window.topleft
@@ -111,8 +113,7 @@ class GameInterface:
 
         if relative:
             return (
-                COORDINATES.origin_x <= x < width and
-                COORDINATES.origin_y <= y < height
+                COORDINATES.origin_x <= x < width and COORDINATES.origin_y <= y < height
             )
         else:
             left, top, width, height = self.get_bounds()
@@ -120,7 +121,7 @@ class GameInterface:
 
     def activate(self) -> bool:
         try:
-            if hasattr(self.window, 'activate'):
+            if hasattr(self.window, "activate"):
                 self.window.activate()
                 return True
             return False
@@ -130,7 +131,7 @@ class GameInterface:
 
     def is_active(self) -> bool:
         try:
-            if hasattr(self.window, 'isActive'):
+            if hasattr(self.window, "isActive"):
                 return self.window.isActive
             return False
         except Exception:
@@ -138,7 +139,7 @@ class GameInterface:
 
     def get_title(self) -> str:
         try:
-            return self.window.title if hasattr(self.window, 'title') else ""
+            return self.window.title if hasattr(self.window, "title") else ""
         except Exception:
             return ""
 

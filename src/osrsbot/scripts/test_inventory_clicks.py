@@ -8,13 +8,15 @@ This script:
 4. Clicks detected button centers
 5. Useful for testing template matching and mouse precision
 """
+
 import logging
 import time
+
 from osrsbot.core.game_interface import GameInterface
-from osrsbot.services.mouse_service import MouseService, MouseConfig
+from osrsbot.models.config import Config
+from osrsbot.services.mouse_service import MouseConfig, MouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.models.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +53,8 @@ def test_inventory_clicks():
         click_variance=mouse_config_dict.get("click_variance", 3),
         post_click_delay=(
             mouse_config_dict.get("post_click_delay_min", 0.05),
-            mouse_config_dict.get("post_click_delay_max", 0.15)
-        )
+            mouse_config_dict.get("post_click_delay_max", 0.15),
+        ),
     )
 
     mouse = MouseService(mouse_config)
@@ -93,14 +95,23 @@ def test_inventory_clicks():
         logger.info("DETECTING UI GRIDS")
         logger.info("=" * 60)
 
-        grid_names = ["inventory", "equipment", "prayer", "spellbook", "minimap", "chat"]
+        grid_names = [
+            "inventory",
+            "equipment",
+            "prayer",
+            "spellbook",
+            "minimap",
+            "chat",
+        ]
         for grid_name in grid_names:
             logger.info(f"\n--- Detecting {grid_name.upper()} grid ---")
 
             detected = template_service.detect_grid(grid_name, screenshot)
 
             if not detected:
-                logger.warning(f"❌ {grid_name} grid not detected (might not be visible)")
+                logger.warning(
+                    f"❌ {grid_name} grid not detected (might not be visible)"
+                )
                 continue
 
             grid = template_service.get_grid(grid_name)
@@ -123,10 +134,21 @@ def test_inventory_clicks():
         logger.info("=" * 60)
 
         button_names = [
-            "inventory_tab", "equipment_tab", "prayer_tab", "spellbook_tab", "skills_tab", "logout_tab",
-            "logout", "settings_collapse", "bank_presets",
-            "autoretal_on", "autoretal_off",
-            "good_click_1", "good_click_2", "good_click_3", "good_click_4"
+            "inventory_tab",
+            "equipment_tab",
+            "prayer_tab",
+            "spellbook_tab",
+            "skills_tab",
+            "logout_tab",
+            "logout",
+            "settings_collapse",
+            "bank_presets",
+            "autoretal_on",
+            "autoretal_off",
+            "good_click_1",
+            "good_click_2",
+            "good_click_3",
+            "good_click_4",
         ]
 
         for button_name in button_names:
@@ -135,7 +157,9 @@ def test_inventory_clicks():
             detected = template_service.detect_button(button_name, screenshot)
 
             if not detected:
-                logger.warning(f"❌ {button_name} button not detected (might not be visible)")
+                logger.warning(
+                    f"❌ {button_name} button not detected (might not be visible)"
+                )
                 continue
 
             button = template_service.get_button(button_name)
@@ -146,7 +170,13 @@ def test_inventory_clicks():
             successful_detections += 1
             element = button.element
             logger.info(f"✓ {button_name} detected")
-            logger.info(f"✓ Region: ({element.x0}, {element.y0}) {element.width}x{element.height}")
+            logger.info(
+                f"✓ Region: ({
+                    element.x0}, {
+                    element.y0}) {
+                    element.width}x{
+                    element.height}"
+            )
 
         # Click the inventory tab to open it
         logger.info("")
@@ -155,7 +185,9 @@ def test_inventory_clicks():
         logger.info("=" * 60)
 
         # Detect inventory tab button
-        inventory_tab_detected = template_service.detect_button("inventory_tab", screenshot)
+        inventory_tab_detected = template_service.detect_button(
+            "inventory_tab", screenshot
+        )
         if not inventory_tab_detected:
             logger.warning("❌ Inventory tab button not detected")
             logger.warning("Attempting to click inventory slots anyway...")
@@ -167,8 +199,10 @@ def test_inventory_clicks():
                 tab_abs_x = win_x + tab_rel_x
                 tab_abs_y = win_y + tab_rel_y
 
-                logger.info(f"✓ Inventory tab button detected at ({tab_rel_x}, {tab_rel_y})")
-                logger.info(f"Clicking inventory tab button...")
+                logger.info(
+                    f"✓ Inventory tab button detected at ({tab_rel_x}, {tab_rel_y})"
+                )
+                logger.info("Clicking inventory tab button...")
                 mouse.click(tab_abs_x, tab_abs_y)
                 total_clicks += 1
                 time.sleep(1.0)  # Wait for tab to open
@@ -207,7 +241,14 @@ def test_inventory_clicks():
             abs_x = win_x + rel_x
             abs_y = win_y + rel_y
 
-            logger.info(f"Clicking slot {i:2d}/{total_slots} at relative ({rel_x:4d}, {rel_y:4d}) -> absolute ({abs_x:4d}, {abs_y:4d})")
+            logger.info(
+                f"Clicking slot {
+                    i:2d}/{total_slots} at relative ({
+                    rel_x:4d}, {
+                    rel_y:4d}) -> absolute ({
+                    abs_x:4d}, {
+                        abs_y:4d})"
+            )
             mouse.click(abs_x, abs_y)
             total_clicks += 1
             time.sleep(0.5)
@@ -221,7 +262,7 @@ def test_inventory_clicks():
         other_tabs = [
             ("equipment_tab", "equipment"),
             ("prayer_tab", "prayer"),
-            ("spellbook_tab", "spellbook")
+            ("spellbook_tab", "spellbook"),
         ]
 
         for tab_button_name, grid_name in other_tabs:
@@ -235,7 +276,9 @@ def test_inventory_clicks():
 
             tab_button = template_service.get_button(tab_button_name)
             if not tab_button or not tab_button.element:
-                logger.warning(f"❌ {tab_button_name} button object not found, skipping")
+                logger.warning(
+                    f"❌ {tab_button_name} button object not found, skipping"
+                )
                 continue
 
             # Click the tab button
@@ -257,11 +300,15 @@ def test_inventory_clicks():
                 logger.warning("Failed to capture screenshot after tab click")
                 continue
 
-            grid_detected = template_service.detect_grid(grid_name, screenshot_after, force=True)
+            grid_detected = template_service.detect_grid(
+                grid_name, screenshot_after, force=True
+            )
             if grid_detected:
                 grid = template_service.get_grid(grid_name)
                 if grid:
-                    logger.info(f"✓ {grid_name} grid now visible with {len(grid.elements)} elements")
+                    logger.info(
+                        f"✓ {grid_name} grid now visible with {len(grid.elements)} elements"
+                    )
                     successful_detections += 1
             else:
                 logger.warning(f"❌ {grid_name} grid not detected after clicking tab")
@@ -288,8 +335,8 @@ if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%H:%M:%S'
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%H:%M:%S",
     )
 
     # Run the test

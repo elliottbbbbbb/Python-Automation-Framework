@@ -13,17 +13,18 @@ Structure:
 
 __version__ = "0.1.0"
 
+from osrsbot.app import Calibrator
+from osrsbot.commands import GameActions
+from osrsbot.core.runner import ScriptRunner
+
 # Export main components for convenience
 from osrsbot.models import Config
 from osrsbot.queries import GameState
-from osrsbot.commands import GameActions
-from osrsbot.core.runner import ScriptRunner
-from osrsbot.app import Calibrator
 
 __all__ = [
-    'Config',
-    'GameState',
-    'GameActions',
-    'ScriptRunner',
-    'Calibrator',
+    "Config",
+    "GameState",
+    "GameActions",
+    "ScriptRunner",
+    "Calibrator",
 ]

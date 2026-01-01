@@ -11,19 +11,19 @@ Provides comprehensive anti-detection features:
 All features are configurable via config.json and constants.py.
 """
 
-import time
-import random
 import logging
-from typing import Optional, Dict, List, TYPE_CHECKING
-from dataclasses import dataclass, field
+import random
+import time
 from collections import deque
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Dict, Optional
 
-from osrsbot.models.config import Config
 from osrsbot.constants import ANTI_BAN
+from osrsbot.models.config import Config
 
 if TYPE_CHECKING:
-    from osrsbot.services.mouse_service import MouseService
     from osrsbot.commands.game_actions import GameActions
+    from osrsbot.services.mouse_service import MouseService
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,9 @@ class BreakScheduler:
 
     def __init__(self, config: Config):
         self.config = config
-        self.enabled = config.get("anti_ban.breaks.enabled", default=ANTI_BAN.enable_breaks)
+        self.enabled = config.get(
+            "anti_ban.breaks.enabled", default=ANTI_BAN.enable_breaks
+        )
 
         # Get interval range from config
         interval_config = config.get("anti_ban.breaks.interval_seconds", default=None)
@@ -83,7 +85,7 @@ class BreakScheduler:
         next_break = time.time() + interval
 
         logger.debug(
-            f"Next break scheduled in {interval/60:.1f} minutes "
+            f"Next break scheduled in {interval / 60:.1f} minutes "
             f"(at {time.strftime('%H:%M:%S', time.localtime(next_break))})"
         )
         return next_break
@@ -97,7 +99,7 @@ class BreakScheduler:
     def get_break_duration(self) -> float:
         """Get randomized break duration in seconds."""
         duration = random.uniform(self.duration_min, self.duration_max)
-        logger.info(f"Break duration: {duration/60:.1f} minutes")
+        logger.info(f"Break duration: {duration / 60:.1f} minutes")
         return duration
 
 
@@ -121,28 +123,27 @@ class AntiBanService:
         # Load configuration
         self.enabled = config.get("anti_ban.enabled", default=True)
         self.micro_breaks_enabled = config.get(
-            "anti_ban.micro_breaks.enabled",
-            default=ANTI_BAN.enable_micro_breaks
+            "anti_ban.micro_breaks.enabled", default=ANTI_BAN.enable_micro_breaks
         )
         self.session_variance_enabled = config.get(
             "anti_ban.session_variance.enabled",
-            default=ANTI_BAN.enable_session_variance
+            default=ANTI_BAN.enable_session_variance,
         )
         self.idle_actions_enabled = config.get(
-            "anti_ban.idle_actions.enabled",
-            default=ANTI_BAN.enable_idle_actions
+            "anti_ban.idle_actions.enabled", default=ANTI_BAN.enable_idle_actions
         )
 
         # Micro-break configuration
         self.micro_break_chance = config.get(
-            "anti_ban.micro_breaks.chance",
-            default=ANTI_BAN.micro_break_chance
+            "anti_ban.micro_breaks.chance", default=ANTI_BAN.micro_break_chance
         )
         micro_break_duration_config = config.get(
-            "anti_ban.micro_breaks.duration_seconds",
-            default=None
+            "anti_ban.micro_breaks.duration_seconds", default=None
         )
-        if isinstance(micro_break_duration_config, (list, tuple)) and len(micro_break_duration_config) == 2:
+        if (
+            isinstance(micro_break_duration_config, (list, tuple))
+            and len(micro_break_duration_config) == 2
+        ):
             self.micro_break_duration_range = tuple(micro_break_duration_config)
         else:
             self.micro_break_duration_range = ANTI_BAN.micro_break_duration_range
@@ -150,13 +151,15 @@ class AntiBanService:
         # Idle action configuration
         self.idle_action_interval = config.get(
             "anti_ban.idle_actions.interval_seconds",
-            default=ANTI_BAN.idle_action_interval
+            default=ANTI_BAN.idle_action_interval,
         )
         mouse_jitter_config = config.get(
-            "anti_ban.idle_actions.mouse_jitter_pixels",
-            default=None
+            "anti_ban.idle_actions.mouse_jitter_pixels", default=None
         )
-        if isinstance(mouse_jitter_config, (list, tuple)) and len(mouse_jitter_config) == 2:
+        if (
+            isinstance(mouse_jitter_config, (list, tuple))
+            and len(mouse_jitter_config) == 2
+        ):
             self.mouse_jitter_range = tuple(mouse_jitter_config)
         else:
             self.mouse_jitter_range = ANTI_BAN.mouse_jitter_range
@@ -181,19 +184,23 @@ class AntiBanService:
         # Get variance ranges from config
         timing_range = self.config.get(
             "anti_ban.session_variance.timing_multiplier",
-            default=ANTI_BAN.timing_variance_range
+            default=ANTI_BAN.timing_variance_range,
         )
         if isinstance(timing_range, (list, tuple)) and len(timing_range) == 2:
-            self.session.timing_variance = random.uniform(timing_range[0], timing_range[1])
+            self.session.timing_variance = random.uniform(
+                timing_range[0], timing_range[1]
+            )
         else:
             self.session.timing_variance = 1.0
 
         mouse_speed_range = self.config.get(
             "anti_ban.session_variance.mouse_speed_multiplier",
-            default=getattr(ANTI_BAN, 'mouse_speed_variance_range', (0.9, 1.1))
+            default=getattr(ANTI_BAN, "mouse_speed_variance_range", (0.9, 1.1)),
         )
         if isinstance(mouse_speed_range, (list, tuple)) and len(mouse_speed_range) == 2:
-            self.session.mouse_speed_variance = random.uniform(mouse_speed_range[0], mouse_speed_range[1])
+            self.session.mouse_speed_variance = random.uniform(
+                mouse_speed_range[0], mouse_speed_range[1]
+            )
         else:
             self.session.mouse_speed_variance = 1.0
 
@@ -236,10 +243,10 @@ class AntiBanService:
 
         duration = self.break_scheduler.get_break_duration()
 
-        logger.info(f"===== TAKING SCHEDULED BREAK ({duration/60:.1f} minutes) =====")
+        logger.info(f"===== TAKING SCHEDULED BREAK ({duration / 60:.1f} minutes) =====")
         logger.info(
             f"Session stats: {self.session.actions_performed} actions performed, "
-            f"uptime: {(time.time() - self.session.session_start_time)/3600:.1f} hours"
+            f"uptime: {(time.time() - self.session.session_start_time) / 3600:.1f} hours"
         )
 
         time.sleep(duration)
@@ -255,8 +262,7 @@ class AntiBanService:
             return
 
         duration = random.uniform(
-            self.micro_break_duration_range[0],
-            self.micro_break_duration_range[1]
+            self.micro_break_duration_range[0], self.micro_break_duration_range[1]
         )
 
         logger.debug(f"Micro-break: {duration:.2f}s")
@@ -295,10 +301,9 @@ class AntiBanService:
             return
 
         self.session.actions_performed += 1
-        self.session.recent_actions.append({
-            "type": action_type,
-            "timestamp": time.time()
-        })
+        self.session.recent_actions.append(
+            {"type": action_type, "timestamp": time.time()}
+        )
 
     def should_idle_action(self) -> bool:
         """
@@ -315,8 +320,8 @@ class AntiBanService:
 
     def execute_idle_action(
         self,
-        mouse: Optional['MouseService'] = None,
-        actions: Optional['GameActions'] = None
+        mouse: Optional["MouseService"] = None,
+        actions: Optional["GameActions"] = None,
     ):
         """
         Perform a random idle action (mouse jitter or stats check).
@@ -347,15 +352,19 @@ class AntiBanService:
 
         self.session.last_idle_action_time = time.time()
 
-    def _mouse_jitter(self, mouse: 'MouseService'):
+    def _mouse_jitter(self, mouse: "MouseService"):
         """Perform small random mouse movements."""
         import pyautogui
 
         current_x, current_y = pyautogui.position()
 
         # Random jitter
-        jitter_x = random.randint(self.mouse_jitter_range[0], self.mouse_jitter_range[1])
-        jitter_y = random.randint(self.mouse_jitter_range[0], self.mouse_jitter_range[1])
+        jitter_x = random.randint(
+            self.mouse_jitter_range[0], self.mouse_jitter_range[1]
+        )
+        jitter_y = random.randint(
+            self.mouse_jitter_range[0], self.mouse_jitter_range[1]
+        )
 
         # Random direction
         if random.random() < 0.5:
@@ -372,7 +381,7 @@ class AntiBanService:
         # Small pause
         time.sleep(random.uniform(0.2, 0.8))
 
-    def _stats_check(self, actions: 'GameActions'):
+    def _stats_check(self, actions: "GameActions"):
         """Simulate checking stats (placeholder for now)."""
         logger.debug("Idle action: stats check (simulated)")
         # Could be implemented with UI button clicks if needed
@@ -394,5 +403,5 @@ class AntiBanService:
             "time_to_break_seconds": time_to_break,
             "timing_variance": self.session.timing_variance,
             "mouse_speed_variance": self.session.mouse_speed_variance,
-            "last_break_ago_seconds": time.time() - self.session.last_break_time
+            "last_break_ago_seconds": time.time() - self.session.last_break_time,
         }

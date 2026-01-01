@@ -17,22 +17,23 @@ Migration path:
 3. Eventually deprecate facade in favor of focused modules
 """
 
-import time
-import random
 import logging
-import pyautogui
-from typing import Optional, Tuple, Any, List
+import random
+import time
+from typing import Any, List, Optional, Tuple
 
-from osrsbot.services.mouse_service import MouseService, MovementStyle
-from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.core.game_interface import GameInterface
-from osrsbot.models.config import Config
-from osrsbot.constants import GAME_TIMING, MINIMAP_NAVIGATION
+import pyautogui
+
+from osrsbot.commands.combat_actions import CombatActions
 
 # Import new focused modules
 from osrsbot.commands.inventory_actions import InventoryActions
-from osrsbot.commands.combat_actions import CombatActions
+from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION
+from osrsbot.core.game_interface import GameInterface
+from osrsbot.models.config import Config
+from osrsbot.services.mouse_service import MouseService, MovementStyle
+from osrsbot.services.screen_service import ScreenService
+from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.utils.coordinate_helpers import CoordinateResolver
 from osrsbot.utils.timing_helpers import TimingHelper
 
@@ -55,7 +56,7 @@ class GameActions:
         template_service: Optional[TemplateMatchService] = None,
         anti_ban_service: Optional[Any] = None,
         loot_detection_service: Optional[Any] = None,
-        walker: Optional[Any] = None
+        walker: Optional[Any] = None,
     ):
         """Initialize actions with services."""
         # Services (keep for backward compatibility and delegation)
@@ -103,9 +104,7 @@ class GameActions:
 
     # --- Inventory Methods (delegate to InventoryActions) ---
     def click_inventory_slot(
-        self,
-        slot_num: int,
-        move_style: MovementStyle = "curved"
+        self, slot_num: int, move_style: MovementStyle = "curved"
     ) -> bool:
         """Click inventory slot (1-28) using config coords."""
         return self.inventory.click_slot(slot_num, move_style)
@@ -114,7 +113,7 @@ class GameActions:
         self,
         slot_num: int,
         move_style: MovementStyle = "curved",
-        force_detect: bool = False
+        force_detect: bool = False,
     ) -> bool:
         """Click inventory slot using template matching."""
         # Ensure inventory open first
@@ -134,7 +133,9 @@ class GameActions:
         """Drop all items except specified slots."""
         return self.inventory.drop_all_except(keep_slots)
 
-    def drop_until_empty_slots(self, target_empty: int, keep_slots: Optional[list[int]] = None) -> int:
+    def drop_until_empty_slots(
+        self, target_empty: int, keep_slots: Optional[list[int]] = None
+    ) -> int:
         """Drop items until we have N empty slots."""
         return self.inventory.drop_until_empty_slots(target_empty, keep_slots)
 
@@ -176,7 +177,7 @@ class GameActions:
         color_name: str,
         move_style: MovementStyle = "curved",
         tolerance: Optional[int] = None,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
         """Click color."""
         return self.combat.click_color(color_name, move_style, tolerance, region)
@@ -189,12 +190,17 @@ class GameActions:
         tolerance: Optional[int] = None,
         enable_stuck_detection: bool = True,
         enable_blacklist: bool = True,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
         """Click color with smart targeting."""
         return self.combat.click_color_smart(
-            color_name, player_position, move_style, tolerance,
-            enable_stuck_detection, enable_blacklist, region
+            color_name,
+            player_position,
+            move_style,
+            tolerance,
+            enable_stuck_detection,
+            enable_blacklist,
+            region,
         )
 
     def reset_click_tracking(self) -> None:
@@ -207,7 +213,7 @@ class GameActions:
         self,
         button_name: str,
         move_style: MovementStyle = "curved",
-        force_detect: bool = False
+        force_detect: bool = False,
     ) -> bool:
         """Click UI button using template matching."""
         button_pos = self.coord_resolver.resolve_ui_button(button_name, force_detect)
@@ -217,13 +223,18 @@ class GameActions:
         rel_x, rel_y = button_pos
         abs_x, abs_y = self.coord_resolver.to_absolute(rel_x, rel_y)
 
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self.timing.get_mouse_speed_multiplier())
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self.timing.get_mouse_speed_multiplier(),
+        )
 
     def pickup_loot(
         self,
         player_pos: Optional[Tuple[int, int]] = None,
         region: Optional[Tuple[int, int, int, int]] = None,
-        tolerance: int = 30
+        tolerance: int = 30,
     ) -> bool:
         """Pickup nearest loot item (purple highlight from RuneLite)."""
         if self.loot_detection is None:
@@ -231,12 +242,13 @@ class GameActions:
             return False
 
         if player_pos is None:
-            player_pos = (654, 111)
+            player_pos = (
+                MINIMAP_NAVIGATION.player_center_x,
+                MINIMAP_NAVIGATION.player_center_y,
+            )
 
         loot_pos = self.loot_detection.detect_nearest_loot(
-            player_pos=player_pos,
-            region=region,
-            tolerance=tolerance
+            player_pos=player_pos, region=region, tolerance=tolerance
         )
 
         if not loot_pos:
@@ -248,12 +260,13 @@ class GameActions:
 
         logger.info(f"Picking up loot at ({loot_x}, {loot_y})")
         self.mouse.click_at(
-            abs_x, abs_y,
+            abs_x,
+            abs_y,
             move_style="curved",
-            speed_multiplier=self._get_mouse_speed_multiplier()
+            speed_multiplier=self._get_mouse_speed_multiplier(),
         )
 
-        pickup_delay = random.uniform(0.5, 0.7)
+        pickup_delay = random.uniform(*LOOT_DETECTION.pickup_delay_range)
         if self.anti_ban:
             pickup_delay *= self.anti_ban.get_timing_variance()
         time.sleep(pickup_delay)
@@ -264,9 +277,7 @@ class GameActions:
         return True
 
     def click_coordinate(
-        self,
-        coord_path: Tuple[str, ...],
-        move_style: MovementStyle = "curved"
+        self, coord_path: Tuple[str, ...], move_style: MovementStyle = "curved"
     ) -> bool:
         """Click config coordinate path."""
         pos = self.coord_resolver.resolve_coordinate_path(*coord_path)
@@ -275,8 +286,15 @@ class GameActions:
 
         x, y = pos
         abs_x, abs_y = self._to_absolute(x, y)
-        logger.debug(f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})")
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        logger.debug(
+            f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})"
+        )
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
     def use_item(self, item_color_name: str) -> bool:
         """Use item by color."""
@@ -295,7 +313,7 @@ class GameActions:
         direction: str,
         tiles: int = 1,
         move_style: str = "random",
-        wait_time: Optional[float] = None
+        wait_time: Optional[float] = None,
     ) -> bool:
         """Walk N tiles in a direction on minimap (up/down/left/right)."""
         if direction not in MINIMAP_NAVIGATION.tile_movements:
@@ -306,13 +324,24 @@ class GameActions:
         target_x = MINIMAP_NAVIGATION.player_center_x + (dx * tiles)
         target_y = MINIMAP_NAVIGATION.player_center_y + (dy * tiles)
 
-        logger.info(f"Walking {tiles} tile(s) {direction} to minimap ({target_x}, {target_y})")
+        logger.info(
+            f"Walking {tiles} tile(s) {direction} to minimap ({target_x}, {target_y})"
+        )
 
         abs_x, abs_y = self._to_absolute(target_x, target_y)
-        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        success = self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
         if success:
-            actual_wait = wait_time if wait_time is not None else MINIMAP_NAVIGATION.default_wait_time
+            actual_wait = (
+                wait_time
+                if wait_time is not None
+                else MINIMAP_NAVIGATION.default_wait_time
+            )
             variance = time.time() % 1.0
             total_wait = actual_wait + variance
 
@@ -374,15 +403,12 @@ class GameActions:
 
     def close_interface(self) -> bool:
         """Close interface with ESC (may not work with dialog boxes)."""
-        pyautogui.press('escape')
+        pyautogui.press("escape")
         self.wait("short")
         return True
 
     def wait_for_color(
-        self,
-        color_name: str,
-        timeout: float = 10.0,
-        check_interval: float = 0.5
+        self, color_name: str, timeout: float = 10.0, check_interval: float = 0.5
     ) -> bool:
         """Wait for color to appear on screen."""
         hex_color = self.config.get("colors", color_name)
@@ -392,34 +418,31 @@ class GameActions:
             return False
 
         match = self.screen.wait_for_color(
-            hex_color,
-            timeout=timeout,
-            check_interval=check_interval
+            hex_color, timeout=timeout, check_interval=check_interval
         )
 
         return match is not None
 
     def walk_to_world_coordinate(
-        self,
-        x: int,
-        y: int,
-        move_style: MovementStyle = "curved"
+        self, x: int, y: int, move_style: MovementStyle = "curved"
     ) -> bool:
         """Walk to world tile coordinates using advanced walker."""
         if not self.walker:
-            logger.error("WalkerService not initialized. Ensure Status Socket plugin is enabled.")
+            logger.error(
+                "WalkerService not initialized. Ensure Status Socket plugin is enabled."
+            )
             return False
 
         return self.walker.walk_to(x, y, move_style=move_style)
 
     def walk_path(
-        self,
-        waypoints: List[Tuple[int, int]],
-        move_style: MovementStyle = "random"
+        self, waypoints: List[Tuple[int, int]], move_style: MovementStyle = "random"
     ) -> bool:
         """Follow a predefined path of world coordinates."""
         if not self.walker:
-            logger.error("WalkerService not initialized. Ensure Status Socket plugin is enabled.")
+            logger.error(
+                "WalkerService not initialized. Ensure Status Socket plugin is enabled."
+            )
             return False
 
         return self.walker.walk_path(waypoints, move_style=move_style)

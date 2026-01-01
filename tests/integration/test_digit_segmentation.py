@@ -1,13 +1,16 @@
 """Test digit segmentation with OSRS-style numbers."""
 
-from PIL import Image, ImageDraw, ImageFont
-from osrsbot.services.digit_classifier import get_digit_classifier
 import os
+
+from PIL import Image, ImageDraw, ImageFont
+
+from osrsbot.services.digit_classifier import get_digit_classifier
+
 
 def create_test_image(number: int, spacing: int = 1) -> Image.Image:
     """Create a test image with a number using a monospace font."""
     # Create image with white background
-    img = Image.new('RGB', (40, 20), color='white')
+    img = Image.new("RGB", (40, 20), color="white")
     draw = ImageDraw.Draw(img)
 
     # Try to use a simple font
@@ -19,9 +22,10 @@ def create_test_image(number: int, spacing: int = 1) -> Image.Image:
 
     # Draw the number in black
     text = str(number)
-    draw.text((5, 2), text, fill='black', font=font)
+    draw.text((5, 2), text, fill="black", font=font)
 
     return img
+
 
 def test_segmentation():
     """Test digit segmentation with various numbers."""
@@ -65,6 +69,7 @@ def test_segmentation():
 
     print("\n" + "=" * 60)
     print("Debug images saved to segmentation_debug/")
+
 
 if __name__ == "__main__":
     test_segmentation()

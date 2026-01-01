@@ -4,14 +4,16 @@ InterceptionMouseService - Kernel-level mouse control using Interception driver.
 Provides hardware-level mouse input that is indistinguishable from real mouse movements.
 Requires interception-python package and Interception driver installation.
 """
-import time
-import random
+
 import logging
+import random
+import time
 from dataclasses import dataclass
-from typing import Tuple, Optional, Literal
+from typing import Literal, Optional, Tuple
 
 try:
-    from interception import Interception, move_to, click, move_relative
+    from interception import Interception, click, move_to
+
     INTERCEPTION_AVAILABLE = True
 except ImportError:
     INTERCEPTION_AVAILABLE = False
@@ -34,6 +36,7 @@ class MouseConfig:
 
     Defaults are set in constants.py for easy tuning.
     """
+
     min_speed: float = 0.1
     max_speed: float = 0.5
     overshoot_chance: float = 0.15
@@ -66,7 +69,9 @@ class InterceptionMouseService:
         try:
             self.context = Interception()
             self.mouse_device = self.context.mouse
-            logger.info(f"Interception context initialized (mouse device: {self.mouse_device})")
+            logger.info(
+                f"Interception context initialized (mouse device: {self.mouse_device})"
+            )
         except Exception as e:
             logger.error(f"Failed to initialize Interception: {e}")
             raise RuntimeError(
@@ -81,7 +86,7 @@ class InterceptionMouseService:
         y: int,
         style: MovementStyle = "curved",
         duration: Optional[float] = None,
-        speed_multiplier: float = 1.0
+        speed_multiplier: float = 1.0,
     ) -> bool:
         """
         Move mouse to absolute screen coordinates.
@@ -98,14 +103,14 @@ class InterceptionMouseService:
         """
         try:
             import pyautogui
+
             current_x, current_y = pyautogui.position()
 
-            distance = ((x - current_x)**2 + (y - current_y)**2)**0.5
+            distance = ((x - current_x) ** 2 + (y - current_y) ** 2) ** 0.5
 
             if duration is None:
                 duration = random.uniform(
-                    self.config.min_speed,
-                    self.config.max_speed
+                    self.config.min_speed, self.config.max_speed
                 ) * (1 + distance / MOUSE_MOVEMENT.distance_factor)
 
             duration *= speed_multiplier
@@ -134,12 +139,7 @@ class InterceptionMouseService:
             return False
 
     def _move_linear(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        duration: float
+        self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
     ) -> None:
         """Move mouse in a straight line."""
         steps = max(10, int(duration * 60))
@@ -165,7 +165,7 @@ class InterceptionMouseService:
         y: Optional[int] = None,
         button: Literal["left", "right", "middle"] = "left",
         variance: bool = True,
-        delay_after: bool = True
+        delay_after: bool = True,
     ) -> bool:
         """
         Click at position with optional variance.
@@ -184,12 +184,10 @@ class InterceptionMouseService:
             if x is not None and y is not None:
                 if variance:
                     offset_x = random.randint(
-                        -self.config.click_variance,
-                        self.config.click_variance
+                        -self.config.click_variance, self.config.click_variance
                     )
                     offset_y = random.randint(
-                        -self.config.click_variance,
-                        self.config.click_variance
+                        -self.config.click_variance, self.config.click_variance
                     )
                     x += offset_x
                     y += offset_y
@@ -216,7 +214,7 @@ class InterceptionMouseService:
         button: Literal["left", "right", "middle"] = "left",
         move_style: MovementStyle = "curved",
         variance: bool = True,
-        speed_multiplier: float = 1.0
+        speed_multiplier: float = 1.0,
     ) -> bool:
         """
         Move and click at absolute coordinates.
@@ -235,20 +233,16 @@ class InterceptionMouseService:
         if not self.move_to(x, y, style=move_style, speed_multiplier=speed_multiplier):
             return False
 
-        time.sleep(random.uniform(
-            MOUSE_MOVEMENT.post_move_delay_min,
-            MOUSE_MOVEMENT.post_move_delay_max
-        ))
+        time.sleep(
+            random.uniform(
+                MOUSE_MOVEMENT.post_move_delay_min, MOUSE_MOVEMENT.post_move_delay_max
+            )
+        )
 
         return self.click(x, y, button=button, variance=variance)
 
     def _move_bezier(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        duration: float
+        self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
     ) -> None:
         """
         Move mouse along a Bezier curve.
@@ -256,25 +250,20 @@ class InterceptionMouseService:
         Creates a smooth curved path with random control points.
         """
         cp1_x = start_x + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
         cp1_y = start_y + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
         cp2_x = end_x + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
         cp2_y = end_y + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
 
         steps = max(
-            BEZIER_CURVE.min_steps,
-            int(duration * BEZIER_CURVE.steps_per_second)
+            BEZIER_CURVE.min_steps, int(duration * BEZIER_CURVE.steps_per_second)
         )
 
         start_time = time.time()
@@ -284,16 +273,16 @@ class InterceptionMouseService:
             elapsed = time.time() - start_time
 
             x = int(
-                (1-t)**3 * start_x +
-                3*(1-t)**2*t * cp1_x +
-                3*(1-t)*t**2 * cp2_x +
-                t**3 * end_x
+                (1 - t) ** 3 * start_x
+                + 3 * (1 - t) ** 2 * t * cp1_x
+                + 3 * (1 - t) * t**2 * cp2_x
+                + t**3 * end_x
             )
             y = int(
-                (1-t)**3 * start_y +
-                3*(1-t)**2*t * cp1_y +
-                3*(1-t)*t**2 * cp2_y +
-                t**3 * end_y
+                (1 - t) ** 3 * start_y
+                + 3 * (1 - t) ** 2 * t * cp1_y
+                + 3 * (1 - t) * t**2 * cp2_y
+                + t**3 * end_y
             )
 
             move_to(x, y, blocking=True)
@@ -304,42 +293,40 @@ class InterceptionMouseService:
                 time.sleep(sleep_time)
 
     def _move_with_overshoot(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        duration: float
+        self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
     ) -> None:
         """
         Move with occasional overshoot (human-like correction).
         """
         if random.random() < self.config.overshoot_chance:
             overshoot_dist = random.randint(
-                MOUSE_MOVEMENT.overshoot_distance_min,
-                self.config.overshoot_distance
+                MOUSE_MOVEMENT.overshoot_distance_min, self.config.overshoot_distance
             )
 
             dx = end_x - start_x
             dy = end_y - start_y
-            length = (dx**2 + dy**2)**0.5
+            length = (dx**2 + dy**2) ** 0.5
 
             if length > 0:
                 overshoot_x = end_x + int((dx / length) * overshoot_dist)
                 overshoot_y = end_y + int((dy / length) * overshoot_dist)
 
                 self._move_bezier(
-                    start_x, start_y,
-                    overshoot_x, overshoot_y,
-                    duration * MOUSE_MOVEMENT.overshoot_duration_fraction
+                    start_x,
+                    start_y,
+                    overshoot_x,
+                    overshoot_y,
+                    duration * MOUSE_MOVEMENT.overshoot_duration_fraction,
                 )
 
                 time.sleep(MOUSE_MOVEMENT.correction_delay)
 
                 self._move_linear(
-                    overshoot_x, overshoot_y,
-                    end_x, end_y,
-                    duration * MOUSE_MOVEMENT.correction_duration_fraction
+                    overshoot_x,
+                    overshoot_y,
+                    end_x,
+                    end_y,
+                    duration * MOUSE_MOVEMENT.correction_duration_fraction,
                 )
             else:
                 self._move_linear(start_x, start_y, end_x, end_y, duration)
@@ -351,17 +338,20 @@ class InterceptionMouseService:
         x: int,
         y: int,
         button: Literal["left", "right", "middle"] = "left",
-        duration: float = 0.5
+        duration: float = 0.5,
     ) -> bool:
         """
         Drag mouse to position while holding button.
         """
         try:
             import pyautogui
+
             current_x, current_y = pyautogui.position()
 
             # Use pyautogui drag since interception-python doesn't expose drag directly
-            pyautogui.drag(x - current_x, y - current_y, duration=duration, button=button)
+            pyautogui.drag(
+                x - current_x, y - current_y, duration=duration, button=button
+            )
 
             return True
         except Exception as e:
@@ -371,6 +361,7 @@ class InterceptionMouseService:
     def get_position(self) -> Tuple[int, int]:
         """Get current mouse position."""
         import pyautogui
+
         return pyautogui.position()
 
     def random_movement(self, radius: Optional[int] = None) -> None:
@@ -388,8 +379,4 @@ class InterceptionMouseService:
         offset_x = random.randint(-radius, radius)
         offset_y = random.randint(-radius, radius)
 
-        self.move_to(
-            current_x + offset_x,
-            current_y + offset_y,
-            style="curved"
-        )
+        self.move_to(current_x + offset_x, current_y + offset_y, style="curved")

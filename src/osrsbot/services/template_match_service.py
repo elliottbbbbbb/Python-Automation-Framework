@@ -11,17 +11,16 @@ Key Features:
 - Mathematical grid subdivision
 - OpenCV-based template matching
 """
+
 import logging
-import time
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-import cv2 as cv
 import numpy as np
 
-from osrsbot.models.config import Config
-from osrsbot.models.ui_elements import UIElement, UIElementGrid, UIButton
 from osrsbot.constants import TEMPLATE_MATCHING
+from osrsbot.models.config import Config
+from osrsbot.models.ui_elements import UIButton, UIElementGrid
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +95,7 @@ class TemplateMatchService:
         sticky: bool = True,
         ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
         padding: int = TEMPLATE_MATCHING.default_padding,
-        border_offset: int = 0
+        border_offset: int = 0,
     ) -> None:
         """
         Register a grid template (inventory, prayer, equipment).
@@ -131,7 +130,7 @@ class TemplateMatchService:
             sticky=sticky,
             ttl_seconds=ttl_seconds,
             padding=padding,
-            border_offset=border_offset
+            border_offset=border_offset,
         )
         self.grids[name] = grid
         logger.info(f"Registered grid: {name} ({num_rows}×{num_cols})")
@@ -142,7 +141,7 @@ class TemplateMatchService:
         template_path: str,
         threshold: float = TEMPLATE_MATCHING.default_threshold,
         sticky: bool = False,
-        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
     ) -> None:
         """
         Register a button template.
@@ -159,7 +158,7 @@ class TemplateMatchService:
             template_path=template_path,
             threshold=threshold,
             sticky=sticky,
-            ttl_seconds=ttl_seconds
+            ttl_seconds=ttl_seconds,
         )
         self.buttons[name] = button
         logger.info(f"Registered button: {name}")
@@ -197,11 +196,13 @@ class TemplateMatchService:
                 template_path=grid_config["path"],
                 num_rows=grid_config.get("rows", 1),
                 num_cols=grid_config.get("cols", 1),
-                threshold=grid_config.get("threshold", TEMPLATE_MATCHING.default_threshold),
+                threshold=grid_config.get(
+                    "threshold", TEMPLATE_MATCHING.default_threshold
+                ),
                 sticky=grid_config.get("sticky", True),
                 ttl_seconds=grid_config.get("ttl_seconds", 5.0),
                 padding=grid_config.get("padding", 4),
-                border_offset=grid_config.get("border_offset", 0)
+                border_offset=grid_config.get("border_offset", 0),
             )
 
         # Load buttons
@@ -210,19 +211,16 @@ class TemplateMatchService:
             self.register_button(
                 name=btn_name,
                 template_path=btn_config["path"],
-                threshold=btn_config.get("threshold", TEMPLATE_MATCHING.default_threshold),
+                threshold=btn_config.get(
+                    "threshold", TEMPLATE_MATCHING.default_threshold
+                ),
                 sticky=btn_config.get("sticky", False),
-                ttl_seconds=btn_config.get("ttl_seconds", 5.0)
+                ttl_seconds=btn_config.get("ttl_seconds", 5.0),
             )
 
     # ==================== Detection ====================
 
-    def detect_grid(
-        self,
-        name: str,
-        img_gray: np.ndarray,
-        force: bool = False
-    ) -> bool:
+    def detect_grid(self, name: str, img_gray: np.ndarray, force: bool = False) -> bool:
         """
         Detect specific grid.
 
@@ -241,10 +239,7 @@ class TemplateMatchService:
         return self.grids[name].detect(img_gray, force=force)
 
     def detect_button(
-        self,
-        name: str,
-        img_gray: np.ndarray,
-        force: bool = False
+        self, name: str, img_gray: np.ndarray, force: bool = False
     ) -> bool:
         """Detect specific button."""
         if name not in self.buttons:
@@ -253,11 +248,7 @@ class TemplateMatchService:
 
         return self.buttons[name].detect(img_gray, force=force)
 
-    def detect_all(
-        self,
-        img_gray: np.ndarray,
-        force: bool = False
-    ) -> Dict[str, bool]:
+    def detect_all(self, img_gray: np.ndarray, force: bool = False) -> Dict[str, bool]:
         """
         Detect all registered elements in one pass.
 
@@ -295,9 +286,7 @@ class TemplateMatchService:
         return False
 
     def get_slot_position(
-        self,
-        grid_name: str,
-        slot_index: int
+        self, grid_name: str, slot_index: int
     ) -> Optional[Tuple[int, int]]:
         """
         Get center coordinates for a grid slot.
@@ -323,13 +312,15 @@ class TemplateMatchService:
         if not 0 <= slot_index < total_slots:
             logger.error(
                 f"Invalid slot index {slot_index} for grid '{grid_name}'. "
-                f"Valid range: 0-{total_slots-1}"
+                f"Valid range: 0-{total_slots - 1}"
             )
             return None
 
         element = grid.get_element(slot_index)
         if not element:
-            logger.error(f"Failed to get element for slot {slot_index} in grid '{grid_name}'")
+            logger.error(
+                f"Failed to get element for slot {slot_index} in grid '{grid_name}'"
+            )
             return None
 
         return element.center

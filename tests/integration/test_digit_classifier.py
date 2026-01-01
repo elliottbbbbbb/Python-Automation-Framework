@@ -3,15 +3,15 @@ Test script for the CNN digit classifier.
 
 Creates test images of digits and verifies the classifier can read them.
 """
+
 from PIL import Image, ImageDraw, ImageFont
-import numpy as np
 
 from osrsbot.services.digit_classifier import get_digit_classifier
 
 
 def create_test_digit(digit: int, size=(40, 60)) -> Image.Image:
     """Create a simple test image of a digit."""
-    img = Image.new('RGB', size, color='black')
+    img = Image.new("RGB", size, color="black")
     draw = ImageDraw.Draw(img)
 
     # Try to use a default font, fallback to basic if not available
@@ -29,7 +29,7 @@ def create_test_digit(digit: int, size=(40, 60)) -> Image.Image:
     x = (size[0] - text_width) // 2
     y = (size[1] - text_height) // 2
 
-    draw.text((x, y), text, fill='white', font=font)
+    draw.text((x, y), text, fill="white", font=font)
 
     return img
 
@@ -72,7 +72,7 @@ def main():
 
     for number in test_numbers:
         # Create image with two digits side by side
-        img = Image.new('RGB', (80, 60), color='black')
+        img = Image.new("RGB", (80, 60), color="black")
         digit1 = number // 10
         digit2 = number % 10
 

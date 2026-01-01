@@ -4,15 +4,15 @@ Unit tests for ScreenService
 Tests screen capture, color detection, and pixel sampling functionality.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
-from PIL import Image
-import numpy as np
-from typing import Tuple
+from unittest.mock import Mock, patch
 
-from osrsbot.services.screen_service import ScreenService
+import numpy as np
+import pytest
+from PIL import Image
+
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
+from osrsbot.services.screen_service import ScreenService
 
 
 class TestScreenServiceInitialization:
@@ -43,19 +43,19 @@ class TestScreenServiceColorDetection:
 
     def test_find_color_simple_match(self, screen_service, sample_screenshot):
         """Test finding a color that exists in the image"""
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = sample_screenshot
 
             # Green color should be found at (50, 50)
             result = screen_service.find_color("#00ff00", tolerance=10)
 
             assert result is not None
-            assert hasattr(result, 'x')
-            assert hasattr(result, 'y')
+            assert hasattr(result, "x")
+            assert hasattr(result, "y")
 
     def test_find_color_not_found(self, screen_service, sample_screenshot):
         """Test finding a color that doesn't exist"""
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = sample_screenshot
 
             # Purple color shouldn't exist in test image
@@ -66,10 +66,10 @@ class TestScreenServiceColorDetection:
     def test_find_color_with_tolerance(self, screen_service):
         """Test color matching with tolerance"""
         # Create image with slightly off-color pixel
-        img = Image.new('RGB', (100, 100), color=(255, 0, 0))  # Red
+        img = Image.new("RGB", (100, 100), color=(255, 0, 0))  # Red
         img.putpixel((50, 50), (250, 5, 5))  # Slightly different red
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             # Should not find with low tolerance
@@ -83,12 +83,12 @@ class TestScreenServiceColorDetection:
     def test_find_color_all_matches(self, screen_service):
         """Test finding all color matches"""
         # Create image with multiple green pixels
-        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img = Image.new("RGB", (100, 100), color=(255, 255, 255))
         img.putpixel((10, 10), (0, 255, 0))
         img.putpixel((20, 20), (0, 255, 0))
         img.putpixel((30, 30), (0, 255, 0))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             results = screen_service.find_color("#00ff00", tolerance=5, find_all=True)
@@ -99,18 +99,16 @@ class TestScreenServiceColorDetection:
 
     def test_find_color_with_region(self, screen_service):
         """Test color detection within specific region"""
-        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img = Image.new("RGB", (100, 100), color=(255, 255, 255))
         img.putpixel((10, 10), (0, 255, 0))
         img.putpixel((90, 90), (0, 255, 0))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             # Search only top-left region - should find one
             result = screen_service.find_color(
-                "#00ff00",
-                tolerance=5,
-                region=(0, 0, 50, 50)
+                "#00ff00", tolerance=5, region=(0, 0, 50, 50)
             )
 
             assert result is not None
@@ -123,10 +121,10 @@ class TestScreenServicePixelSampling:
     def test_get_pixel_color(self, screen_service):
         """Test getting color of a specific pixel"""
         # Create test image
-        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img = Image.new("RGB", (100, 100), color=(255, 255, 255))
         img.putpixel((50, 50), (255, 0, 0))  # Red pixel
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             color = screen_service.get_pixel_color(50, 50)
@@ -135,10 +133,10 @@ class TestScreenServicePixelSampling:
 
     def test_get_pixel_color_with_bounds(self, screen_service):
         """Test pixel sampling with window bounds offset"""
-        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img = Image.new("RGB", (100, 100), color=(255, 255, 255))
         img.putpixel((25, 25), (0, 0, 255))  # Blue pixel
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             # The service should handle coordinate translation
@@ -153,9 +151,9 @@ class TestScreenServiceCapture:
 
     def test_capture_screen(self, screen_service):
         """Test capturing the game window"""
-        mock_img = Image.new('RGB', (800, 600), color=(100, 100, 100))
+        mock_img = Image.new("RGB", (800, 600), color=(100, 100, 100))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = mock_img
 
             result = screen_service.capture_screen()
@@ -166,9 +164,9 @@ class TestScreenServiceCapture:
 
     def test_capture_region(self, screen_service):
         """Test capturing specific region"""
-        mock_img = Image.new('RGB', (200, 200), color=(100, 100, 100))
+        mock_img = Image.new("RGB", (200, 200), color=(100, 100, 100))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = mock_img
 
             result = screen_service.capture_region((100, 100, 200, 200))
@@ -219,9 +217,9 @@ class TestScreenServiceEdgeCases:
 
     def test_find_color_empty_region(self, screen_service):
         """Test color detection in empty region"""
-        img = Image.new('RGB', (10, 10), color=(255, 255, 255))
+        img = Image.new("RGB", (10, 10), color=(255, 255, 255))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             result = screen_service.find_color("#00ff00", tolerance=5)
@@ -234,9 +232,9 @@ class TestScreenServiceEdgeCases:
 
     def test_get_pixel_color_out_of_bounds(self, screen_service):
         """Test getting pixel outside image bounds"""
-        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img = Image.new("RGB", (100, 100), color=(255, 255, 255))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             # Should handle gracefully (or raise appropriate error)
@@ -249,14 +247,14 @@ class TestScreenServicePerformance:
 
     def test_numpy_optimization_used(self, screen_service):
         """Test that NumPy is used for performance"""
-        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img = Image.new("RGB", (100, 100), color=(255, 255, 255))
 
-        with patch('pyautogui.screenshot') as mock_screenshot:
+        with patch("pyautogui.screenshot") as mock_screenshot:
             mock_screenshot.return_value = img
 
             # The implementation should convert to numpy for performance
             # This is more of a code inspection test
-            with patch('numpy.array') as mock_array:
+            with patch("numpy.array") as mock_array:
                 mock_array.return_value = np.array(img)
                 screen_service.find_color("#ffffff", tolerance=5)
 
@@ -265,6 +263,7 @@ class TestScreenServicePerformance:
 
 
 # Fixtures
+
 
 @pytest.fixture
 def mock_game_interface():
@@ -291,7 +290,7 @@ def screen_service(mock_game_interface, mock_config):
 @pytest.fixture
 def sample_screenshot():
     """Create sample screenshot for testing"""
-    img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+    img = Image.new("RGB", (100, 100), color=(255, 255, 255))
     # Add some colored pixels
     img.putpixel((50, 50), (0, 255, 0))  # Green
     img.putpixel((25, 25), (255, 0, 0))  # Red

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Tuple, Optional, List, Union, Dict, Any, Callable
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import cv2 as cv
 import numpy as np
@@ -138,21 +138,16 @@ class ScreenService:
 
     # ==================== Color Helpers ====================
     def _color_matches(
-        self,
-        color1: Tuple[int, int, int],
-        color2: Tuple[int, int, int],
-        tolerance: int
+        self, color1: Tuple[int, int, int], color2: Tuple[int, int, int], tolerance: int
     ) -> bool:
         return all(abs(c1 - c2) <= tolerance for c1, c2 in zip(color1, color2))
 
     def _color_similarity(
-        self,
-        color1: Tuple[int, int, int],
-        color2: Tuple[int, int, int]
+        self, color1: Tuple[int, int, int], color2: Tuple[int, int, int]
     ) -> float:
         distance = sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)) ** 0.5
         max_distance = (
-            COLOR_DETECTION.max_rgb_value ** 2 * COLOR_DETECTION.rgb_channels
+            COLOR_DETECTION.max_rgb_value**2 * COLOR_DETECTION.rgb_channels
         ) ** 0.5
         return COLOR_DETECTION.perfect_match - (distance / max_distance)
 
@@ -204,19 +199,21 @@ class ScreenService:
                     x=x + region_offset_x,  # Correct for region offset
                     y=y + region_offset_y,
                     confidence=self._color_similarity(pixel_rgb, target),
-                    color=pixel_rgb  # type: ignore
+                    color=pixel_rgb,  # type: ignore
                 )
 
             # Build all matches
-            for i in range(len(x_coords)):
-                x, y = int(x_coords[i]), int(y_coords[i])
+            for x_coord, y_coord in zip(x_coords, y_coords):
+                x, y = int(x_coord), int(y_coord)
                 pixel_rgb = tuple(img_array[y, x, :3].tolist())
-                matches.append(ColorMatch(
-                    x=x + region_offset_x,  # Correct for region offset
-                    y=y + region_offset_y,
-                    confidence=self._color_similarity(pixel_rgb, target),
-                    color=pixel_rgb  # type: ignore
-                ))
+                matches.append(
+                    ColorMatch(
+                        x=x + region_offset_x,  # Correct for region offset
+                        y=y + region_offset_y,
+                        confidence=self._color_similarity(pixel_rgb, target),
+                        color=pixel_rgb,  # type: ignore
+                    )
+                )
 
             return matches
         except Exception:
@@ -229,7 +226,7 @@ class ScreenService:
         reference_point: Tuple[int, int],
         tolerance: int = COLOR_DETECTION.default_tolerance,
         region: Optional[Tuple[int, int, int, int]] = None,
-        blacklist_checker: Optional[Any] = None
+        blacklist_checker: Optional[Any] = None,
     ) -> List[Tuple[ColorMatch, float]]:
         """
         Find all color matches sorted by distance from reference point.
@@ -246,10 +243,7 @@ class ScreenService:
         """
         # Find all color matches
         matches = self.find_color(
-            hex_color=hex_color,
-            tolerance=tolerance,
-            region=region,
-            find_all=True
+            hex_color=hex_color, tolerance=tolerance, region=region, find_all=True
         )
 
         if not matches or not isinstance(matches, list):
@@ -278,7 +272,9 @@ class ScreenService:
 
         return matches_with_distance
 
-    def get_pixel_color(self, x: int, y: int, relative: bool = True) -> Tuple[int, int, int]:
+    def get_pixel_color(
+        self, x: int, y: int, relative: bool = True
+    ) -> Tuple[int, int, int]:
         """Return absolute RGB pixel color (uses pyautogui.pixel)."""
         bounds = self._get_bounds()
         if relative and bounds:
@@ -304,7 +300,7 @@ class ScreenService:
                 template_path,
                 needle_screenshot,
                 confidence=confidence,
-                grayscale=grayscale
+                grayscale=grayscale,
             )
             if location:
                 return (location.left, location.top, location.width, location.height)
@@ -320,7 +316,9 @@ class ScreenService:
         Returns False if vision not injected or capture failed.
         """
         if self.vision is None:
-            logger.debug("No vision instance injected; detect_inventory returning False")
+            logger.debug(
+                "No vision instance injected; detect_inventory returning False"
+            )
             return False
         frame = self.capture_grayscale()
         if frame is None:
@@ -374,7 +372,7 @@ class ScreenService:
         timeout: float = 10.0,
         check_interval: float = 0.5,
         tolerance: int = COLOR_DETECTION.default_tolerance,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> Optional[ColorMatch]:
         """
         Wait for a color to appear on screen within a timeout period.
@@ -401,4 +399,3 @@ class ScreenService:
 
         logger.debug(f"Color {hex_color} not found within {timeout}s")
         return None
-

@@ -4,8 +4,8 @@ Template detection helpers with config fallbacks.
 Provides reusable patterns for template-first detection with graceful degradation.
 """
 
-from typing import Optional, Callable, TypeVar, TYPE_CHECKING
 import logging
+from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class TemplateHelper:
@@ -23,8 +23,8 @@ class TemplateHelper:
 
     def __init__(
         self,
-        screen: 'ScreenService',
-        template_service: Optional['TemplateMatchService'] = None
+        screen: "ScreenService",
+        template_service: Optional["TemplateMatchService"] = None,
     ):
         self.screen = screen
         self.template_service = template_service
@@ -33,7 +33,7 @@ class TemplateHelper:
         self,
         template_detection: Callable[[], Optional[T]],
         fallback: Callable[[], Optional[T]],
-        strategy_name: str = "detection"
+        strategy_name: str = "detection",
     ) -> Optional[T]:
         """
         Try template detection first, fall back to alternative strategy.

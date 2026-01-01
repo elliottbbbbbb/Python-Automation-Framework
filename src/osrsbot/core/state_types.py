@@ -7,10 +7,11 @@ This module defines the core types used by the state machine framework:
 - StateTransition: Defines allowed state transitions
 - StateHistoryEntry: Tracks state execution history
 """
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Optional, Callable, Any
+
 import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Callable, Optional
 
 
 class StateResult(Enum):
@@ -19,11 +20,12 @@ class StateResult(Enum):
 
     Determines the next action the state machine should take.
     """
-    SUCCESS = "success"      # State completed successfully, proceed to next state
-    FAILURE = "failure"      # State failed, may retry or transition to failover
-    RETRY = "retry"          # State should be retried immediately
-    SKIP = "skip"            # State skipped (condition not met), proceed to next
-    TIMEOUT = "timeout"      # State timed out, transition to failover
+
+    SUCCESS = "success"  # State completed successfully, proceed to next state
+    FAILURE = "failure"  # State failed, may retry or transition to failover
+    RETRY = "retry"  # State should be retried immediately
+    SKIP = "skip"  # State skipped (condition not met), proceed to next
+    TIMEOUT = "timeout"  # State timed out, transition to failover
 
 
 @dataclass
@@ -33,11 +35,12 @@ class StateMetadata:
 
     Defines retry behavior, timeouts, and failover logic for a state.
     """
+
     name: str
     description: str = ""
-    max_retries: int = 3                    # Max retry attempts before failover
-    timeout: Optional[float] = None         # Max execution time in seconds (None = no timeout)
-    failover_state: Optional[Enum] = None   # State to transition to on repeated failures
+    max_retries: int = 3  # Max retry attempts before failover
+    timeout: Optional[float] = None  # Max execution time in seconds (None = no timeout)
+    failover_state: Optional[Enum] = None  # State to transition to on repeated failures
 
     def __post_init__(self):
         """Validate metadata after initialization."""
@@ -54,9 +57,12 @@ class StateTransition:
 
     Includes optional condition function to determine if transition should occur.
     """
+
     from_state: Enum
     to_state: Enum
-    condition: Optional[Callable[[], bool]] = None  # If provided, must return True to transition
+    condition: Optional[Callable[[], bool]] = (
+        None  # If provided, must return True to transition
+    )
 
     def can_transition(self) -> bool:
         """
@@ -81,9 +87,10 @@ class StateHistoryEntry:
 
     Tracks timing, result, and retry information for analysis and debugging.
     """
+
     state: Enum
     result: StateResult
-    duration: float                         # Execution time in seconds
+    duration: float  # Execution time in seconds
     timestamp: float = field(default_factory=time.time)
     retry_count: int = 0
     error_message: Optional[str] = None
@@ -102,13 +109,15 @@ class StateHistoryEntry:
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
-            "state": self.state.name if isinstance(self.state, Enum) else str(self.state),
+            "state": (
+                self.state.name if isinstance(self.state, Enum) else str(self.state)
+            ),
             "result": self.result.value,
             "duration": self.duration,
             "timestamp": self.timestamp,
             "retry_count": self.retry_count,
             "error_message": self.error_message,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
@@ -119,6 +128,7 @@ class StateExecutionContext:
 
     Provides access to bot services and current execution state.
     """
+
     current_state: Enum
     retry_count: int = 0
     start_time: float = field(default_factory=time.time)

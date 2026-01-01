@@ -3,11 +3,12 @@ MouseService - Handles all mouse movement and clicking with humanization.
 
 Inspired by OSBC's Bezier curve implementation but with added flexibility.
 """
-import time
-import random
+
 import logging
+import random
+import time
 from dataclasses import dataclass
-from typing import Tuple, Optional, Literal
+from typing import Literal, Optional, Tuple
 
 import pyautogui
 
@@ -25,6 +26,7 @@ class MouseConfig:
 
     Defaults are set in constants.py for easy tuning.
     """
+
     min_speed: float = 0.1
     max_speed: float = 0.5
     overshoot_chance: float = 0.15
@@ -55,7 +57,7 @@ class MouseService:
         y: int,
         style: MovementStyle = "curved",
         duration: Optional[float] = None,
-        speed_multiplier: float = 1.0
+        speed_multiplier: float = 1.0,
     ) -> bool:
         """
         Move mouse to absolute screen coordinates.
@@ -73,12 +75,11 @@ class MouseService:
         try:
             current_x, current_y = pyautogui.position()
 
-            distance = ((x - current_x)**2 + (y - current_y)**2)**0.5
+            distance = ((x - current_x) ** 2 + (y - current_y) ** 2) ** 0.5
 
             if duration is None:
                 duration = random.uniform(
-                    self.config.min_speed,
-                    self.config.max_speed
+                    self.config.min_speed, self.config.max_speed
                 ) * (1 + distance / MOUSE_MOVEMENT.distance_factor)
 
             # Apply anti-ban speed variance
@@ -113,7 +114,7 @@ class MouseService:
         y: Optional[int] = None,
         button: Literal["left", "right", "middle"] = "left",
         variance: bool = True,
-        delay_after: bool = True
+        delay_after: bool = True,
     ) -> bool:
         """
         Click at position with optional variance.
@@ -132,12 +133,10 @@ class MouseService:
             if x is not None and y is not None:
                 if variance:
                     offset_x = random.randint(
-                        -self.config.click_variance,
-                        self.config.click_variance
+                        -self.config.click_variance, self.config.click_variance
                     )
                     offset_y = random.randint(
-                        -self.config.click_variance,
-                        self.config.click_variance
+                        -self.config.click_variance, self.config.click_variance
                     )
                     x += offset_x
                     y += offset_y
@@ -164,7 +163,7 @@ class MouseService:
         button: Literal["left", "right", "middle"] = "left",
         move_style: MovementStyle = "curved",
         variance: bool = True,
-        speed_multiplier: float = 1.0
+        speed_multiplier: float = 1.0,
     ) -> bool:
         """
         Move and click at absolute coordinates.
@@ -186,20 +185,16 @@ class MouseService:
         if not self.move_to(x, y, style=move_style, speed_multiplier=speed_multiplier):
             return False
 
-        time.sleep(random.uniform(
-            MOUSE_MOVEMENT.post_move_delay_min,
-            MOUSE_MOVEMENT.post_move_delay_max
-        ))
+        time.sleep(
+            random.uniform(
+                MOUSE_MOVEMENT.post_move_delay_min, MOUSE_MOVEMENT.post_move_delay_max
+            )
+        )
 
         return self.click(x, y, button=button, variance=variance)
 
     def _move_bezier(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        duration: float
+        self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
     ) -> None:
         """
         Move mouse along a Bezier curve (OSBC-inspired).
@@ -208,25 +203,20 @@ class MouseService:
         Uses configuration from constants.BEZIER_CURVE.
         """
         cp1_x = start_x + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
         cp1_y = start_y + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
         cp2_x = end_x + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
         cp2_y = end_y + random.randint(
-            BEZIER_CURVE.control_point_offset_min,
-            BEZIER_CURVE.control_point_offset_max
+            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
         )
 
         steps = max(
-            BEZIER_CURVE.min_steps,
-            int(duration * BEZIER_CURVE.steps_per_second)
+            BEZIER_CURVE.min_steps, int(duration * BEZIER_CURVE.steps_per_second)
         )
 
         start_time = time.time()
@@ -236,16 +226,16 @@ class MouseService:
             elapsed = time.time() - start_time
 
             x = (
-                (1-t)**3 * start_x +
-                3*(1-t)**2*t * cp1_x +
-                3*(1-t)*t**2 * cp2_x +
-                t**3 * end_x
+                (1 - t) ** 3 * start_x
+                + 3 * (1 - t) ** 2 * t * cp1_x
+                + 3 * (1 - t) * t**2 * cp2_x
+                + t**3 * end_x
             )
             y = (
-                (1-t)**3 * start_y +
-                3*(1-t)**2*t * cp1_y +
-                3*(1-t)*t**2 * cp2_y +
-                t**3 * end_y
+                (1 - t) ** 3 * start_y
+                + 3 * (1 - t) ** 2 * t * cp1_y
+                + 3 * (1 - t) * t**2 * cp2_y
+                + t**3 * end_y
             )
 
             pyautogui.moveTo(int(x), int(y))
@@ -256,12 +246,7 @@ class MouseService:
                 time.sleep(sleep_time)
 
     def _move_with_overshoot(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        duration: float
+        self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
     ) -> None:
         """
         Move with occasional overshoot (human-like correction).
@@ -270,28 +255,30 @@ class MouseService:
         """
         if random.random() < self.config.overshoot_chance:
             overshoot_dist = random.randint(
-                MOUSE_MOVEMENT.overshoot_distance_min,
-                self.config.overshoot_distance
+                MOUSE_MOVEMENT.overshoot_distance_min, self.config.overshoot_distance
             )
 
             dx = end_x - start_x
             dy = end_y - start_y
-            length = (dx**2 + dy**2)**0.5
+            length = (dx**2 + dy**2) ** 0.5
 
             if length > 0:
                 overshoot_x = end_x + int((dx / length) * overshoot_dist)
                 overshoot_y = end_y + int((dy / length) * overshoot_dist)
 
                 self._move_bezier(
-                    start_x, start_y,
-                    overshoot_x, overshoot_y,
-                    duration * MOUSE_MOVEMENT.overshoot_duration_fraction
+                    start_x,
+                    start_y,
+                    overshoot_x,
+                    overshoot_y,
+                    duration * MOUSE_MOVEMENT.overshoot_duration_fraction,
                 )
 
                 time.sleep(MOUSE_MOVEMENT.correction_delay)
                 pyautogui.moveTo(
-                    end_x, end_y,
-                    duration=duration * MOUSE_MOVEMENT.correction_duration_fraction
+                    end_x,
+                    end_y,
+                    duration=duration * MOUSE_MOVEMENT.correction_duration_fraction,
                 )
             else:
                 pyautogui.moveTo(end_x, end_y, duration=duration)
@@ -303,7 +290,7 @@ class MouseService:
         x: int,
         y: int,
         button: Literal["left", "right", "middle"] = "left",
-        duration: float = 0.5
+        duration: float = 0.5,
     ) -> bool:
         """
         Drag mouse to position while holding button.
@@ -315,7 +302,7 @@ class MouseService:
                 x - pyautogui.position()[0],
                 y - pyautogui.position()[1],
                 duration=duration,
-                button=button
+                button=button,
             )
             return True
         except Exception as e:
@@ -340,8 +327,4 @@ class MouseService:
         offset_x = random.randint(-radius, radius)
         offset_y = random.randint(-radius, radius)
 
-        self.move_to(
-            current_x + offset_x,
-            current_y + offset_y,
-            style="curved"
-        )
+        self.move_to(current_x + offset_x, current_y + offset_y, style="curved")

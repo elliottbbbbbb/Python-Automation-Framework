@@ -5,11 +5,12 @@ Manages intelligent target selection by tracking:
 - Click history to detect stuck clicking patterns
 - Blacklisted locations to avoid inaccessible areas
 """
-import time
+
 import logging
+import time
+from collections import deque
 from dataclasses import dataclass
 from typing import List
-from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ClickRecord:
     """Record of a single click attempt."""
+
     timestamp: float
     x: int
     y: int
@@ -25,6 +27,7 @@ class ClickRecord:
 @dataclass
 class BlacklistEntry:
     """Temporarily blacklisted location."""
+
     x: int
     y: int
     radius: int  # Area around point to blacklist
@@ -58,11 +61,7 @@ class ClickTargetTracker:
             x: Click X coordinate (relative to window)
             y: Click Y coordinate (relative to window)
         """
-        record = ClickRecord(
-            timestamp=time.time(),
-            x=x,
-            y=y
-        )
+        record = ClickRecord(timestamp=time.time(), x=x, y=y)
         self._click_history.append(record)
         logger.debug(f"Recorded click at ({x}, {y})")
 
@@ -80,11 +79,7 @@ class ClickTargetTracker:
             return []
         return list(self._click_history)[-n:]
 
-    def is_stuck(
-        self,
-        window: int = 3,
-        threshold_pixels: int = 18
-    ) -> bool:
+    def is_stuck(self, window: int = 3, threshold_pixels: int = 18) -> bool:
         """
         Check if last N clicks are within threshold distance (stuck).
 
@@ -102,13 +97,14 @@ class ClickTargetTracker:
             return False
 
         # Calculate pairwise distances between all recent clicks
-        for i in range(len(recent_clicks)):
+        for i, click1 in enumerate(recent_clicks):
             for j in range(i + 1, len(recent_clicks)):
-                click1 = recent_clicks[i]
                 click2 = recent_clicks[j]
 
                 # Euclidean distance
-                distance = ((click1.x - click2.x) ** 2 + (click1.y - click2.y) ** 2) ** 0.5
+                distance = (
+                    (click1.x - click2.x) ** 2 + (click1.y - click2.y) ** 2
+                ) ** 0.5
 
                 if distance > threshold_pixels:
                     # Found clicks that are far apart, not stuck
@@ -121,11 +117,7 @@ class ClickTargetTracker:
         return True
 
     def blacklist_location(
-        self,
-        x: int,
-        y: int,
-        duration: float = 12.0,
-        radius: int = 25
+        self, x: int, y: int, duration: float = 12.0, radius: int = 25
     ) -> None:
         """
         Add location to blacklist temporarily.
@@ -140,10 +132,7 @@ class ClickTargetTracker:
         self._clean_expired_blacklist()
 
         entry = BlacklistEntry(
-            x=x,
-            y=y,
-            radius=radius,
-            expires_at=time.time() + duration
+            x=x, y=y, radius=radius, expires_at=time.time() + duration
         )
         self._blacklist.append(entry)
         logger.info(
@@ -184,8 +173,7 @@ class ClickTargetTracker:
         original_count = len(self._blacklist)
 
         self._blacklist = [
-            entry for entry in self._blacklist
-            if entry.expires_at > current_time
+            entry for entry in self._blacklist if entry.expires_at > current_time
         ]
 
         removed = original_count - len(self._blacklist)

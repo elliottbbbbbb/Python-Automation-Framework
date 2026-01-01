@@ -1,4 +1,5 @@
 """Loot detection service using color detection for ground items."""
+
 import logging
 from typing import Optional, Tuple
 
@@ -26,9 +27,7 @@ class LootDetectionService:
         logger.info(f"LootDetectionService initialized (loot color: {loot_color})")
 
     def detect_loot(
-        self,
-        region: Optional[Tuple[int, int, int, int]] = None,
-        tolerance: int = 30
+        self, region: Optional[Tuple[int, int, int, int]] = None, tolerance: int = 30
     ) -> list[Tuple[int, int]]:
         """
         Detect all loot items on screen using color detection.
@@ -45,9 +44,7 @@ class LootDetectionService:
         """
         # Find all purple loot highlights
         loot_positions = self.screen.find_color(
-            self.loot_color,
-            tolerance=tolerance,
-            region=region
+            self.loot_color, tolerance=tolerance, region=region
         )
 
         if not loot_positions:
@@ -64,7 +61,7 @@ class LootDetectionService:
         self,
         player_pos: Tuple[int, int],
         region: Optional[Tuple[int, int, int, int]] = None,
-        tolerance: int = 30
+        tolerance: int = 30,
     ) -> Optional[Tuple[int, int]]:
         """
         Detect nearest loot item to player position.
@@ -88,6 +85,7 @@ class LootDetectionService:
         def distance(pos: Tuple[int, int]) -> float:
             loot_x, loot_y = pos
             import math
+
             return math.sqrt((loot_x - player_x) ** 2 + (loot_y - player_y) ** 2)
 
         nearest = min(all_loot, key=distance)
@@ -97,9 +95,7 @@ class LootDetectionService:
         return nearest
 
     def _cluster_nearby_positions(
-        self,
-        positions: list[Tuple[int, int]],
-        cluster_radius: int = 10
+        self, positions: list[Tuple[int, int]], cluster_radius: int = 10
     ) -> list[Tuple[int, int]]:
         """
         Cluster nearby positions into single points.
@@ -135,7 +131,7 @@ class LootDetectionService:
 
                 dx = abs(pos[0] - other_pos[0])
                 dy = abs(pos[1] - other_pos[1])
-                distance = (dx ** 2 + dy ** 2) ** 0.5
+                distance = (dx**2 + dy**2) ** 0.5
 
                 if distance <= cluster_radius:
                     cluster.append(other_pos)

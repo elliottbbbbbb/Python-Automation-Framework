@@ -1,10 +1,11 @@
 """Unit tests for WalkerService - Focus on rotation matrix accuracy."""
-import math
-import pytest
-from unittest.mock import Mock, MagicMock
 
-from osrsbot.services.walker_service import WalkerService, WalkerConfig
+from unittest.mock import Mock
+
+import pytest
+
 from osrsbot.services.status_socket_service import PlayerState
+from osrsbot.services.walker_service import WalkerConfig, WalkerService
 
 
 class TestWalkerService:
@@ -18,17 +19,17 @@ class TestWalkerService:
             minimap_center_y=111,
             tile_size=4,
             arrival_tolerance=2,
-            max_click_distance=15
+            max_click_distance=15,
         )
 
     @pytest.fixture
     def mock_services(self):
         """Mock service dependencies."""
         return {
-            'status_socket': Mock(),
-            'mouse': Mock(),
-            'screen': Mock(),
-            'interface': Mock()
+            "status_socket": Mock(),
+            "mouse": Mock(),
+            "screen": Mock(),
+            "interface": Mock(),
         }
 
     @pytest.fixture
@@ -36,10 +37,10 @@ class TestWalkerService:
         """Create WalkerService instance with mocks."""
         return WalkerService(
             config=walker_config,
-            status_socket=mock_services['status_socket'],
-            mouse=mock_services['mouse'],
-            screen=mock_services['screen'],
-            interface=mock_services['interface']
+            status_socket=mock_services["status_socket"],
+            mouse=mock_services["mouse"],
+            screen=mock_services["screen"],
+            interface=mock_services["interface"],
         )
 
     # ========================================================================
@@ -54,7 +55,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3210
         camera_yaw = 0
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
         minimap_x, minimap_y = result
@@ -64,8 +67,12 @@ class TestWalkerService:
         expected_x = 654  # Center (no horizontal movement)
         expected_y = 111 - 40  # 40 pixels north (up)
 
-        assert abs(minimap_x - expected_x) <= 1, f"X: got {minimap_x}, expected {expected_x}"
-        assert abs(minimap_y - expected_y) <= 1, f"Y: got {minimap_y}, expected {expected_y}"
+        assert (
+            abs(minimap_x - expected_x) <= 1
+        ), f"X: got {minimap_x}, expected {expected_x}"
+        assert (
+            abs(minimap_y - expected_y) <= 1
+        ), f"Y: got {minimap_y}, expected {expected_y}"
 
     def test_rotation_east_yaw_512(self, walker):
         """Test rotation when camera faces east (yaw=512 = 90 degrees)."""
@@ -75,7 +82,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3210  # North
         camera_yaw = 512  # East
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
         minimap_x, minimap_y = result
@@ -84,8 +93,12 @@ class TestWalkerService:
         expected_x = 654 - 40  # West
         expected_y = 111  # Center vertically
 
-        assert abs(minimap_x - expected_x) <= 2, f"X: got {minimap_x}, expected {expected_x}"
-        assert abs(minimap_y - expected_y) <= 2, f"Y: got {minimap_y}, expected {expected_y}"
+        assert (
+            abs(minimap_x - expected_x) <= 2
+        ), f"X: got {minimap_x}, expected {expected_x}"
+        assert (
+            abs(minimap_y - expected_y) <= 2
+        ), f"Y: got {minimap_y}, expected {expected_y}"
 
     def test_rotation_south_yaw_1024(self, walker):
         """Test rotation when camera faces south (yaw=1024 = 180 degrees)."""
@@ -95,7 +108,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3210  # North
         camera_yaw = 1024  # South
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
         minimap_x, minimap_y = result
@@ -104,8 +119,12 @@ class TestWalkerService:
         expected_x = 654  # Center
         expected_y = 111 + 40  # South
 
-        assert abs(minimap_x - expected_x) <= 2, f"X: got {minimap_x}, expected {expected_x}"
-        assert abs(minimap_y - expected_y) <= 2, f"Y: got {minimap_y}, expected {expected_y}"
+        assert (
+            abs(minimap_x - expected_x) <= 2
+        ), f"X: got {minimap_x}, expected {expected_x}"
+        assert (
+            abs(minimap_y - expected_y) <= 2
+        ), f"Y: got {minimap_y}, expected {expected_y}"
 
     def test_rotation_west_yaw_1536(self, walker):
         """Test rotation when camera faces west (yaw=1536 = 270 degrees)."""
@@ -115,7 +134,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3210  # North
         camera_yaw = 1536  # West
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
         minimap_x, minimap_y = result
@@ -124,8 +145,12 @@ class TestWalkerService:
         expected_x = 654 + 40  # East
         expected_y = 111  # Center
 
-        assert abs(minimap_x - expected_x) <= 2, f"X: got {minimap_x}, expected {expected_x}"
-        assert abs(minimap_y - expected_y) <= 2, f"Y: got {minimap_y}, expected {expected_y}"
+        assert (
+            abs(minimap_x - expected_x) <= 2
+        ), f"X: got {minimap_x}, expected {expected_x}"
+        assert (
+            abs(minimap_y - expected_y) <= 2
+        ), f"Y: got {minimap_y}, expected {expected_y}"
 
     def test_rotation_northeast_yaw_256(self, walker):
         """Test rotation at NE diagonal (yaw=256 = 45 degrees)."""
@@ -134,7 +159,9 @@ class TestWalkerService:
         target_x, target_y = 3210, 3210  # NE diagonal (10, 10)
         camera_yaw = 256  # NE
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
         # Should be roughly in upper area of minimap
@@ -146,7 +173,9 @@ class TestWalkerService:
         target_x, target_y = 3210, 3190  # SE diagonal
         camera_yaw = 768  # SE
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
 
@@ -156,7 +185,9 @@ class TestWalkerService:
         target_x, target_y = 3190, 3190  # SW diagonal
         camera_yaw = 1280  # SW
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
 
@@ -166,7 +197,9 @@ class TestWalkerService:
         target_x, target_y = 3190, 3210  # NW diagonal
         camera_yaw = 1792  # NW
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
 
@@ -182,7 +215,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3300
         camera_yaw = 0
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         # Should return None (out of bounds)
         assert result is None
@@ -195,7 +230,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3218  # 18 tiles north
         camera_yaw = 0
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         # Should succeed (just within bounds)
         assert result is not None
@@ -206,7 +243,9 @@ class TestWalkerService:
         target_x, target_y = 3200, 3200
         camera_yaw = 512
 
-        result = walker.world_to_minimap(target_x, target_y, player_x, player_y, camera_yaw)
+        result = walker.world_to_minimap(
+            target_x, target_y, player_x, player_y, camera_yaw
+        )
 
         assert result is not None
         minimap_x, minimap_y = result
@@ -275,21 +314,17 @@ class TestWalkerService:
     def test_walk_path_single_waypoint(self, walker, mock_services):
         """Test walking to a single waypoint."""
         # Mock player state
-        mock_services['status_socket'].get_player_state.return_value = PlayerState(
-            world_x=3200,
-            world_y=3200,
-            plane=0,
-            camera_yaw=0,
-            timestamp=0
+        mock_services["status_socket"].get_player_state.return_value = PlayerState(
+            world_x=3200, world_y=3200, plane=0, camera_yaw=0, timestamp=0
         )
-        mock_services['status_socket'].wait_for_arrival.return_value = True
-        mock_services['screen'].relative_to_absolute.return_value = (1000, 500)
+        mock_services["status_socket"].wait_for_arrival.return_value = True
+        mock_services["screen"].relative_to_absolute.return_value = (1000, 500)
 
         waypoints = [(3205, 3205)]
         result = walker.walk_path(waypoints)
 
         assert result is True
-        assert mock_services['mouse'].click_at.called
+        assert mock_services["mouse"].click_at.called
 
     def test_walk_path_empty_waypoints(self, walker):
         """Test walk_path with empty list."""
@@ -299,7 +334,7 @@ class TestWalkerService:
 
     def test_walk_path_status_socket_unavailable(self, walker, mock_services):
         """Test handling when Status Socket disconnects."""
-        mock_services['status_socket'].get_player_state.return_value = None
+        mock_services["status_socket"].get_player_state.return_value = None
 
         result = walker.walk_path([(3210, 3210)])
 
@@ -311,16 +346,16 @@ class TestWalkerService:
         positions = [
             PlayerState(3200, 3200, 0, 0, 0),
             PlayerState(3205, 3205, 0, 0, 0),
-            PlayerState(3210, 3210, 0, 0, 0)
+            PlayerState(3210, 3210, 0, 0, 0),
         ]
-        mock_services['status_socket'].get_player_state.side_effect = positions
-        mock_services['status_socket'].wait_for_arrival.return_value = True
-        mock_services['screen'].relative_to_absolute.return_value = (1000, 500)
+        mock_services["status_socket"].get_player_state.side_effect = positions
+        mock_services["status_socket"].wait_for_arrival.return_value = True
+        mock_services["screen"].relative_to_absolute.return_value = (1000, 500)
 
         waypoints = [(3205, 3205), (3210, 3210)]
-        result = walker.walk_path(waypoints)
+        walker.walk_path(waypoints)
 
-        assert mock_services['mouse'].click_at.call_count >= 2
+        assert mock_services["mouse"].click_at.call_count >= 2
 
     # ========================================================================
     # COMPUTE MINIMAP CLICK TESTS
@@ -328,12 +363,8 @@ class TestWalkerService:
 
     def test_compute_minimap_click_success(self, walker, mock_services):
         """Test compute_minimap_click convenience method."""
-        mock_services['status_socket'].get_player_state.return_value = PlayerState(
-            world_x=3200,
-            world_y=3200,
-            plane=0,
-            camera_yaw=512,
-            timestamp=0
+        mock_services["status_socket"].get_player_state.return_value = PlayerState(
+            world_x=3200, world_y=3200, plane=0, camera_yaw=512, timestamp=0
         )
 
         result = walker.compute_minimap_click(3210, 3210)
@@ -344,7 +375,7 @@ class TestWalkerService:
 
     def test_compute_minimap_click_no_player_state(self, walker, mock_services):
         """Test compute_minimap_click when Status Socket unavailable."""
-        mock_services['status_socket'].get_player_state.return_value = None
+        mock_services["status_socket"].get_player_state.return_value = None
 
         result = walker.compute_minimap_click(3210, 3210)
 
@@ -356,15 +387,11 @@ class TestWalkerService:
 
     def test_walk_to_without_path(self, walker, mock_services):
         """Test walk_to creates single-waypoint path."""
-        mock_services['status_socket'].get_player_state.return_value = PlayerState(
-            world_x=3200,
-            world_y=3200,
-            plane=0,
-            camera_yaw=0,
-            timestamp=0
+        mock_services["status_socket"].get_player_state.return_value = PlayerState(
+            world_x=3200, world_y=3200, plane=0, camera_yaw=0, timestamp=0
         )
-        mock_services['status_socket'].wait_for_arrival.return_value = True
-        mock_services['screen'].relative_to_absolute.return_value = (1000, 500)
+        mock_services["status_socket"].wait_for_arrival.return_value = True
+        mock_services["screen"].relative_to_absolute.return_value = (1000, 500)
 
         result = walker.walk_to(3205, 3205)
 
@@ -372,21 +399,17 @@ class TestWalkerService:
 
     def test_walk_to_with_path(self, walker, mock_services):
         """Test walk_to uses provided path."""
-        mock_services['status_socket'].get_player_state.return_value = PlayerState(
-            world_x=3200,
-            world_y=3200,
-            plane=0,
-            camera_yaw=0,
-            timestamp=0
+        mock_services["status_socket"].get_player_state.return_value = PlayerState(
+            world_x=3200, world_y=3200, plane=0, camera_yaw=0, timestamp=0
         )
-        mock_services['status_socket'].wait_for_arrival.return_value = True
-        mock_services['screen'].relative_to_absolute.return_value = (1000, 500)
+        mock_services["status_socket"].wait_for_arrival.return_value = True
+        mock_services["screen"].relative_to_absolute.return_value = (1000, 500)
 
         path = [(3202, 3202), (3205, 3205), (3210, 3210)]
         result = walker.walk_to(3210, 3210, path=path)
 
         # Should attempt to walk all waypoints
-        assert mock_services['mouse'].click_at.call_count >= len(path)
+        assert mock_services["mouse"].click_at.call_count >= len(path)
 
     # ========================================================================
     # WALKER CONFIG TESTS
@@ -410,7 +433,7 @@ class TestWalkerService:
             minimap_center_y=150,
             tile_size=5,
             arrival_tolerance=3,
-            max_click_distance=20
+            max_click_distance=20,
         )
 
         assert config.minimap_center_x == 700

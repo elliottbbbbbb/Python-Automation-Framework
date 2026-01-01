@@ -1,15 +1,17 @@
 import logging
 import sys
+
 from dotenv import load_dotenv
 
-load_dotenv()
-
-from osrsbot.models.config import Config
 from osrsbot.app.calibration import Calibrator
 from osrsbot.core.runner import ScriptRunner
+from osrsbot.models.config import Config
 from osrsbot.scripts.comprehensive_state_bot_test import ComprehensiveTestBot
 from osrsbot.scripts.hp_tracker import HPTrackerBot
 from osrsbot.scripts.test_inventory_clicks import test_inventory_clicks
+
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,8 +23,8 @@ def get_valid_int(prompt: str, default: int) -> int:
         value = int(user_input)
         if value <= 0:
             logger.warning(
-                f"Invalid value {value}, must be positive. "
-                f"Using default: {default}")
+                f"Invalid value {value}, must be positive. " f"Using default: {default}"
+            )
             print(f"  ⚠ Must be positive. Using default: {default}")
             return default
         return value
@@ -35,7 +37,7 @@ def get_valid_int(prompt: str, default: int) -> int:
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     try:
@@ -70,8 +72,7 @@ def main() -> None:
             try:
                 config = Config()
                 window_title = config.get_window_title()
-                runs = get_valid_int(
-                    "Number of runs [default: 1]: ", default=1)
+                runs = get_valid_int("Number of runs [default: 1]: ", default=1)
 
                 print("\n🤖 Comprehensive Test Bot")
                 print("This bot tests ALL framework features in sequence:")
@@ -94,7 +95,7 @@ def main() -> None:
                     state=runner.state,
                     actions=runner.actions,
                     config=runner.config,
-                    debug_ui=False # Enable debug UI
+                    debug_ui=False,  # Enable debug UI
                 )
                 bot.run(bank_location="", runs=runs)
             except Exception as e:
@@ -122,7 +123,7 @@ def main() -> None:
                     state=runner.state,
                     actions=runner.actions,
                     config=runner.config,
-                    debug_ui=False
+                    debug_ui=False,
                 )
                 bot.run(bank_location="", runs=1)
             except Exception as e:

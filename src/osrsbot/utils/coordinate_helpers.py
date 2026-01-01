@@ -7,13 +7,13 @@ Provides coordinate conversion and resolution with multiple fallback strategies:
 3. Error handling and logging
 """
 
-from typing import Optional, Tuple, TYPE_CHECKING
 import logging
+from typing import TYPE_CHECKING, Optional, Tuple
 
 if TYPE_CHECKING:
+    from osrsbot.models.config import Config
     from osrsbot.services.screen_service import ScreenService
     from osrsbot.services.template_match_service import TemplateMatchService
-    from osrsbot.models.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +27,9 @@ class CoordinateResolver:
 
     def __init__(
         self,
-        screen: 'ScreenService',
-        config: 'Config',
-        template_service: Optional['TemplateMatchService'] = None
+        screen: "ScreenService",
+        config: "Config",
+        template_service: Optional["TemplateMatchService"] = None,
     ):
         self.screen = screen
         self.config = config
@@ -40,9 +40,7 @@ class CoordinateResolver:
         return self.screen.relative_to_absolute(x, y)
 
     def resolve_inventory_slot(
-        self,
-        slot_num: int,
-        force_detect: bool = False
+        self, slot_num: int, force_detect: bool = False
     ) -> Optional[Tuple[int, int]]:
         """
         Resolve inventory slot position (template-first, config fallback).
@@ -62,11 +60,17 @@ class CoordinateResolver:
         if self.template_service:
             img_gray = self.screen.capture_grayscale()
             if img_gray is not None:
-                if self.template_service.detect_grid("inventory", img_gray, force=force_detect):
+                if self.template_service.detect_grid(
+                    "inventory", img_gray, force=force_detect
+                ):
                     # Convert 1-indexed to 0-indexed
-                    position = self.template_service.get_slot_position("inventory", slot_num - 1)
+                    position = self.template_service.get_slot_position(
+                        "inventory", slot_num - 1
+                    )
                     if position:
-                        logger.debug(f"Slot {slot_num} resolved via template: {position}")
+                        logger.debug(
+                            f"Slot {slot_num} resolved via template: {position}"
+                        )
                         return position
 
         # Strategy 2: Config fallback
@@ -80,9 +84,7 @@ class CoordinateResolver:
         return None
 
     def resolve_ui_button(
-        self,
-        button_name: str,
-        force_detect: bool = False
+        self, button_name: str, force_detect: bool = False
     ) -> Optional[Tuple[int, int]]:
         """
         Resolve UI button position using template detection.
@@ -103,19 +105,20 @@ class CoordinateResolver:
             logger.error("Failed to capture screenshot")
             return None
 
-        if self.template_service.detect_button(button_name, img_gray, force=force_detect):
+        if self.template_service.detect_button(
+            button_name, img_gray, force=force_detect
+        ):
             position = self.template_service.get_button_position(button_name)
             if position:
-                logger.debug(f"Button '{button_name}' resolved via template: {position}")
+                logger.debug(
+                    f"Button '{button_name}' resolved via template: {position}"
+                )
                 return position
 
         logger.debug(f"Failed to detect button: {button_name}")
         return None
 
-    def resolve_coordinate_path(
-        self,
-        *coord_path: str
-    ) -> Optional[Tuple[int, int]]:
+    def resolve_coordinate_path(self, *coord_path: str) -> Optional[Tuple[int, int]]:
         """
         Resolve nested config coordinate path.
 

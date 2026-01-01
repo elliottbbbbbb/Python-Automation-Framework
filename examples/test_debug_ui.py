@@ -11,14 +11,15 @@ Requirements:
     - pip install rich>=13.7.0
     - RuneScape client must be running and logged in
 """
+
 import logging
+
 from osrsbot.core.runner import ScriptRunner
 from osrsbot.scripts.test_state_machine_bot import StateMachineTestBot
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ def main():
         state=runner.state,
         actions=runner.actions,
         config=runner.config,
-        debug_ui=True  # Enable debug UI
+        debug_ui=True,  # Enable debug UI
     )
 
     # Run bot

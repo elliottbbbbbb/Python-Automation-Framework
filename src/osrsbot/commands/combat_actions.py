@@ -16,15 +16,15 @@ Responsibilities:
 """
 
 import logging
-from typing import Optional, Tuple, Any
+from typing import Any, Optional, Tuple
 
+from osrsbot.constants import COLOR_DETECTION, TARGET_SELECTION
+from osrsbot.models.config import Config
+from osrsbot.services.click_target_tracker import ClickTargetTracker
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.click_target_tracker import ClickTargetTracker
 from osrsbot.utils.coordinate_helpers import CoordinateResolver
 from osrsbot.utils.timing_helpers import TimingHelper
-from osrsbot.models.config import Config
-from osrsbot.constants import COLOR_DETECTION, TARGET_SELECTION
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class CombatActions:
         coord_resolver: CoordinateResolver,
         timing: TimingHelper,
         config: Config,
-        anti_ban_service: Optional[Any] = None
+        anti_ban_service: Optional[Any] = None,
     ):
         self.mouse = mouse
         self.screen = screen
@@ -53,11 +53,7 @@ class CombatActions:
         self.anti_ban = anti_ban_service
         self._target_tracker = ClickTargetTracker()
 
-    def attack_npc(
-        self,
-        npc_color_name: str,
-        use_smart_targeting: bool = True
-    ) -> bool:
+    def attack_npc(self, npc_color_name: str, use_smart_targeting: bool = True) -> bool:
         """
         Attack NPC by color.
 
@@ -118,7 +114,9 @@ class CombatActions:
         rel_x, rel_y = button_pos
         abs_x, abs_y = self.coords.to_absolute(rel_x, rel_y)
 
-        success = self.mouse.click_at(abs_x, abs_y, speed_multiplier=self.timing.get_mouse_speed_multiplier())
+        success = self.mouse.click_at(
+            abs_x, abs_y, speed_multiplier=self.timing.get_mouse_speed_multiplier()
+        )
         if success:
             self.timing.wait("short")
 
@@ -144,7 +142,9 @@ class CombatActions:
         rel_x, rel_y = button_pos
         abs_x, abs_y = self.coords.to_absolute(rel_x, rel_y)
 
-        success = self.mouse.click_at(abs_x, abs_y, speed_multiplier=self.timing.get_mouse_speed_multiplier())
+        success = self.mouse.click_at(
+            abs_x, abs_y, speed_multiplier=self.timing.get_mouse_speed_multiplier()
+        )
         if success:
             self.timing.wait("short")
 
@@ -167,7 +167,7 @@ class CombatActions:
         color_name: str,
         move_style: MovementStyle = "curved",
         tolerance: Optional[int] = None,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
         """
         Click first occurrence of color.
@@ -187,7 +187,9 @@ class CombatActions:
             return False
 
         if tolerance is None:
-            tolerance = self.config.get("tolerances", "color_match", default=COLOR_DETECTION.default_tolerance)
+            tolerance = self.config.get(
+                "tolerances", "color_match", default=COLOR_DETECTION.default_tolerance
+            )
 
         match = self.screen.find_color(hex_color, tolerance, region)
         if not match:
@@ -195,12 +197,15 @@ class CombatActions:
             return False
 
         abs_x, abs_y = self.coords.to_absolute(match.x, match.y)
-        logger.debug(f"Found '{color_name}' at ({match.x}, {match.y}) -> ({abs_x}, {abs_y})")
+        logger.debug(
+            f"Found '{color_name}' at ({match.x}, {match.y}) -> ({abs_x}, {abs_y})"
+        )
 
         return self.mouse.click_at(
-            abs_x, abs_y,
+            abs_x,
+            abs_y,
             move_style=move_style,
-            speed_multiplier=self.timing.get_mouse_speed_multiplier()
+            speed_multiplier=self.timing.get_mouse_speed_multiplier(),
         )
 
     def click_color_smart(
@@ -211,7 +216,7 @@ class CombatActions:
         tolerance: Optional[int] = None,
         enable_stuck_detection: bool = True,
         enable_blacklist: bool = True,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
         """
         Click color with distance-based selection, stuck detection, and blacklisting.
@@ -237,7 +242,9 @@ class CombatActions:
             return False
 
         if tolerance is None:
-            tolerance = self.config.get("tolerances", "color_match", default=COLOR_DETECTION.default_tolerance)
+            tolerance = self.config.get(
+                "tolerances", "color_match", default=COLOR_DETECTION.default_tolerance
+            )
             if tolerance is None:
                 tolerance = COLOR_DETECTION.default_tolerance
 
@@ -253,7 +260,7 @@ class CombatActions:
             reference_point=player_position,
             tolerance=tolerance,
             region=region,
-            blacklist_checker=blacklist_checker
+            blacklist_checker=blacklist_checker,
         )
 
         if not matches_with_distance:
@@ -261,19 +268,26 @@ class CombatActions:
             return False
 
         best_match, distance = matches_with_distance[0]
-        logger.debug(f"Selected target at ({best_match.x}, {best_match.y}), distance: {distance:.1f}px")
+        logger.debug(
+            f"Selected target at ({
+                best_match.x}, {
+                best_match.y}), distance: {
+                distance:.1f}px"
+        )
 
         # Check for stuck clicking
         if enable_stuck_detection and self._target_tracker.is_stuck(
             window=TARGET_SELECTION.stuck_detection_window,
-            threshold_pixels=TARGET_SELECTION.stuck_threshold_pixels
+            threshold_pixels=TARGET_SELECTION.stuck_threshold_pixels,
         ):
-            logger.warning(f"Stuck detected at ({best_match.x}, {best_match.y}), blacklisting")
+            logger.warning(
+                f"Stuck detected at ({best_match.x}, {best_match.y}), blacklisting"
+            )
             self._target_tracker.blacklist_location(
                 best_match.x,
                 best_match.y,
                 duration=TARGET_SELECTION.blacklist_duration,
-                radius=TARGET_SELECTION.blacklist_radius
+                radius=TARGET_SELECTION.blacklist_radius,
             )
             # Retry with blacklist
             return self.click_color_smart(
@@ -283,14 +297,15 @@ class CombatActions:
                 tolerance=tolerance,
                 enable_stuck_detection=enable_stuck_detection,
                 enable_blacklist=True,
-                region=region
+                region=region,
             )
 
         abs_x, abs_y = self.coords.to_absolute(best_match.x, best_match.y)
         success = self.mouse.click_at(
-            abs_x, abs_y,
+            abs_x,
+            abs_y,
             move_style=move_style,
-            speed_multiplier=self.timing.get_mouse_speed_multiplier()
+            speed_multiplier=self.timing.get_mouse_speed_multiplier(),
         )
 
         if success:

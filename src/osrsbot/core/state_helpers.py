@@ -2,10 +2,10 @@
 
 import logging
 from enum import Enum
-from typing import Dict, Optional
 from functools import wraps
+from typing import Dict, Optional
 
-from osrsbot.core.state_types import StateMetadata, StateResult, StateExecutionContext
+from osrsbot.core.state_types import StateExecutionContext, StateMetadata, StateResult
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def create_state_metadata(
     description: str = "",
     max_retries: int = 3,
     timeout: Optional[float] = None,
-    failover_state: Optional[Enum] = None
+    failover_state: Optional[Enum] = None,
 ) -> StateMetadata:
     """
     Create StateMetadata with less boilerplate.
@@ -45,13 +45,12 @@ def create_state_metadata(
         description=description,
         max_retries=max_retries,
         timeout=timeout,
-        failover_state=failover_state
+        failover_state=failover_state,
     )
 
 
 def build_metadata_dict(
-    states_enum: type[Enum],
-    configs: Dict[Enum, dict]
+    states_enum: type[Enum], configs: Dict[Enum, dict]
 ) -> Dict[Enum, StateMetadata]:
     """
     Build state metadata dictionary from compact configuration.
@@ -96,7 +95,7 @@ def build_metadata_dict(
             description=config.get("description", ""),
             max_retries=config.get("max_retries", 3),
             timeout=config.get("timeout", None),
-            failover_state=config.get("failover", None)
+            failover_state=config.get("failover", None),
         )
     return result
 
@@ -125,6 +124,7 @@ def log_state_execution(func):
         This decorator is optional and can be used selectively per state handler.
         Some handlers may prefer custom logging for more detailed context.
     """
+
     @wraps(func)
     def wrapper(self, context: StateExecutionContext) -> StateResult:
         state_name = context.current_state.name.upper()

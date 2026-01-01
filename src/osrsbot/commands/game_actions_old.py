@@ -1,17 +1,24 @@
 """Game actions - clicking, combat, inventory, banking, etc."""
-import time
-import random
-import logging
-import pyautogui
-from typing import Optional, Tuple, Any, List
 
+import logging
+import random
+import time
+from typing import Any, List, Optional, Tuple
+
+import pyautogui
+
+from osrsbot.constants import (
+    COLOR_DETECTION,
+    GAME_TIMING,
+    MINIMAP_NAVIGATION,
+    TARGET_SELECTION,
+)
+from osrsbot.core.game_interface import GameInterface
+from osrsbot.models.config import Config
+from osrsbot.services.click_target_tracker import ClickTargetTracker
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.services.click_target_tracker import ClickTargetTracker
-from osrsbot.core.game_interface import GameInterface
-from osrsbot.models.config import Config
-from osrsbot.constants import COLOR_DETECTION, GAME_TIMING, TARGET_SELECTION, MINIMAP_NAVIGATION
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +35,7 @@ class GameActions:
         template_service: Optional[TemplateMatchService] = None,
         anti_ban_service: Optional[Any] = None,
         loot_detection_service: Optional[Any] = None,
-        walker: Optional[Any] = None
+        walker: Optional[Any] = None,
     ):
         """Initialize actions with services."""
         self.mouse = mouse
@@ -42,13 +49,18 @@ class GameActions:
         self._target_tracker = ClickTargetTracker()
 
     def wait(self, timing_type: str) -> None:
-        delay = self.config.get("timings", timing_type, default=GAME_TIMING.default_wait)
+        delay = self.config.get(
+            "timings", timing_type, default=GAME_TIMING.default_wait
+        )
 
         # Handle tuple/list ranges for variance (Phase 0 anti-detection)
         if isinstance(delay, (list, tuple)) and len(delay) == 2:
             min_delay, max_delay = delay
             actual_delay = random.uniform(float(min_delay), float(max_delay))
-            logger.debug(f"Wait '{timing_type}': {actual_delay:.2f}s (range: {min_delay}-{max_delay}s)")
+            logger.debug(
+                f"Wait '{timing_type}': {
+                    actual_delay:.2f}s (range: {min_delay}-{max_delay}s)"
+            )
         elif isinstance(delay, (int, float)):
             actual_delay = float(delay)
         else:
@@ -61,7 +73,9 @@ class GameActions:
         if self.anti_ban:
             variance = self.anti_ban.get_timing_variance()
             actual_delay *= variance
-            logger.debug(f"Applied session variance ({variance:.3f}): {actual_delay:.2f}s")
+            logger.debug(
+                f"Applied session variance ({variance:.3f}): {actual_delay:.2f}s"
+            )
 
         time.sleep(actual_delay)
 
@@ -93,17 +107,13 @@ class GameActions:
         logger.debug("Click tracking reset")
 
     def click_inventory_slot(
-        self,
-        slot_num: int,
-        move_style: MovementStyle = "curved"
+        self, slot_num: int, move_style: MovementStyle = "curved"
     ) -> bool:
         """Click inventory slot (1-28) using config coords."""
         coord = self.config.get("coordinates", "inventory", f"slot_{slot_num}")
 
         if not coord or "x" not in coord or "y" not in coord:
-            logger.error(
-                f"No coordinates for slot {slot_num} in config"
-            )
+            logger.error(f"No coordinates for slot {slot_num} in config")
             return False
 
         x, y = coord["x"], coord["y"]
@@ -113,13 +123,18 @@ class GameActions:
             f"Clicking inventory slot {slot_num} at "
             f"relative ({x}, {y}) -> absolute ({abs_x}, {abs_y})"
         )
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
     def click_inventory_slot_detected(
         self,
         slot_num: int,
         move_style: MovementStyle = "curved",
-        force_detect: bool = False
+        force_detect: bool = False,
     ) -> bool:
         """Click inventory slot using template matching (auto-opens inv if closed)."""
         if not self.template_service:
@@ -143,9 +158,7 @@ class GameActions:
             return False
 
         detected = self.template_service.detect_grid(
-            "inventory",
-            img_gray,
-            force=force_detect
+            "inventory", img_gray, force=force_detect
         )
         if not detected:
             logger.error("Failed to detect inventory grid")
@@ -165,13 +178,18 @@ class GameActions:
             f"relative ({rel_x}, {rel_y}) -> absolute ({abs_x}, {abs_y})"
         )
 
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
     def click_ui_button_detected(
         self,
         button_name: str,
         move_style: MovementStyle = "curved",
-        force_detect: bool = False
+        force_detect: bool = False,
     ) -> bool:
         """Click UI button using template matching."""
         if not self.template_service:
@@ -184,9 +202,7 @@ class GameActions:
             return False
 
         detected = self.template_service.detect_button(
-            button_name,
-            img_gray,
-            force=force_detect
+            button_name, img_gray, force=force_detect
         )
         if not detected:
             logger.error(f"Failed to detect button: {button_name}")
@@ -205,14 +221,18 @@ class GameActions:
             f"relative ({rel_x}, {rel_y}) -> absolute ({abs_x}, {abs_y})"
         )
 
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
     def ensure_inventory_open(self) -> bool:
         """Ensure inventory is open by clicking the inventory tab."""
         if not self.template_service:
             logger.warning(
-                "TemplateMatchService not available. "
-                "Cannot open inventory tab."
+                "TemplateMatchService not available. " "Cannot open inventory tab."
             )
             return True  # Assume open when detection unavailable
 
@@ -227,7 +247,9 @@ class GameActions:
                 logger.warning("Failed to click inventory tab")
                 return False
         elif self.template_service.has_button("inventory_button"):
-            success = self.click_ui_button_detected("inventory_button", force_detect=True)
+            success = self.click_ui_button_detected(
+                "inventory_button", force_detect=True
+            )
             if success:
                 self.wait("short")
                 return True
@@ -235,8 +257,10 @@ class GameActions:
                 logger.warning("Failed to click inventory button")
                 return False
         else:
-            logger.warning("No inventory tab/button configured - pressing ESC as fallback")
-            pyautogui.press('escape')
+            logger.warning(
+                "No inventory tab/button configured - pressing ESC as fallback"
+            )
+            pyautogui.press("escape")
             self.wait("short")
             return True
 
@@ -255,7 +279,9 @@ class GameActions:
 
             img_gray = self.screen.capture_grayscale()
             if img_gray and self.template_service.detect_grid("inventory", img_gray):
-                position = self.template_service.get_slot_position("inventory", slot - 1)
+                position = self.template_service.get_slot_position(
+                    "inventory", slot - 1
+                )
                 if position:
                     x, y = position
                     abs_x, abs_y = self._to_absolute(x, y)
@@ -279,13 +305,18 @@ class GameActions:
 
         if shift_drop:
             # Shift-drop method (requires RuneLite plugin)
-            keyboard.press('shift')
+            keyboard.press("shift")
             time.sleep(random.uniform(0.02, 0.05))  # Small delay
 
-            self.mouse.click_at(abs_x, abs_y, move_style="curved", speed_multiplier=self._get_mouse_speed_multiplier())
+            self.mouse.click_at(
+                abs_x,
+                abs_y,
+                move_style="curved",
+                speed_multiplier=self._get_mouse_speed_multiplier(),
+            )
 
             time.sleep(random.uniform(0.02, 0.05))
-            keyboard.release('shift')
+            keyboard.release("shift")
 
             delay = random.uniform(0.25, 0.35)
             if self.anti_ban:
@@ -305,7 +336,10 @@ class GameActions:
                 delay *= self.anti_ban.get_timing_variance()
             time.sleep(delay)
 
-        logger.debug(f"Dropped item from slot {slot} ({'shift-drop' if shift_drop else 'right-click'})")
+        logger.debug(
+            f"Dropped item from slot {slot} ({
+                'shift-drop' if shift_drop else 'right-click'})"
+        )
 
         if self.anti_ban:
             self.anti_ban.record_action(f"drop_slot_{slot}")
@@ -329,7 +363,9 @@ class GameActions:
                 wrong_slot = random.choice([s for s in drop_slots if s != slot])
                 logger.debug(f"Anti-ban: Misclick on slot {wrong_slot}")
                 # Just move mouse there, don't actually click
-                coord = self.config.get("coordinates", "inventory", f"slot_{wrong_slot}")
+                coord = self.config.get(
+                    "coordinates", "inventory", f"slot_{wrong_slot}"
+                )
                 if coord:
                     abs_x, abs_y = self._to_absolute(coord["x"], coord["y"])
                     pyautogui.moveTo(abs_x, abs_y, duration=random.uniform(0.1, 0.3))
@@ -341,7 +377,9 @@ class GameActions:
         logger.info(f"Dropped {dropped} items (kept slots: {keep_slots})")
         return dropped
 
-    def drop_until_empty_slots(self, target_empty: int, keep_slots: Optional[list[int]] = None) -> int:
+    def drop_until_empty_slots(
+        self, target_empty: int, keep_slots: Optional[list[int]] = None
+    ) -> int:
         """Drop items until we have N empty slots."""
         if keep_slots is None:
             keep_slots = []
@@ -351,7 +389,9 @@ class GameActions:
         current_empty = total_slots - current_filled
 
         if current_empty >= target_empty:
-            logger.debug(f"Already have {current_empty} empty slots (target: {target_empty})")
+            logger.debug(
+                f"Already have {current_empty} empty slots (target: {target_empty})"
+            )
             return 0
 
         to_drop = target_empty - current_empty
@@ -372,7 +412,7 @@ class GameActions:
         self,
         player_pos: Optional[Tuple[int, int]] = None,
         region: Optional[Tuple[int, int, int, int]] = None,
-        tolerance: int = 30
+        tolerance: int = 30,
     ) -> bool:
         """
         Pickup nearest loot item (purple highlight from RuneLite).
@@ -393,9 +433,7 @@ class GameActions:
             player_pos = (654, 111)
 
         loot_pos = self.loot_detection.detect_nearest_loot(
-            player_pos=player_pos,
-            region=region,
-            tolerance=tolerance
+            player_pos=player_pos, region=region, tolerance=tolerance
         )
 
         if not loot_pos:
@@ -407,9 +445,10 @@ class GameActions:
 
         logger.info(f"Picking up loot at ({loot_x}, {loot_y})")
         self.mouse.click_at(
-            abs_x, abs_y,
+            abs_x,
+            abs_y,
             move_style="curved",
-            speed_multiplier=self._get_mouse_speed_multiplier()
+            speed_multiplier=self._get_mouse_speed_multiplier(),
         )
 
         pickup_delay = random.uniform(0.5, 0.7)
@@ -427,7 +466,7 @@ class GameActions:
         color_name: str,
         move_style: MovementStyle = "curved",
         tolerance: Optional[int] = None,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
         hex_color = self.config.get("colors", color_name)
 
@@ -450,7 +489,12 @@ class GameActions:
             f"Found '{color_name}' at relative ({match.x}, {match.y}) -> "
             f"absolute ({abs_x}, {abs_y})"
         )
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
     def click_color_smart(
         self,
@@ -460,7 +504,7 @@ class GameActions:
         tolerance: Optional[int] = None,
         enable_stuck_detection: bool = True,
         enable_blacklist: bool = True,
-        region: Optional[Tuple[int, int, int, int]] = None
+        region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
         """Click color with distance-based selection, stuck detection, and blacklisting."""
         hex_color = self.config.get("colors", color_name)
@@ -487,7 +531,7 @@ class GameActions:
             reference_point=player_position,
             tolerance=tolerance,
             region=region,
-            blacklist_checker=blacklist_checker
+            blacklist_checker=blacklist_checker,
         )
 
         if not matches_with_distance:
@@ -503,7 +547,7 @@ class GameActions:
         # Check for stuck clicking (before clicking)
         if enable_stuck_detection and self._target_tracker.is_stuck(
             window=TARGET_SELECTION.stuck_detection_window,
-            threshold_pixels=TARGET_SELECTION.stuck_threshold_pixels
+            threshold_pixels=TARGET_SELECTION.stuck_threshold_pixels,
         ):
             # Blacklist this location and retry with next best target
             logger.warning(
@@ -513,7 +557,7 @@ class GameActions:
                 best_match.x,
                 best_match.y,
                 duration=TARGET_SELECTION.blacklist_duration,
-                radius=TARGET_SELECTION.blacklist_radius
+                radius=TARGET_SELECTION.blacklist_radius,
             )
             return self.click_color_smart(
                 color_name=color_name,
@@ -522,7 +566,7 @@ class GameActions:
                 tolerance=tolerance,
                 enable_stuck_detection=enable_stuck_detection,
                 enable_blacklist=True,
-                region=region
+                region=region,
             )
 
         abs_x, abs_y = self._to_absolute(best_match.x, best_match.y)
@@ -531,7 +575,12 @@ class GameActions:
             f"absolute ({abs_x}, {abs_y})"
         )
 
-        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        success = self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
         if not success:
             return False
 
@@ -543,9 +592,7 @@ class GameActions:
         return True
 
     def click_coordinate(
-        self,
-        coord_path: Tuple[str, ...],
-        move_style: MovementStyle = "curved"
+        self, coord_path: Tuple[str, ...], move_style: MovementStyle = "curved"
     ) -> bool:
         current = self.config.get("coordinates")
 
@@ -569,7 +616,12 @@ class GameActions:
             f"Clicking coordinate {coord_path} at relative ({x}, {y}) -> "
             f"absolute ({abs_x}, {abs_y})"
         )
-        return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        return self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
     def use_item(self, item_color_name: str) -> bool:
         return self.click_color(item_color_name)
@@ -589,7 +641,7 @@ class GameActions:
         direction: str,
         tiles: int = 1,
         move_style: str = "random",
-        wait_time: Optional[float] = None
+        wait_time: Optional[float] = None,
     ) -> bool:
         """Walk N tiles in a direction on minimap (up/down/left/right)."""
         if direction not in MINIMAP_NAVIGATION.tile_movements:
@@ -600,13 +652,24 @@ class GameActions:
         target_x = MINIMAP_NAVIGATION.player_center_x + (dx * tiles)
         target_y = MINIMAP_NAVIGATION.player_center_y + (dy * tiles)
 
-        logger.info(f"Walking {tiles} tile(s) {direction} to minimap ({target_x}, {target_y})")
+        logger.info(
+            f"Walking {tiles} tile(s) {direction} to minimap ({target_x}, {target_y})"
+        )
 
         abs_x, abs_y = self._to_absolute(target_x, target_y)
-        success = self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
+        success = self.mouse.click_at(
+            abs_x,
+            abs_y,
+            move_style=move_style,
+            speed_multiplier=self._get_mouse_speed_multiplier(),
+        )
 
         if success:
-            actual_wait = wait_time if wait_time is not None else MINIMAP_NAVIGATION.default_wait_time
+            actual_wait = (
+                wait_time
+                if wait_time is not None
+                else MINIMAP_NAVIGATION.default_wait_time
+            )
             variance = time.time() % 1.0
             total_wait = actual_wait + variance
 
@@ -673,15 +736,12 @@ class GameActions:
 
     def close_interface(self) -> bool:
         """Close interface with ESC (may not work with dialog boxes)."""
-        pyautogui.press('escape')
+        pyautogui.press("escape")
         self.wait("short")
         return True
 
     def wait_for_color(
-        self,
-        color_name: str,
-        timeout: float = 10.0,
-        check_interval: float = 0.5
+        self, color_name: str, timeout: float = 10.0, check_interval: float = 0.5
     ) -> bool:
         hex_color = self.config.get("colors", color_name)
 
@@ -690,18 +750,13 @@ class GameActions:
             return False
 
         match = self.screen.wait_for_color(
-            hex_color,
-            timeout=timeout,
-            check_interval=check_interval
+            hex_color, timeout=timeout, check_interval=check_interval
         )
 
         return match is not None
 
     def walk_to_world_coordinate(
-        self,
-        x: int,
-        y: int,
-        move_style: MovementStyle = "curved"
+        self, x: int, y: int, move_style: MovementStyle = "curved"
     ) -> bool:
         """
         Walk to world tile coordinates using advanced walker.
@@ -715,15 +770,15 @@ class GameActions:
             True if successfully arrived, False otherwise
         """
         if not self.walker:
-            logger.error("WalkerService not initialized. Ensure Status Socket plugin is enabled.")
+            logger.error(
+                "WalkerService not initialized. Ensure Status Socket plugin is enabled."
+            )
             return False
 
         return self.walker.walk_to(x, y, move_style=move_style)
 
     def walk_path(
-        self,
-        waypoints: List[Tuple[int, int]],
-        move_style: MovementStyle = "random"
+        self, waypoints: List[Tuple[int, int]], move_style: MovementStyle = "random"
     ) -> bool:
         """
         Follow a predefined path of world coordinates.
@@ -746,7 +801,9 @@ class GameActions:
             actions.walk_path(path)
         """
         if not self.walker:
-            logger.error("WalkerService not initialized. Ensure Status Socket plugin is enabled.")
+            logger.error(
+                "WalkerService not initialized. Ensure Status Socket plugin is enabled."
+            )
             return False
 
         return self.walker.walk_path(waypoints, move_style=move_style)

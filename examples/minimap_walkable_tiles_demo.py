@@ -5,12 +5,12 @@ This example shows how to use MinimapService to convert the OSRS minimap
 into a grid of walkable tiles.
 """
 
-import cv2
 import numpy as np
-from osrsbot.services.minimap_service import MinimapService
-from osrsbot.services.screen_service import ScreenService
+
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
+from osrsbot.services.minimap_service import MinimapService
+from osrsbot.services.screen_service import ScreenService
 
 
 def main():
@@ -31,8 +31,7 @@ def main():
 
     # Extract walkable tiles (with debug output)
     tile_grid = minimap.extract_walkable_tiles(
-        minimap_center,
-        debug=True  # Saves debug images to debug/minimap/
+        minimap_center, debug=True  # Saves debug images to debug/minimap/
     )
 
     # Print grid dimensions
@@ -49,7 +48,9 @@ def main():
     # Example: Check if specific tiles are walkable
     print("\nChecking specific tiles:")
     center_tile = (tile_grid.shape[1] // 2, tile_grid.shape[0] // 2)
-    print(f"Center tile {center_tile}: {'Walkable' if tile_grid[center_tile[1], center_tile[0]] else 'Blocked'}")
+    print(
+        f"Center tile {center_tile}: {'Walkable' if tile_grid[center_tile[1], center_tile[0]] else 'Blocked'}"
+    )
 
     # Example: Find path between two points
     print("\nFinding path from center to edge...")

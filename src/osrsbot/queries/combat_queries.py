@@ -13,11 +13,11 @@ Responsibilities:
 """
 
 import logging
-from typing import Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
+from osrsbot.constants import COMBAT_DETECTION
 from osrsbot.models.config import Config
 from osrsbot.utils.color_helpers import hex_to_rgb
-from osrsbot.constants import COLOR_DETECTION
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
@@ -35,9 +35,9 @@ class CombatQueries:
 
     def __init__(
         self,
-        screen: 'ScreenService',
+        screen: "ScreenService",
         config: Config,
-        template_service: Optional['TemplateMatchService'] = None
+        template_service: Optional["TemplateMatchService"] = None,
     ):
         self.screen = screen
         self.config = config
@@ -57,19 +57,19 @@ class CombatQueries:
             logger.error("combat_indicator coordinates not found in config")
             return False
 
-        color = self.screen.get_pixel_color(coord['x'], coord['y'], relative=True)
+        color = self.screen.get_pixel_color(coord["x"], coord["y"], relative=True)
 
         combat_green_hex = self.config.get("colors", "combat_indicator_green")
         combat_red_hex = self.config.get("colors", "combat_indicator_red")
 
         if combat_green_hex and combat_red_hex:
-            combat_colors = [
-                hex_to_rgb(combat_green_hex),
-                hex_to_rgb(combat_red_hex)
-            ]
+            combat_colors = [hex_to_rgb(combat_green_hex), hex_to_rgb(combat_red_hex)]
         else:
             logger.warning("Combat indicator colors not in config, using fallback")
-            combat_colors = [(7, 139, 54), (99, 21, 19)]
+            combat_colors = [
+                COMBAT_DETECTION.indicator_green_rgb,
+                COMBAT_DETECTION.indicator_red_rgb,
+            ]
 
         tolerance = self.config.get("tolerances", "color_match", default=10)
 
@@ -104,16 +104,26 @@ class CombatQueries:
 
             # Check if ANY of the red click templates match
             for button_name in buttons:
-                if self.template_service.detect_button(button_name, img_gray, force=True):
+                if self.template_service.detect_button(
+                    button_name, img_gray, force=True
+                ):
                     detections += 1
-                    logger.debug(f"Click check attempt {attempt + 1}: Click template '{button_name}' detected")
+                    logger.debug(
+                        f"Click check attempt {
+                            attempt +
+                            1}: Click template '{button_name}' detected"
+                    )
                     break
 
             # Early exit if we already have majority
             if detections > tries // 2:
-                logger.info(f"Click success confirmed ({detections}/{attempt + 1} frames)")
+                logger.info(
+                    f"Click success confirmed ({detections}/{attempt + 1} frames)"
+                )
                 return True
 
         success = detections > tries // 2
-        logger.info(f"Click check complete: {detections}/{tries} frames detected click (success={success})")
+        logger.info(
+            f"Click check complete: {detections}/{tries} frames detected click (success={success})"
+        )
         return success

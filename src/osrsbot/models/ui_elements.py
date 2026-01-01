@@ -8,11 +8,12 @@ Key Classes:
 - UIElement: Single clickable UI element with bounding box
 - UIElementGrid: Grid of elements (inventory, prayer tab) with subdivision logic
 """
+
 import logging
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
-from dataclasses import dataclass
 
 import cv2 as cv
 import numpy as np
@@ -36,6 +37,7 @@ class UIElement:
         x1: Bottom-right X (relative to window)
         y1: Bottom-right Y (relative to window)
     """
+
     x0: int
     y0: int
     x1: int
@@ -104,7 +106,7 @@ class UIElementGrid:
         sticky: bool = True,
         ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
         padding: int = TEMPLATE_MATCHING.default_padding,
-        border_offset: int = 0
+        border_offset: int = 0,
     ):
         """
         Initialize grid template.
@@ -168,11 +170,7 @@ class UIElementGrid:
         )
         return template
 
-    def detect(
-        self,
-        img_gray: np.ndarray,
-        force: bool = False
-    ) -> bool:
+    def detect(self, img_gray: np.ndarray, force: bool = False) -> bool:
         """
         Detect grid in screenshot and subdivide into elements.
 
@@ -248,13 +246,7 @@ class UIElementGrid:
             self.visible = False
             return False
 
-    def _subdivide_grid(
-        self,
-        x: int,
-        y: int,
-        w: int,
-        h: int
-    ) -> None:
+    def _subdivide_grid(self, x: int, y: int, w: int, h: int) -> None:
         """
         Subdivide detected grid into individual clickable elements.
 
@@ -321,11 +313,7 @@ class UIElementGrid:
             return self.elements[index]
         return None
 
-    def get_element_at(
-        self,
-        row: int,
-        col: int
-    ) -> Optional[UIElement]:
+    def get_element_at(self, row: int, col: int) -> Optional[UIElement]:
         """
         Get element by row/col coordinates (0-based).
 
@@ -355,7 +343,7 @@ class UIButton:
         template_path: str,
         threshold: float = TEMPLATE_MATCHING.default_threshold,
         sticky: bool = False,
-        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds
+        ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
     ):
         """
         Initialize button template.
@@ -401,11 +389,7 @@ class UIButton:
         )
         return template
 
-    def detect(
-        self,
-        img_gray: np.ndarray,
-        force: bool = False
-    ) -> bool:
+    def detect(self, img_gray: np.ndarray, force: bool = False) -> bool:
         """
         Detect button in screenshot.
 
