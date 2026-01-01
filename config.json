@@ -19,6 +19,7 @@
     "empty_inventory_slot": "#4B423A",
     "combat_indicator_green": "#078B36",
     "combat_indicator_red": "#63150D",
+    "combat_indicator_teal": "#068a34",
     "1": "#596E13"
   },
   "coordinates": {
@@ -259,7 +260,7 @@
       },
       "prayer_tab": {
         "path": "src/osrsbot/images/bot/ui_templates/prayer.PNG",
-        "threshold": 0.70
+        "threshold": 0.75
       },
       "protect_from_melee": {
         "path": "src/osrsbot/images/bot/prayers/melee.PNG",

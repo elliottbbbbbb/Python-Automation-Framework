@@ -199,34 +199,8 @@ class GameState:
         Returns:
             True if in combat, False otherwise
         """
-        # Try template matching first (preferred method)
-        if self.template_service:
-            img_gray = self.screen.capture_grayscale()
-            if img_gray is None:
-                logger.warning("Failed to capture screenshot for combat check")
-                return False
+    # Try template matching first (preferred method)
 
-            # Detect combat indicator template
-            detected = self.template_service.detect_button(
-                "combat_indicator",
-                img_gray,
-                force=True  # Always fresh detection (combat changes rapidly)
-            )
-
-            # Validate position - combat indicator should be in top-left corner
-            # Expected position is around (24-30, 65-85)
-            if detected:
-                button = self.template_service.get_button("combat_indicator")
-                if button and button.element:
-                    x, y = button.element.center
-                    # Only accept detections in the top-left area
-                    if x > 100 or y > 120:
-                        logger.debug(f"Combat indicator detected at invalid position ({x}, {y}), ignoring")
-                        return False
-                    logger.debug(f"Combat indicator detected at valid position ({x}, {y})")
-                    return True
-
-            return detected
 
         # Fallback to pixel-based detection (legacy method)
         logger.debug("Template service unavailable, using pixel-based combat check")
