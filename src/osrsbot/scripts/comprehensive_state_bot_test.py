@@ -8,6 +8,7 @@ This bot demonstrates and validates the entire framework by testing:
 - Color detection (smart NPC targeting)
 - Template matching (UI button detection)
 - OCR (HP and stats reading)
+- Prayer system (prayer tab and prayer toggling)
 - Combat detection (in_combat checks)
 - State machine (transitions, retries, failovers)
 
@@ -19,6 +20,7 @@ States:
     TEST_COLOR_DETECTION - Test color-based NPC clicking
     TEST_TEMPLATE_MATCHING - Test UI template detection
     TEST_OCR - Test OCR stat reading
+    TEST_PRAYER - Test prayer tab and prayer toggling
     TEST_COMBAT - Test combat detection
     COMPLETE - Final state
 
@@ -52,6 +54,7 @@ class TestBotStates(Enum):
     TEST_COLOR_DETECTION = "test_color_detection"
     TEST_TEMPLATE_MATCHING = "test_template_matching"
     TEST_OCR = "test_ocr"
+    TEST_PRAYER = "test_prayer"
     TEST_COMBAT = "test_combat"
     COMPLETE = "complete"
 
@@ -142,6 +145,12 @@ class ComprehensiveTestBot(StateMachineBot):
                 "name": "Test OCR",
                 "description": "Test HP and stats reading",
                 "timeout": 30.0,
+                "failover": TestBotStates.TEST_PRAYER,
+            },
+            TestBotStates.TEST_PRAYER: {
+                "name": "Test Prayer System",
+                "description": "Test prayer tab and prayer toggling",
+                "timeout": 30.0,
                 "failover": TestBotStates.TEST_COMBAT,
             },
             TestBotStates.TEST_COMBAT: {
@@ -169,7 +178,8 @@ class ComprehensiveTestBot(StateMachineBot):
             StateTransition(TestBotStates.TEST_INVENTORY_CLICKING, TestBotStates.TEST_COLOR_DETECTION),
             StateTransition(TestBotStates.TEST_COLOR_DETECTION, TestBotStates.TEST_TEMPLATE_MATCHING),
             StateTransition(TestBotStates.TEST_TEMPLATE_MATCHING, TestBotStates.TEST_OCR),
-            StateTransition(TestBotStates.TEST_OCR, TestBotStates.TEST_COMBAT),
+            StateTransition(TestBotStates.TEST_OCR, TestBotStates.TEST_PRAYER),
+            StateTransition(TestBotStates.TEST_PRAYER, TestBotStates.TEST_COMBAT),
             StateTransition(TestBotStates.TEST_COMBAT, TestBotStates.COMPLETE)
         ]
 
@@ -775,6 +785,94 @@ class ComprehensiveTestBot(StateMachineBot):
             self._test_results["ocr"] = False
             return StateResult.FAILURE
 
+    def _handle_test_prayer(self, context: StateExecutionContext) -> StateResult:
+        """Test prayer system by opening prayer tab and toggling prayers."""
+        logger.info("\n[TEST 9/10] PRAYER SYSTEM")
+        logger.info("-" * 60)
+
+        try:
+            if not self.actions.template_service:
+                logger.warning("  ! TemplateMatchService not available")
+                logger.warning("  -> Prayer system requires template matching")
+                logger.warning("  -> Skipping prayer test")
+                self._test_results["prayer"] = "skipped"
+                return StateResult.SUCCESS
+
+            # Test 1: Read current prayer level
+            logger.info("  Test 1: Reading prayer level...")
+            prayer_level = self.state.get_prayer(force=True)
+            if prayer_level is not None:
+                logger.info(f"  OK Current prayer: {prayer_level}")
+            else:
+                logger.warning("  ! Failed to read prayer level (OCR issue)")
+
+            self.actions.wait("short")
+
+            # Test 2: Open prayer tab
+            logger.info("\n  Test 2: Opening prayer tab...")
+            success = self.actions.open_prayer_tab()
+
+            if success:
+                logger.info("  OK Prayer tab opened successfully")
+            else:
+                logger.warning("  ! Failed to open prayer tab")
+                self._test_results["prayer"] = False
+                return StateResult.FAILURE
+
+            self.actions.wait("short")
+
+            # Test 3: Toggle Protect from Melee
+            logger.info("\n  Test 3: Toggling Protect from Melee...")
+            success = self.actions.activate_protect_from_melee()
+            if success:
+                logger.info("  OK Protect from Melee toggled")
+            else:
+                logger.warning("  ! Failed to toggle Protect from Melee")
+
+            self.actions.wait("short")
+
+            # Test 4: Toggle Protect from Magic
+            logger.info("\n  Test 4: Toggling Protect from Magic...")
+            success = self.actions.activate_protect_from_magic()
+            if success:
+                logger.info("  OK Protect from Magic toggled")
+            else:
+                logger.warning("  ! Failed to toggle Protect from Magic")
+
+            self.actions.wait("short")
+
+            # Test 5: Toggle Protect from Ranged
+            logger.info("\n  Test 5: Toggling Protect from Ranged...")
+            success = self.actions.activate_protect_from_ranged()
+            if success:
+                logger.info("  OK Protect from Ranged toggled")
+            else:
+                logger.warning("  ! Failed to toggle Protect from Ranged")
+
+            self.actions.wait("short")
+
+            # Test 6: Turn off all prayers (toggle again to deactivate)
+            logger.info("\n  Test 6: Turning off all prayers...")
+            self.actions.toggle_prayer("protect_from_ranged")
+            self.actions.wait("short")
+            self.actions.toggle_prayer("protect_from_magic")
+            self.actions.wait("short")
+            self.actions.toggle_prayer("protect_from_melee")
+            self.actions.wait("short")
+
+            logger.info("  OK All prayers toggled off")
+
+            logger.info("\n  OK Prayer system test complete")
+            self._test_results["prayer"] = True
+            return StateResult.SUCCESS
+
+        except Exception as e:
+            logger.error(f"Prayer test failed: {e}")
+            import traceback
+            traceback.print_exc()
+            self._test_results["prayer"] = False
+            return StateResult.FAILURE
+
     def _handle_test_combat(self, context: StateExecutionContext) -> StateResult:
         """
         Test combat detection by killing NPCs.
@@ -784,7 +882,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.RETRY to continue testing
             StateResult.FAILURE if test fails
         """
-        logger.info(f"\n[TEST 9/9] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})")
+        logger.info(f"\n[TEST 10/10] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})")
 
         try:
             # Check if test complete

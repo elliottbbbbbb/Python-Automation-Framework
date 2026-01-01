@@ -761,3 +761,57 @@ class GameActions:
             return False
 
         return self.walker.walk_path(waypoints, move_style=move_style)
+
+    def open_prayer_tab(self) -> bool:
+        """Open the prayer tab by clicking the prayer tab button."""
+        if not self.template_service:
+            logger.error("Template service not available, cannot open prayer tab")
+            return False
+
+        logger.debug("Opening prayer tab")
+        success = self.click_ui_button_detected("prayer_tab", force_detect=True)
+
+        if success:
+            self.wait("short")
+            logger.debug("Prayer tab opened successfully")
+        else:
+            logger.warning("Failed to open prayer tab")
+
+        return success
+
+    def toggle_prayer(self, prayer_name: str) -> bool:
+        """
+        Toggle a prayer on/off by clicking it.
+
+        Args:
+            prayer_name: Prayer button name (e.g., "protect_from_melee")
+
+        Returns:
+            True if prayer was clicked successfully
+        """
+        if not self.template_service:
+            logger.error("Template service not available, cannot toggle prayer")
+            return False
+
+        logger.info(f"Toggling prayer: {prayer_name}")
+        success = self.click_ui_button_detected(prayer_name, force_detect=True)
+
+        if success:
+            self.wait("short")
+            logger.debug(f"Successfully clicked {prayer_name}")
+        else:
+            logger.warning(f"Failed to click {prayer_name}")
+
+        return success
+
+    def activate_protect_from_melee(self) -> bool:
+        """Activate Protect from Melee prayer."""
+        return self.toggle_prayer("protect_from_melee")
+
+    def activate_protect_from_magic(self) -> bool:
+        """Activate Protect from Magic prayer."""
+        return self.toggle_prayer("protect_from_magic")
+
+    def activate_protect_from_ranged(self) -> bool:
+        """Activate Protect from Ranged prayer."""
+        return self.toggle_prayer("protect_from_ranged")
