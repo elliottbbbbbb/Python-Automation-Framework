@@ -207,49 +207,38 @@ class GameActions:
 
         return self.mouse.click_at(abs_x, abs_y, move_style=move_style, speed_multiplier=self._get_mouse_speed_multiplier())
 
-    def ensure_inventory_open(self, max_attempts: int = 3) -> bool:
-        """Ensure inventory is open (clicks inv button or presses ESC if needed)."""
+    def ensure_inventory_open(self) -> bool:
+        """Ensure inventory is open by clicking the inventory tab."""
         if not self.template_service:
             logger.warning(
                 "TemplateMatchService not available. "
-                "Cannot verify inventory state."
+                "Cannot open inventory tab."
             )
             return True  # Assume open when detection unavailable
 
-        for attempt in range(max_attempts):
-            img_gray = self.screen.capture_grayscale()
-            if img_gray is None:
-                logger.error(f"Failed to capture screenshot (attempt {attempt + 1})")
-                continue
-
-            detected = self.template_service.detect_grid(
-                "inventory",
-                img_gray,
-                force=True
-            )
-            if detected:
-                logger.debug(f"Inventory detected on attempt {attempt + 1}")
+        # Simply click the inventory tab - don't bother checking if it's already open
+        logger.debug("Clicking inventory tab to ensure it's open")
+        if self.template_service.has_button("inventory_tab"):
+            success = self.click_ui_button_detected("inventory_tab", force_detect=True)
+            if success:
+                self.wait("short")
                 return True
-
-            logger.debug(
-                f"Inventory not detected (attempt {attempt + 1}/{max_attempts}). "
-                "Attempting to open..."
-            )
-
-            # First attempt: click inventory button if available, else press ESC
-            # Subsequent attempts: always press ESC to close competing interfaces
-            if attempt == 0:
-                if self.template_service.has_button("inventory_button"):
-                    self.click_ui_button_detected("inventory_button", force_detect=True)
-                else:
-                    pyautogui.press('escape')
             else:
-                pyautogui.press('escape')
-
+                logger.warning("Failed to click inventory tab")
+                return False
+        elif self.template_service.has_button("inventory_button"):
+            success = self.click_ui_button_detected("inventory_button", force_detect=True)
+            if success:
+                self.wait("short")
+                return True
+            else:
+                logger.warning("Failed to click inventory button")
+                return False
+        else:
+            logger.warning("No inventory tab/button configured - pressing ESC as fallback")
+            pyautogui.press('escape')
             self.wait("short")
-
-        logger.error(f"Failed to open inventory after {max_attempts} attempts")
-        return False
+            return True
 
     def drop_item(self, slot: int, shift_drop: bool = False) -> bool:
         """Drop item from inventory slot."""
