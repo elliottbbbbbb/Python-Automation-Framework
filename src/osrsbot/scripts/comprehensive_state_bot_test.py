@@ -502,6 +502,16 @@ class ComprehensiveTestBot(StateMachineBot):
                 self._test_results["inventory_clicking"] = "skipped"
                 return StateResult.SUCCESS
 
+            # Open inventory once at the start
+            logger.info("  Opening inventory...")
+            if not self.actions.ensure_inventory_open():
+                logger.warning("  ! Failed to open inventory")
+                self._test_results["inventory_clicking"] = False
+                return StateResult.FAILURE
+
+            logger.info("  OK Inventory opened")
+            self.actions.wait("short")
+
             # Test clicking several inventory slots
             test_slots = [1, 5, 10, 15, 20, 28]  # Sample slots across inventory
 
@@ -509,9 +519,31 @@ class ComprehensiveTestBot(StateMachineBot):
 
             for slot in test_slots:
                 logger.info(f"  -> Clicking slot {slot}...")
-                success = self.actions.click_inventory_slot_detected(
-                    slot_num=slot,
-                    move_style="curved"
+
+                # Use direct template matching without ensure_inventory_open
+                img_gray = self.state.screen.capture_grayscale()
+                if img_gray is None:
+                    logger.warning(f"    ! Failed to capture screenshot for slot {slot}")
+                    continue
+
+                # Detect inventory grid
+                if not self.actions.template_service.detect_grid("inventory", img_gray, force=True):
+                    logger.warning(f"    ! Inventory grid not detected for slot {slot}")
+                    continue
+
+                # Get slot position
+                position = self.actions.template_service.get_slot_position("inventory", slot - 1)
+                if not position:
+                    logger.warning(f"    ! Failed to get position for slot {slot}")
+                    continue
+
+                # Click the slot
+                rel_x, rel_y = position
+                abs_x, abs_y = self.actions._to_absolute(rel_x, rel_y)
+                success = self.actions.mouse.click_at(
+                    abs_x, abs_y,
+                    move_style="curved",
+                    speed_multiplier=self.actions._get_mouse_speed_multiplier()
                 )
 
                 if success:
