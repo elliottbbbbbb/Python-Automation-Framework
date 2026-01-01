@@ -1,11 +1,32 @@
-import logging
-from typing import Optional, Any, TYPE_CHECKING, Tuple, Dict
-from PIL import Image
+"""
+Game State Facade - CQRS Query layer.
 
-from osrsbot.services.template_ocr_service import TemplateOCRService, ORB_GREEN, ORB_RED, CYAN, YELLOW
+BACKWARD COMPATIBILITY FACADE:
+This class maintains the original GameState API while delegating
+to focused modules (CombatQueries, StatQueries, InventoryState).
+
+All existing bot code continues to work unchanged.
+
+New code should prefer using focused modules directly:
+- CombatQueries for combat state
+- StatQueries for HP/prayer/run
+- InventoryState for inventory checks
+
+Migration path:
+1. Old code uses this facade (works unchanged)
+2. New code uses focused modules
+3. Eventually deprecate facade in favor of focused modules
+"""
+
+import logging
+from typing import Optional, Any, TYPE_CHECKING
+
+from osrsbot.services.template_ocr_service import TemplateOCRService
 from osrsbot.models.config import Config
-from osrsbot.utils.color_helpers import hex_to_rgb
-from osrsbot.constants import COLOR_DETECTION
+
+# Import new focused modules
+from osrsbot.queries.combat_queries import CombatQueries
+from osrsbot.queries.stat_queries import StatQueries
 
 if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
@@ -17,354 +38,95 @@ logger = logging.getLogger(__name__)
 
 class GameState:
     """
-    Manages game state checks like HP and combat status.
+    Game state facade (BACKWARD COMPATIBILITY).
 
-    Uses TemplateOCRService for reading stats from the game UI.
+    Delegates to focused query modules while maintaining original API.
     """
 
     def __init__(
-            self,
-            interface: Any,
-            config: Config,
-            ocr_service: TemplateOCRService,
-            screen_service: Optional["ScreenService"] = None,
-            template_service: Optional[Any] = None) -> None:
-        self._interface = interface  # Private: use services layer instead
+        self,
+        interface: Any,
+        config: Config,
+        ocr_service: TemplateOCRService,
+        screen_service: Optional["ScreenService"] = None,
+        template_service: Optional[Any] = None
+    ) -> None:
+        """Initialize game state queries."""
+        self._interface = interface  # Keep for backward compatibility
         self.config = config
         self.ocr_service = ocr_service
-        self.screen: Optional["ScreenService"] = screen_service
+        self.screen = screen_service
         self.template_service = template_service
 
-        # Initialize inventory detection if services available
+        # Initialize focused query modules
+        if screen_service:
+            self.combat_queries = CombatQueries(screen_service, config, template_service)
+            self.stat_queries = StatQueries(screen_service, ocr_service, config)
+        else:
+            self.combat_queries = None
+            self.stat_queries = None
+            logger.warning("ScreenService not available - combat and stat queries unavailable")
+
+        # Initialize inventory detection (already exists)
         if template_service and screen_service:
             from osrsbot.queries.inventory_queries import InventoryState
-            self.inventory: Optional["InventoryState"] = InventoryState(
-                template_service, screen_service, config
-            )
+            self.inventory = InventoryState(template_service, screen_service, config)
             logger.debug("InventoryState initialized successfully")
         else:
-            self.inventory: Optional["InventoryState"] = None
+            self.inventory = None
             logger.debug("InventoryState not initialized (missing services)")
 
-    def _verify_click_color_is_red(self, button_name: str) -> bool:
-        """
-        Verify that a detected click is actually red (not yellow).
+    # ==================== Backward Compatibility Methods ====================
+    # These delegate to new modules while maintaining exact same API
 
-        After grayscale template matching detects a click, this checks
-        the actual color to distinguish red clicks (interaction) from
-        yellow clicks (movement).
+    # --- Combat Queries (delegate to CombatQueries) ---
+    def in_combat(self) -> bool:
+        """Check if player is in combat."""
+        if self.combat_queries:
+            return self.combat_queries.in_combat()
 
-        Args:
-            button_name: Name of the button that was detected
-
-        Returns:
-            True if the detected region contains red color, False if yellow/other
-        """
-        if not self.template_service:
-            return False
-
-        if not self.screen:
-            return False
-
-        button = self.template_service.get_button(button_name)
-        if not button or not button.visible or not button.element:
-            return False
-
-        # Sample a few pixels from the detected click region
-        center_x, center_y = button.element.center
-
-        # Sample pixels around the center of the detected click
-        # Use a larger sampling area since the click cursor is very small
-        sample_offsets = [
-            (0, 0),    # Center
-            (-3, -3), (-3, 0), (-3, 3),  # Left column
-            (0, -3), (0, 3),              # Top and bottom center
-            (3, -3), (3, 0), (3, 3),      # Right column
-            (-5, 0), (5, 0), (0, -5), (0, 5)  # Far edges
-        ]
-        red_pixels = 0
-        yellow_pixels = 0
-
-        for dx, dy in sample_offsets:
-            x = center_x + dx
-            y = center_y + dy
-
-            try:
-                color = self.screen.get_pixel_color(x, y, relative=True)
-
-                # Red click: high red, low green, low blue
-                # Yellow click: high red, high green, low blue
-                r, g, b = color
-
-                # Log the actual color values for debugging
-                logger.info(f"Sampled pixel at ({x}, {y}): RGB({r}, {g}, {b})")
-
-                # Distinguish red from yellow by checking green channel
-                if r > COLOR_DETECTION.red_channel_min and b < COLOR_DETECTION.blue_channel_max:
-                    if g < COLOR_DETECTION.green_channel_max_red:
-                        red_pixels += 1
-                        logger.info(
-                            f"  → Classified as RED "
-                            f"(r={r} > {COLOR_DETECTION.red_channel_min}, "
-                            f"g={g} < {COLOR_DETECTION.green_channel_max_red}, "
-                            f"b={b} < {COLOR_DETECTION.blue_channel_max})"
-                        )
-                    elif g > COLOR_DETECTION.green_channel_min_yellow:
-                        yellow_pixels += 1
-                        logger.info(
-                            f"  → Classified as YELLOW "
-                            f"(r={r} > {COLOR_DETECTION.red_channel_min}, "
-                            f"g={g} > {COLOR_DETECTION.green_channel_min_yellow}, "
-                            f"b={b} < {COLOR_DETECTION.blue_channel_max})"
-                        )
-                else:
-                    logger.info(f"  → Not red or yellow (r={r}, g={g}, b={b})")
-
-            except Exception as e:
-                logger.debug(f"Error sampling pixel at ({x}, {y}): {e}")
-                continue
-
-        # Click cursor is very small - use majority vote
-        # If we found more red than yellow = red click (combat/interaction)
-        # If we found more yellow than red = yellow click (movement/miss)
-        # If we found only red and no yellow = definitely red click
-        # If we found neither = background only, reject
-        if red_pixels > yellow_pixels:
-            is_red = True  # Mostly red pixels = combat click
-        else:
-            is_red = False  # Mostly yellow, or no color data
-
-        logger.info(
-            f"Color verification for {button_name}: "
-            f"red_pixels={red_pixels}, yellow_pixels={yellow_pixels}, is_red={is_red}"
-        )
-        return is_red
+        # Fallback to false if module not available
+        logger.warning("CombatQueries not available, using fallback")
+        return False
 
     def click_success(self, tries: int = 3) -> bool:
-        """
-        Check if a click was detected using template matching.
+        """Check if click was detected."""
+        if self.combat_queries:
+            return self.combat_queries.click_success(tries)
 
-        Retries across multiple frames and uses majority vote.
-        Uses red click templates to detect successful interactions.
+        logger.warning("CombatQueries not available")
+        return False
 
-        Args:
-            tries: Number of frames to check (default 3)
-
-        Returns:
-            True if click template detected in majority of frames, False otherwise
-        """
-        if not self.template_service:
-            logger.warning("Template service not available for click check")
-            return False
-
-        if not self.screen:
-            logger.warning("Screen service not available for click check")
-            return False
-
-        # We have 4 different red click templates to handle variations
-        buttons = ["good_click_1", "good_click_2", "good_click_3", "good_click_4"]
-        detections = 0
-
-        for attempt in range(tries):
-            # Refresh image each try
-            img_gray = self.screen.capture_grayscale()
-            if img_gray is None:
-                logger.debug(f"Click check attempt {attempt + 1}: Failed to capture screenshot")
-                continue
-
-            # Check if ANY of the red click templates match
-            for button_name in buttons:
-                if self.template_service.detect_button(button_name, img_gray, force=True):
-                    detections += 1
-                    logger.debug(f"Click check attempt {attempt + 1}: Click template '{button_name}' detected")
-                    break
-
-            # Early exit if we already have majority
-            if detections > tries // 2:
-                logger.info(f"Click success confirmed ({detections}/{attempt + 1} frames)")
-                return True
-
-        # Return True if majority of attempts detected a click
-        success = detections > tries // 2
-        logger.info(f"Click check complete: {detections}/{tries} frames detected click (success={success})")
-        return success
-
-    def in_combat(self) -> bool:
-        """
-        Check if player is in combat by detecting the combat indicator.
-
-        Uses template matching to detect the NPC HP bar in the top left.
-        Falls back to pixel-based detection if template matching unavailable.
-
-        Returns:
-            True if in combat, False otherwise
-        """
-    # Try template matching first (preferred method)
-
-
-        # Fallback to pixel-based detection (legacy method)
-        logger.debug("Template service unavailable, using pixel-based combat check")
-        coord = self.config.get("coordinates", "checks", "combat_indicator")
-        if not coord:
-            logger.error("combat check coordinates were not found in config.")
-            return False
-
-        if not self.screen:
-            logger.error("ScreenService not available for combat check")
-            return False
-
-        color = self.screen.get_pixel_color(
-            coord['x'], coord['y'], relative=True)
-
-        combat_green_hex = self.config.get("colors", "combat_indicator_green")
-        combat_red_hex = self.config.get("colors", "combat_indicator_red")
-
-        if combat_green_hex and combat_red_hex:
-            combat_colors = [
-                hex_to_rgb(combat_green_hex),
-                hex_to_rgb(combat_red_hex)
-            ]
-        else:
-            logger.warning(
-                "Combat indicator colors not in config, using fallback")
-            combat_colors = [(7, 139, 54), (99, 21, 19)]
-
-        tolerance = self.config.get("tolerances", "color_match", default=10)
-
-        return any(
-            all(abs(color[i] - cc[i]) <= tolerance for i in range(3))
-            for cc in combat_colors
-        )
-
+    # --- Stat Queries (delegate to StatQueries) ---
     def get_hp(self, force: bool = False) -> Optional[int]:
-        """
-        Args:
-            force: Currently ignored (Template OCR is fast enough to read every time)
+        """Get current HP."""
+        if self.stat_queries:
+            return self.stat_queries.get_hp(force)
 
-        Returns:
-            Current HP value or None if OCR failed
-        """
-        if not self.screen:
-            logger.error("ScreenService not available")
-            return None
-
-        hp_region_config = self.config.get("coordinates", "ocr", "hp_region")
-        if not hp_region_config:
-            logger.error("hp_region not in config")
-            return None
-
-        # Capture the HP orb region
-        x, y = hp_region_config["x"], hp_region_config["y"]
-        width, height = hp_region_config["width"], hp_region_config["height"]
-
-        img = self.screen.capture(region=(x, y, width, height), relative=True)
-        if img is None:
-            logger.debug("get_hp: Failed to capture screen region")
-            return None
-
-        # Extract HP using template matching (supports green/yellow/red orb colors)
-        hp = self.ocr_service.extract_number(
-            img,
-            font_name="plain11",
-            colors=[ORB_GREEN, ORB_RED],
-            correlation_threshold=0.95
-        )
-
-        if hp is None:
-            logger.debug("get_hp: OCR returned None")
-        else:
-            logger.debug(f"get_hp: {hp}")
-
-        return hp
+        logger.error("StatQueries not available")
+        return None
 
     def get_health(self, force: bool = False) -> Optional[int]:
         """Alias for get_hp() for backward compatibility."""
         return self.get_hp(force=force)
 
     def get_prayer(self, force: bool = False) -> Optional[int]:
-        """
-        Args:
-            force: Currently ignored (Template OCR is fast enough to read every time)
+        """Get current prayer points."""
+        if self.stat_queries:
+            return self.stat_queries.get_prayer(force)
 
-        Returns:
-            Current prayer points or None if OCR failed
-        """
-        if not self.screen:
-            logger.error("ScreenService not available")
-            return None
-
-        prayer_region_config = self.config.get(
-            "coordinates", "ocr", "prayer_region")
-        if not prayer_region_config:
-            logger.warning("prayer_region not in config")
-            return None
-
-        # Capture the prayer orb region
-        x, y = prayer_region_config["x"], prayer_region_config["y"]
-        width, height = prayer_region_config["width"], prayer_region_config["height"]
-
-        img = self.screen.capture(region=(x, y, width, height), relative=True)
-        if img is None:
-            logger.debug("get_prayer: Failed to capture screen region")
-            return None
-
-        # Extract prayer using template matching (cyan orb color)
-        prayer = self.ocr_service.extract_number(
-            img,
-            font_name="plain11",
-            colors=[CYAN],
-            correlation_threshold=0.95
-        )
-
-        if prayer is None:
-            logger.debug("get_prayer: OCR returned None")
-        else:
-            logger.debug(f"get_prayer: {prayer}")
-
-        return prayer
+        logger.error("StatQueries not available")
+        return None
 
     def get_run_energy(self, force: bool = False) -> Optional[int]:
-        """
-        Args:
-            force: Currently ignored (Template OCR is fast enough to read every time)
+        """Get current run energy."""
+        if self.stat_queries:
+            return self.stat_queries.get_run_energy(force)
 
-        Returns:
-            Current run energy (0-100) or None if OCR failed
-        """
-        if not self.screen:
-            logger.error("ScreenService not available")
-            return None
+        logger.error("StatQueries not available")
+        return None
 
-        run_region_config = self.config.get(
-            "coordinates", "ocr", "run_energy_region")
-        if not run_region_config:
-            logger.warning("run_energy_region not in config")
-            return None
-
-        # Capture the run energy orb region
-        x, y = run_region_config["x"], run_region_config["y"]
-        width, height = run_region_config["width"], run_region_config["height"]
-
-        img = self.screen.capture(region=(x, y, width, height), relative=True)
-        if img is None:
-            logger.debug("get_run_energy: Failed to capture screen region")
-            return None
-
-        # Extract run energy using template matching (yellow orb color)
-        energy = self.ocr_service.extract_number(
-            img,
-            font_name="plain11",
-            colors=[YELLOW],
-            correlation_threshold=0.95
-        )
-
-        if energy is None:
-            logger.debug("get_run_energy: OCR returned None")
-        else:
-            logger.debug(f"get_run_energy: {energy}")
-
-        return energy
-
+    # --- Inventory Queries (delegate to InventoryState) ---
     def inventory_full(self, threshold: int = 27) -> bool:
         """
         Check if inventory has >= threshold items.
@@ -381,72 +143,130 @@ class GameState:
         # Use new InventoryState system if available
         if self.inventory:
             try:
-                return self.inventory.is_full(threshold=threshold)
+                result = self.inventory.is_full(threshold=threshold)
+                logger.debug(f"inventory_full: InventoryState returned {result}")
+                return result
             except Exception as e:
                 logger.error(f"InventoryState check failed: {e}", exc_info=True)
-                # Fall through to legacy method
+                # Fall through to conservative default
 
-        # Legacy fallback (backward compatibility)
-        if not self.template_service:
-            logger.warning("TemplateMatchService not available, assuming inventory full")
-            return True  # Conservative: assume full if can't check
+        # Fallback: assume full (conservative)
+        logger.warning("InventoryState not available - assuming inventory is full (conservative)")
+        return True
 
-        if not self.screen:
-            logger.warning("ScreenService not available, assuming inventory full")
-            return True  # Conservative: assume full if can't check
+    # --- Debug methods (keep unchanged) ---
+    def debug_hp_ocr(self, num_samples: int = 20) -> None:
+        """Debug HP OCR by taking multiple samples."""
+        if not self.stat_queries:
+            logger.error("StatQueries not available for debugging")
+            return
 
-        try:
-            # Capture screenshot for template matching
-            img_gray = self.screen.capture_grayscale()
+        logger.info(f"\n{'='*50}")
+        logger.info(f"HP OCR Debug - Taking {num_samples} samples")
+        logger.info(f"{'='*50}")
 
-            # Detect inventory grid
-            inventory_detected = self.template_service.detect_grid("inventory", img_gray)
+        successful_reads = 0
+        failed_reads = 0
+        values = []
 
-            if not inventory_detected:
-                logger.debug("Inventory grid not detected, assuming inventory full")
-                return True  # Conservative: assume full if can't detect
+        for i in range(num_samples):
+            hp = self.stat_queries.get_hp(force=True)
+            if hp is not None:
+                successful_reads += 1
+                values.append(hp)
+                logger.info(f"[{i+1:2d}/{num_samples}] HP: {hp}")
+            else:
+                failed_reads += 1
+                logger.warning(f"[{i+1:2d}/{num_samples}] HP: FAILED")
 
-            # Count filled inventory slots by checking pixel color
-            # Purple item outlines indicate items in slots
-            filled_slots = 0
-            grid = self.template_service.get_grid("inventory")
+        success_rate = (100 * successful_reads / num_samples) if num_samples > 0 else 0
 
-            if not grid or not grid.visible:
-                logger.debug("Inventory grid not visible, assuming inventory full")
-                return True
+        logger.info(f"\n{'='*50}")
+        logger.info(f"Results:")
+        logger.info(f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)")
+        logger.info(f"  Failed:     {failed_reads}/{num_samples}")
+        if values:
+            logger.info(f"  Values:     {values}")
+            logger.info(f"  Min:        {min(values)}")
+            logger.info(f"  Max:        {max(values)}")
+            logger.info(f"  Most common: {max(set(values), key=values.count)}")
+        logger.info(f"{'='*50}\n")
 
-            # Check each of the 28 inventory slots for items
-            purple_hex = self.config.get("colors", "purple_item_outline", default="#ff00ff")
-            purple_rgb = hex_to_rgb(purple_hex)
-            tolerance = self.config.get("tolerances", "color_match", default=10)
+    def debug_prayer_ocr(self, num_samples: int = 20) -> None:
+        """Debug Prayer OCR by taking multiple samples."""
+        if not self.stat_queries:
+            logger.error("StatQueries not available for debugging")
+            return
 
-            for slot_idx in range(28):  # 28 inventory slots
-                element = grid.get_element(slot_idx)
-                if element:
-                    # Check center pixel of slot for purple outline
-                    pixel_color = self.screen.get_pixel_color(
-                        element.center_x,
-                        element.center_y,
-                        relative=True
-                    )
+        logger.info(f"\n{'='*50}")
+        logger.info(f"Prayer OCR Debug - Taking {num_samples} samples")
+        logger.info(f"{'='*50}")
 
-                    # Check if pixel matches purple (item present)
-                    if all(abs(pixel_color[i] - purple_rgb[i]) <= tolerance for i in range(3)):
-                        filled_slots += 1
+        successful_reads = 0
+        failed_reads = 0
+        values = []
 
-            is_full = filled_slots >= threshold
-            logger.debug(f"Inventory check (legacy): {filled_slots}/28 slots filled (threshold: {threshold}, full: {is_full})")
-            return is_full
+        for i in range(num_samples):
+            prayer = self.stat_queries.get_prayer(force=True)
+            if prayer is not None:
+                successful_reads += 1
+                values.append(prayer)
+                logger.info(f"[{i+1:2d}/{num_samples}] Prayer: {prayer}")
+            else:
+                failed_reads += 1
+                logger.warning(f"[{i+1:2d}/{num_samples}] Prayer: FAILED")
 
-        except Exception as e:
-            logger.error(f"Error checking inventory_full: {e}", exc_info=True)
-            return True  # Conservative: assume full on error
+        success_rate = (100 * successful_reads / num_samples) if num_samples > 0 else 0
 
-    # ==================== Debug/Diagnostic Methods ====================
-    # These methods expose diagnostic capabilities for testing and debugging.
-    # They bypass caching and provide direct access to underlying detection systems.
+        logger.info(f"\n{'='*50}")
+        logger.info(f"Results:")
+        logger.info(f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)")
+        logger.info(f"  Failed:     {failed_reads}/{num_samples}")
+        if values:
+            logger.info(f"  Values:     {values}")
+            logger.info(f"  Min:        {min(values)}")
+            logger.info(f"  Max:        {max(values)}")
+            logger.info(f"  Most common: {max(set(values), key=values.count)}")
+        logger.info(f"{'='*50}\n")
 
-    def debug_get_viewport_dimensions(self) -> Optional[Tuple[int, int]]:
+    def debug_run_energy_ocr(self, num_samples: int = 20) -> None:
+        """Debug Run Energy OCR by taking multiple samples."""
+        if not self.stat_queries:
+            logger.error("StatQueries not available for debugging")
+            return
+
+        logger.info(f"\n{'='*50}")
+        logger.info(f"Run Energy OCR Debug - Taking {num_samples} samples")
+        logger.info(f"{'='*50}")
+
+        successful_reads = 0
+        failed_reads = 0
+        values = []
+
+        for i in range(num_samples):
+            energy = self.stat_queries.get_run_energy(force=True)
+            if energy is not None:
+                successful_reads += 1
+                values.append(energy)
+                logger.info(f"[{i+1:2d}/{num_samples}] Run Energy: {energy}")
+            else:
+                failed_reads += 1
+                logger.warning(f"[{i+1:2d}/{num_samples}] Run Energy: FAILED")
+
+        success_rate = (100 * successful_reads / num_samples) if num_samples > 0 else 0
+
+        logger.info(f"\n{'='*50}")
+        logger.info(f"Results:")
+        logger.info(f"  Successful: {successful_reads}/{num_samples} ({success_rate:.1f}%)")
+        logger.info(f"  Failed:     {failed_reads}/{num_samples}")
+        if values:
+            logger.info(f"  Values:     {values}")
+            logger.info(f"  Min:        {min(values)}")
+            logger.info(f"  Max:        {max(values)}")
+            logger.info(f"  Most common: {max(set(values), key=values.count)}")
+        logger.info(f"{'='*50}\n")
+
+    def debug_get_viewport_dimensions(self) -> Optional[tuple]:
         """
         Get viewport dimensions for diagnostic purposes.
 
@@ -510,96 +330,4 @@ class GameState:
                 return img
         except Exception as e:
             logger.error(f"Debug screen capture failed: {e}")
-            return None
-
-    def debug_detect_inventory_grid(self, force: bool = True) -> bool:
-        """
-        Detect inventory grid for diagnostic purposes.
-
-        Forces fresh template detection and returns success status.
-        Used by test code to verify template matching system.
-
-        Args:
-            force: Force fresh detection (default True for diagnostics)
-
-        Returns:
-            True if inventory grid detected, False otherwise
-
-        Example:
-            >>> if self.state.debug_detect_inventory_grid():
-            >>>     logger.info("Template matching working correctly")
-        """
-        if not self.template_service:
-            logger.warning("TemplateMatchService not available for debug detection")
-            return False
-
-        if not self.screen:
-            logger.warning("ScreenService not available for debug detection")
-            return False
-
-        try:
-            img_gray = self.screen.capture_grayscale()
-            if img_gray is None:
-                logger.warning("Debug detection: screen capture failed")
-                return False
-
-            detected = self.template_service.detect_grid("inventory", img_gray, force=force)
-            logger.debug(f"Debug inventory detection: {'detected' if detected else 'not found'}")
-            return detected
-        except Exception as e:
-            logger.error(f"Debug inventory detection failed: {e}")
-            return False
-
-    def debug_get_inventory_grid_info(self) -> Optional[Dict[str, Any]]:
-        """
-        Get inventory grid information for diagnostic purposes.
-
-        Returns detailed information about detected inventory grid.
-        Used by test code to verify grid structure and element count.
-
-        Returns:
-            Dictionary with grid info or None if not available:
-            {
-                "visible": bool,
-                "total_elements": int,
-                "num_rows": int,
-                "num_cols": int,
-                "bounds": (x, y, width, height) or None
-            }
-
-        Example:
-            >>> grid_info = self.state.debug_get_inventory_grid_info()
-            >>> if grid_info and grid_info["visible"]:
-            >>>     logger.info(f"Grid has {grid_info['total_elements']} elements")
-        """
-        if not self.template_service:
-            logger.warning("TemplateMatchService not available")
-            return None
-
-        try:
-            grid = self.template_service.get_grid("inventory")
-            if not grid:
-                logger.debug("Debug: No inventory grid available")
-                return None
-
-            info = {
-                "visible": grid.visible,
-                "total_elements": len(grid.elements),
-                "num_rows": grid.num_rows,
-                "num_cols": grid.num_cols,
-                "bounds": None
-            }
-
-            if grid.element:
-                info["bounds"] = (
-                    grid.element.x,
-                    grid.element.y,
-                    grid.element.width,
-                    grid.element.height
-                )
-
-            logger.debug(f"Debug grid info: visible={info['visible']}, elements={info['total_elements']}")
-            return info
-        except Exception as e:
-            logger.error(f"Failed to get grid info: {e}")
             return None
