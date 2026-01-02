@@ -4,9 +4,10 @@ Shared pytest fixtures for OSRSbot testing.
 Provides mock objects and test data for unit tests.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
+
 import numpy as np
+import pytest
 from PIL import Image
 
 
@@ -59,10 +60,7 @@ def mock_screen():
     screen.capture_grayscale.return_value = np.zeros((100, 100), dtype=np.uint8)
     screen.get_pixel_color.return_value = (255, 0, 0)
     screen.find_color.return_value = [(50, 50), (75, 75)]
-    screen.find_color_with_distance.return_value = [
-        ((50, 50), 10.0),
-        ((75, 75), 20.0)
-    ]
+    screen.find_color_with_distance.return_value = [((50, 50), 10.0), ((75, 75), 20.0)]
     return screen
 
 
@@ -118,7 +116,7 @@ def sample_screenshot():
     - Bottom-right (50x50): Blue
     """
     arr = np.zeros((200, 200, 3), dtype=np.uint8)
-    arr[50:100, 50:100] = [255, 0, 0]    # Red square
+    arr[50:100, 50:100] = [255, 0, 0]  # Red square
     arr[100:150, 100:150] = [0, 255, 0]  # Green square
     arr[150:200, 150:200] = [0, 0, 255]  # Blue square
     return Image.fromarray(arr)
@@ -163,21 +161,12 @@ def sample_config_dict():
     """
     return {
         "timings": {
-            "wait": {
-                "short": [0.1, 0.3],
-                "medium": [0.3, 0.6],
-                "long": [0.6, 1.0]
-            }
+            "wait": {"short": [0.1, 0.3], "medium": [0.3, 0.6], "long": [0.6, 1.0]}
         },
         "coordinates": {
             "hp": {"x": 100, "y": 50, "width": 30, "height": 15},
-            "prayer": {"x": 100, "y": 70, "width": 30, "height": 15}
+            "prayer": {"x": 100, "y": 70, "width": 30, "height": 15},
         },
-        "colors": {
-            "combat_red": "#631513",
-            "combat_green": "#078B36"
-        },
-        "tolerances": {
-            "color_match": 10
-        }
+        "colors": {"combat_red": "#631513", "combat_green": "#078B36"},
+        "tolerances": {"color_match": 10},
     }

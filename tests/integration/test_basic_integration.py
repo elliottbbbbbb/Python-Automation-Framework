@@ -4,16 +4,17 @@ Basic integration tests
 Tests integration between multiple components.
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from PIL import Image
 
+from osrsbot.commands.game_actions import GameActions
 from osrsbot.core.game_interface import GameInterface
+from osrsbot.models.config import Config
+from osrsbot.queries.game_queries import GameState
 from osrsbot.services.mouse_service import MouseService
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.commands.game_actions import GameActions
-from osrsbot.queries.game_queries import GameState
-from osrsbot.models.config import Config
 
 
 class TestServiceIntegration:
@@ -53,9 +54,9 @@ class TestServiceIntegration:
         config.get = Mock(return_value="#ff0000")
 
         # Action should use screen service
-        with patch.object(actions, 'click_color') as mock_click:
+        with patch.object(actions, "click_color") as mock_click:
             mock_click.return_value = True
-            result = actions.click_color("target")
+            actions.click_color("target")
 
             # Integration verified
             assert mock_click.called
@@ -112,9 +113,9 @@ class TestConfigurationFlow:
 class TestEndToEndScenario:
     """Test end-to-end scenarios"""
 
-    @patch('pyautogui.screenshot')
-    @patch('pyautogui.moveTo')
-    @patch('pyautogui.click')
+    @patch("pyautogui.screenshot")
+    @patch("pyautogui.moveTo")
+    @patch("pyautogui.click")
     def test_find_and_click_workflow(
         self, mock_click, mock_move, mock_screenshot, integration_setup
     ):
@@ -122,19 +123,19 @@ class TestEndToEndScenario:
         interface, config, mouse, screen = integration_setup
 
         # Create test image with colored pixel
-        test_img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        test_img = Image.new("RGB", (100, 100), color=(255, 255, 255))
         test_img.putpixel((50, 50), (0, 255, 0))  # Green pixel
         mock_screenshot.return_value = test_img
 
         # Create actions
         state = Mock(spec=GameState)
-        actions = GameActions(interface, config, mouse, screen, state)
+        GameActions(interface, config, mouse, screen, state)
 
         config.get = Mock(return_value="#00ff00")
 
         # Execute: find color and click
         # This tests the full workflow
-        with patch.object(screen, 'find_color') as mock_find:
+        with patch.object(screen, "find_color") as mock_find:
             color_match = Mock(x=50, y=50)
             mock_find.return_value = color_match
 
@@ -143,6 +144,7 @@ class TestEndToEndScenario:
 
 
 # Fixtures
+
 
 @pytest.fixture
 def integration_setup():
@@ -165,7 +167,7 @@ def integration_setup():
 @pytest.fixture
 def sample_game_screenshot():
     """Create sample game screenshot for testing"""
-    img = Image.new('RGB', (800, 600), color=(100, 150, 100))
+    img = Image.new("RGB", (800, 600), color=(100, 150, 100))
 
     # Add some game-like elements
     img.putpixel((400, 300), (0, 255, 0))  # Green NPC

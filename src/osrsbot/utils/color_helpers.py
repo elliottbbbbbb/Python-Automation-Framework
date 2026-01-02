@@ -3,6 +3,7 @@ Color utility functions for RGB/Hex conversion and color matching.
 
 Provides shared color manipulation utilities used across services and queries.
 """
+
 from typing import Tuple
 
 
@@ -22,8 +23,8 @@ def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
         >>> hex_to_rgb("00FF00")
         (0, 255, 0)
     """
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))  # type: ignore
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore
 
 
 def rgb_to_hex(r: int, g: int, b: int) -> str:
@@ -66,9 +67,7 @@ def color_distance(color1: Tuple[int, int, int], color2: Tuple[int, int, int]) -
 
 
 def colors_match(
-    color1: Tuple[int, int, int],
-    color2: Tuple[int, int, int],
-    tolerance: int = 10
+    color1: Tuple[int, int, int], color2: Tuple[int, int, int], tolerance: int = 10
 ) -> bool:
     """
     Check if two colors match within tolerance.

@@ -2,24 +2,26 @@
 Test script for template-based OCR service.
 Tests HP extraction using kellton's template matching approach.
 """
-import sys
+
 import logging
+import sys
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from osrsbot.services.template_ocr_service import (
-    TemplateOCRService,
-    ORB_GREEN,
-    ORB_RED,
-)
-import pyautogui
 import cv2
 import numpy as np
+import pyautogui
+
+from osrsbot.services.template_ocr_service import (
+    ORB_GREEN,
+    ORB_RED,
+    TemplateOCRService,
+)
 
 # Setup logging
-logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +57,7 @@ def test_hp_extraction():
         img_np,
         font_name="plain11",
         colors=[ORB_GREEN, ORB_RED],
-        correlation_threshold=0.98
+        correlation_threshold=0.98,
     )
 
     print(f"Template OCR Result: {result}")
@@ -65,7 +67,7 @@ def test_hp_extraction():
         img_np,
         font_name="plain11",
         colors=[ORB_GREEN, ORB_RED],
-        correlation_threshold=0.98
+        correlation_threshold=0.98,
     )
     print(f"Template OCR Text: '{text_result}'")
 

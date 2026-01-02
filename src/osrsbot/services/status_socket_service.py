@@ -3,9 +3,10 @@ StatusSocketService - Reads live player position and camera data from RuneLite/O
 
 Monitors live_data.json written by the Status Socket plugin for real-time game state.
 """
+
 import json
-import time
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PlayerState:
     """Player state data from Status Socket plugin."""
+
     world_x: int
     world_y: int
     plane: int
@@ -76,21 +78,21 @@ class StatusSocketService:
                 return self._last_state
 
             # Read and parse JSON
-            with open(self.data_file, 'r') as f:
+            with open(self.data_file, "r") as f:
                 data = json.load(f)
 
             # Extract player state
-            world_point = data.get('worldPoint', {})
-            camera = data.get('camera', {})
+            world_point = data.get("worldPoint", {})
+            camera = data.get("camera", {})
 
             state = PlayerState(
-                world_x=world_point.get('x', 0),
-                world_y=world_point.get('y', 0),
-                plane=world_point.get('plane', 0),
-                camera_yaw=camera.get('yaw', 0),
+                world_x=world_point.get("x", 0),
+                world_y=world_point.get("y", 0),
+                plane=world_point.get("plane", 0),
+                camera_yaw=camera.get("yaw", 0),
                 timestamp=time.time(),
-                is_moving=data.get('isMoving', False),
-                animation_id=data.get('animation', -1)
+                is_moving=data.get("isMoving", False),
+                animation_id=data.get("animation", -1),
             )
 
             # Update cache
@@ -103,7 +105,9 @@ class StatusSocketService:
             return state
 
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse Status Socket JSON: {e}. Using last known state.")
+            logger.warning(
+                f"Failed to parse Status Socket JSON: {e}. Using last known state."
+            )
             return self._last_state
         except Exception as e:
             logger.error(f"Error reading Status Socket data: {e}")
@@ -132,11 +136,7 @@ class StatusSocketService:
         return True
 
     def wait_for_arrival(
-        self,
-        target_x: int,
-        target_y: int,
-        tolerance: int = 2,
-        timeout: float = 10.0
+        self, target_x: int, target_y: int, tolerance: int = 2, timeout: float = 10.0
     ) -> bool:
         """
         Poll until player reaches target coordinates or timeout.
@@ -163,8 +163,7 @@ class StatusSocketService:
 
             # Calculate distance to target
             distance = self._calculate_distance(
-                state.world_x, state.world_y,
-                target_x, target_y
+                state.world_x, state.world_y, target_x, target_y
             )
 
             # Arrived!
@@ -201,4 +200,4 @@ class StatusSocketService:
 
     def _calculate_distance(self, x1: int, y1: int, x2: int, y2: int) -> float:
         """Calculate Euclidean distance between two points."""
-        return ((x2 - x1)**2 + (y2 - y1)**2)**0.5
+        return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5

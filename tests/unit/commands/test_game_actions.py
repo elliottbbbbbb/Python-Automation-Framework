@@ -4,15 +4,16 @@ Unit tests for GameActions (CQRS Commands)
 Tests high-level game action commands.
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock, call
 
 from osrsbot.commands.game_actions import GameActions
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
+from osrsbot.queries.game_queries import GameState
 from osrsbot.services.mouse_service import MouseService
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.queries.game_queries import GameState
 
 
 class TestGameActionsInitialization:
@@ -23,11 +24,7 @@ class TestGameActionsInitialization:
     ):
         """Test GameActions initializes with all dependencies"""
         actions = GameActions(
-            mock_interface,
-            mock_config,
-            mock_mouse,
-            mock_screen,
-            mock_state
+            mock_interface, mock_config, mock_mouse, mock_screen, mock_state
         )
 
         assert actions.interface == mock_interface
@@ -74,7 +71,9 @@ class TestGameActionsClickCoordinate:
 class TestGameActionsClickColor:
     """Test clicking at colored elements"""
 
-    def test_click_color_found(self, game_actions, mock_config, mock_screen, mock_mouse):
+    def test_click_color_found(
+        self, game_actions, mock_config, mock_screen, mock_mouse
+    ):
         """Test clicking when color is found"""
         # Configure color
         mock_config.get.return_value = "#00ff00"
@@ -109,7 +108,7 @@ class TestGameActionsClickColor:
         """Test clicking color with custom tolerance"""
         mock_config.get.side_effect = lambda *args: {
             ("colors", "target"): "#ff0000",
-            ("color_detection", "tolerance"): 15
+            ("color_detection", "tolerance"): 15,
         }.get(args, 10)
 
         color_match = Mock()
@@ -130,7 +129,7 @@ class TestGameActionsWait:
         """Test short wait timing"""
         mock_config.get.return_value = [0.4, 0.7]
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             game_actions.wait("short")
 
             mock_sleep.assert_called_once()
@@ -142,7 +141,7 @@ class TestGameActionsWait:
         """Test medium wait timing"""
         mock_config.get.return_value = [0.8, 1.3]
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             game_actions.wait("medium")
 
             mock_sleep.assert_called_once()
@@ -153,7 +152,7 @@ class TestGameActionsWait:
         """Test long wait timing"""
         mock_config.get.return_value = [2.5, 3.8]
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             game_actions.wait("long")
 
             mock_sleep.assert_called_once()
@@ -164,7 +163,7 @@ class TestGameActionsWait:
         """Test custom timing type"""
         mock_config.get.return_value = [5.0, 10.0]
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             game_actions.wait("custom_timing")
 
             mock_sleep.assert_called_once()
@@ -191,9 +190,7 @@ class TestGameActionsWalkToMarker:
         mock_mouse.move_to.assert_called_once()
         mock_mouse.click.assert_called_once()
 
-    def test_walk_to_marker_not_found(
-        self, game_actions, mock_config, mock_screen
-    ):
+    def test_walk_to_marker_not_found(self, game_actions, mock_config, mock_screen):
         """Test walking when marker not found"""
         mock_config.get.return_value = "#fcfc01"
         mock_screen.find_color.return_value = None
@@ -236,7 +233,7 @@ class TestGameActionsIntegration:
         color_match = Mock(x=100, y=100)
         mock_screen.find_color.return_value = color_match
 
-        with patch('time.sleep') as mock_sleep:
+        with patch("time.sleep") as mock_sleep:
             game_actions.click_color("target")
             game_actions.wait("short")
 
@@ -271,6 +268,7 @@ class TestGameActionsErrorHandling:
 
 
 # Fixtures
+
 
 @pytest.fixture
 def mock_interface():
@@ -312,10 +310,4 @@ def mock_state():
 @pytest.fixture
 def game_actions(mock_interface, mock_config, mock_mouse, mock_screen, mock_state):
     """Create GameActions instance for testing"""
-    return GameActions(
-        mock_interface,
-        mock_config,
-        mock_mouse,
-        mock_screen,
-        mock_state
-    )
+    return GameActions(mock_interface, mock_config, mock_mouse, mock_screen, mock_state)

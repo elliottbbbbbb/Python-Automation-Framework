@@ -2,8 +2,10 @@
 Diagnostic script to test Interception driver setup.
 Run this to diagnose why Interception isn't working.
 """
-import sys
+
 import os
+import sys
+
 from dotenv import load_dotenv
 
 # Load .env file
@@ -23,9 +25,12 @@ print(f"  Will use interception: {use_interception.lower() in ('1', 'true', 'yes
 print("\n[TEST 2] Python Package Check")
 try:
     import interception
+
     print("  OK interception-python package is installed")
     print(f"  Package location: {interception.__file__}")
-    print(f"  Package version: {interception.__version__ if hasattr(interception, '__version__') else 'unknown'}")
+    print(
+        f"  Package version: {interception.__version__ if hasattr(interception, '__version__') else 'unknown'}"
+    )
 except ImportError as e:
     print(f"  X interception-python package NOT installed")
     print(f"  Error: {e}")
@@ -36,6 +41,7 @@ except ImportError as e:
 print("\n[TEST 3] Driver Initialization (New API)")
 try:
     from interception import Interception
+
     print("  -> Creating Interception context...")
     context = Interception()
 
@@ -69,8 +75,9 @@ except Exception as e:
 # Test 4: Try to move mouse
 print("\n[TEST 4] Test Mouse Movement")
 try:
-    from interception import move_to
     import pyautogui
+
+    from interception import move_to
 
     current_x, current_y = pyautogui.position()
     print(f"  -> Current position: ({current_x}, {current_y})")

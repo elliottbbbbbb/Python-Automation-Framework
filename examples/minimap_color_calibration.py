@@ -8,7 +8,6 @@ specific OSRS client setup.
 import cv2
 import numpy as np
 import pyautogui
-from PIL import Image
 
 
 def main():
@@ -56,12 +55,9 @@ def capture_minimap(center_x: int, center_y: int, radius: int) -> np.ndarray:
         Minimap image as numpy array (BGR)
     """
     # Capture region
-    screenshot = pyautogui.screenshot(region=(
-        center_x - radius,
-        center_y - radius,
-        radius * 2,
-        radius * 2
-    ))
+    screenshot = pyautogui.screenshot(
+        region=(center_x - radius, center_y - radius, radius * 2, radius * 2)
+    )
 
     # Convert to numpy array (BGR for OpenCV)
     img = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
@@ -81,8 +77,10 @@ def analyze_colors(minimap_img: np.ndarray):
     gray = cv2.cvtColor(minimap_img, cv2.COLOR_BGR2GRAY)
 
     print("Color Statistics:")
-    print(f"  BGR - Min: {minimap_img.min(axis=(0,1))}, Max: {minimap_img.max(axis=(0,1))}")
-    print(f"  HSV - Min: {hsv.min(axis=(0,1))}, Max: {hsv.max(axis=(0,1))}")
+    print(
+        f"  BGR - Min: {minimap_img.min(axis=(0, 1))}, Max: {minimap_img.max(axis=(0, 1))}"
+    )
+    print(f"  HSV - Min: {hsv.min(axis=(0, 1))}, Max: {hsv.max(axis=(0, 1))}")
     print(f"  Grayscale - Min: {gray.min()}, Max: {gray.max()}")
 
     # Find dominant colors
@@ -102,7 +100,9 @@ def analyze_colors(minimap_img: np.ndarray):
         count = counts[idx]
         percentage = 100 * count / pixels.shape[0]
 
-        print(f"  {i+1}. BGR({color[0]:3d}, {color[1]:3d}, {color[2]:3d}) - {percentage:.1f}%")
+        print(
+            f"  {i + 1}. BGR({color[0]:3d}, {color[1]:3d}, {color[2]:3d}) - {percentage:.1f}%"
+        )
 
 
 def interactive_color_picker(minimap_img: np.ndarray):
@@ -124,10 +124,7 @@ def interactive_color_picker(minimap_img: np.ndarray):
             rgb = (bgr[2], bgr[1], bgr[0])
 
             # Convert to HSV
-            hsv = cv2.cvtColor(
-                np.uint8([[bgr]]),
-                cv2.COLOR_BGR2HSV
-            )[0][0]
+            hsv = cv2.cvtColor(np.uint8([[bgr]]), cv2.COLOR_BGR2HSV)[0][0]
 
             print(f"Clicked at ({x}, {y}):")
             print(f"  BGR: ({bgr[0]}, {bgr[1]}, {bgr[2]})")
@@ -157,7 +154,8 @@ def interactive_color_picker(minimap_img: np.ndarray):
 
     print("\nSuggested color ranges based on your samples:")
     print("(Update these in minimap_service.py)")
-    print("""
+    print(
+        """
 WALKABLE_COLORS = {
     'grass': [(40, 80, 40), (80, 150, 80)],      # Light green grass
     'path': [(60, 60, 40), (100, 100, 70)],      # Brown/tan paths
@@ -167,7 +165,8 @@ NON_WALKABLE_COLORS = {
     'tree': [(20, 40, 20), (40, 70, 40)],        # Dark green trees
     'wall': [(30, 30, 30), (60, 60, 60)],        # Gray walls
 }
-    """)
+    """
+    )
 
 
 def generate_color_masks(minimap_img: np.ndarray):

@@ -4,10 +4,12 @@ Based on OS-Bot-COLOR's OCR implementation - much faster and more accurate than 
 
 Uses template matching with correlation threshold instead of machine learning OCR.
 """
-import pathlib
+
 import logging
+import pathlib
 from operator import itemgetter
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
+
 import cv2
 import numpy as np
 from PIL import Image
@@ -22,6 +24,7 @@ class Color:
     Converts RGB colors to BGR to satisfy OpenCV's color format.
     Colors are specified in RGB but reversed to BGR internally.
     """
+
     def __init__(self, lower: tuple, upper: tuple = None):
         # Reverse RGB to BGR for OpenCV
         self.lower = np.array(lower[::-1], dtype=np.uint8)
@@ -137,7 +140,7 @@ class TemplateOCRService:
         image: np.ndarray,
         font_name: str = "plain11",
         colors: Optional[List[Color]] = None,
-        correlation_threshold: float = 0.98
+        correlation_threshold: float = 0.98,
     ) -> str:
         """
         Extracts text from an image using template matching.
@@ -178,7 +181,9 @@ class TemplateOCRService:
                 template_slice = template[1:]
 
             try:
-                correlation = cv2.matchTemplate(image, template_slice, cv2.TM_CCOEFF_NORMED)
+                correlation = cv2.matchTemplate(
+                    image, template_slice, cv2.TM_CCOEFF_NORMED
+                )
                 y_mins, x_mins = np.where(correlation >= correlation_threshold)
 
                 # Add each instance of this character
@@ -200,7 +205,7 @@ class TemplateOCRService:
         image: np.ndarray,
         font_name: str = "plain11",
         colors: Optional[List[Color]] = None,
-        correlation_threshold: float = 0.98
+        correlation_threshold: float = 0.98,
     ) -> Optional[int]:
         """
         Extracts a number from an image.

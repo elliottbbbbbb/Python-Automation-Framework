@@ -6,11 +6,10 @@ Demonstrates:
 - Fallback to config if template matching unavailable
 - Works for all 28 slots (not just first 4)
 """
+
 import logging
+
 from osrsbot.models.config import Config
-from osrsbot.queries.game_queries import GameState
-from osrsbot.core.game_interface import GameInterface
-from osrsbot.core.runner import ScriptRunner
 
 logger = logging.getLogger(__name__)
 
@@ -163,11 +162,11 @@ def main():
     """Run examples."""
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     config = Config()
-    window_title = config.get_window_title()
+    config.get_window_title()
 
     print("\n" + "=" * 60)
     print("CLICK INVENTORY SLOT - NEW SYSTEM")

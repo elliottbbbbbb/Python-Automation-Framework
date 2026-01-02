@@ -2,4 +2,4 @@
 
 from osrsbot.app.calibration import Calibrator
 
-__all__ = ['Calibrator']
+__all__ = ["Calibrator"]

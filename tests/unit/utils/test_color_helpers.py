@@ -4,12 +4,12 @@ Unit tests for color_helpers utility functions.
 Tests RGB/hex conversion, color distance calculation, and color matching.
 """
 
-import pytest
+
 from osrsbot.utils.color_helpers import (
+    color_distance,
+    colors_match,
     hex_to_rgb,
     rgb_to_hex,
-    color_distance,
-    colors_match
 )
 
 

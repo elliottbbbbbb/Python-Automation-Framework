@@ -12,27 +12,29 @@ States:
     BANKING - Deposit loot, withdraw food
     RECOVERY - Failover state for error recovery
 """
+
 import logging
-import time
 import random
+import time
 from enum import Enum
 from typing import Dict, List
 
-from osrsbot.core.state_machine_bot import StateMachineBot
-from osrsbot.core.state_helpers import build_metadata_dict
-from osrsbot.core.state_types import (
-    StateResult,
-    StateMetadata,
-    StateTransition,
-    StateExecutionContext
-)
 from osrsbot.constants import GAME_TIMING
+from osrsbot.core.state_helpers import build_metadata_dict
+from osrsbot.core.state_machine_bot import StateMachineBot
+from osrsbot.core.state_types import (
+    StateExecutionContext,
+    StateMetadata,
+    StateResult,
+    StateTransition,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class GreenDragonsStates(Enum):
     """States for Green Dragons farming bot."""
+
     IDLE = "idle"
     TELEPORT_TO_DRAGONS = "teleport_to_dragons"
     NAVIGATE_TO_SPOT = "navigate_to_spot"
@@ -74,52 +76,55 @@ class GreenDragonsStateMachineBot(StateMachineBot):
 
         Configures retry limits, timeouts, and failover behavior.
         """
-        return build_metadata_dict(GreenDragonsStates, {
-            GreenDragonsStates.IDLE: {
-                "name": "Idle",
-                "description": "Initial state, safety checks",
-                "max_retries": 1,
+        return build_metadata_dict(
+            GreenDragonsStates,
+            {
+                GreenDragonsStates.IDLE: {
+                    "name": "Idle",
+                    "description": "Initial state, safety checks",
+                    "max_retries": 1,
+                },
+                GreenDragonsStates.TELEPORT_TO_DRAGONS: {
+                    "name": "Teleport to Dragons",
+                    "description": "Use wilderness obelisk teleport",
+                    "max_retries": 2,
+                    "timeout": 30.0,
+                    "failover": GreenDragonsStates.RECOVERY,
+                },
+                GreenDragonsStates.NAVIGATE_TO_SPOT: {
+                    "name": "Navigate to Spot",
+                    "description": "Walk to dragon spawn, drink potions",
+                    "max_retries": 2,
+                    "timeout": 45.0,
+                    "failover": GreenDragonsStates.RECOVERY,
+                },
+                GreenDragonsStates.COMBAT: {
+                    "name": "Combat",
+                    "description": "Kill dragons until inventory full",
+                    "max_retries": 1,
+                    "timeout": 600.0,
+                    "failover": GreenDragonsStates.TELEPORT_TO_BANK,
+                },
+                GreenDragonsStates.TELEPORT_TO_BANK: {
+                    "name": "Teleport to Bank",
+                    "description": "Varrock teleport",
+                    "max_retries": 2,
+                    "timeout": 30.0,
+                    "failover": GreenDragonsStates.RECOVERY,
+                },
+                GreenDragonsStates.BANKING: {
+                    "name": "Banking",
+                    "description": "Deposit loot, withdraw food",
+                    "timeout": 60.0,
+                    "failover": GreenDragonsStates.RECOVERY,
+                },
+                GreenDragonsStates.RECOVERY: {
+                    "name": "Recovery",
+                    "description": "Failover state for error recovery",
+                    "max_retries": 2,
+                },
             },
-            GreenDragonsStates.TELEPORT_TO_DRAGONS: {
-                "name": "Teleport to Dragons",
-                "description": "Use wilderness obelisk teleport",
-                "max_retries": 2,
-                "timeout": 30.0,
-                "failover": GreenDragonsStates.RECOVERY,
-            },
-            GreenDragonsStates.NAVIGATE_TO_SPOT: {
-                "name": "Navigate to Spot",
-                "description": "Walk to dragon spawn, drink potions",
-                "max_retries": 2,
-                "timeout": 45.0,
-                "failover": GreenDragonsStates.RECOVERY,
-            },
-            GreenDragonsStates.COMBAT: {
-                "name": "Combat",
-                "description": "Kill dragons until inventory full",
-                "max_retries": 1,
-                "timeout": 600.0,
-                "failover": GreenDragonsStates.TELEPORT_TO_BANK,
-            },
-            GreenDragonsStates.TELEPORT_TO_BANK: {
-                "name": "Teleport to Bank",
-                "description": "Varrock teleport",
-                "max_retries": 2,
-                "timeout": 30.0,
-                "failover": GreenDragonsStates.RECOVERY,
-            },
-            GreenDragonsStates.BANKING: {
-                "name": "Banking",
-                "description": "Deposit loot, withdraw food",
-                "timeout": 60.0,
-                "failover": GreenDragonsStates.RECOVERY,
-            },
-            GreenDragonsStates.RECOVERY: {
-                "name": "Recovery",
-                "description": "Failover state for error recovery",
-                "max_retries": 2,
-            },
-        })
+        )
 
     def define_transitions(self) -> List[StateTransition]:
         """
@@ -132,32 +137,27 @@ class GreenDragonsStateMachineBot(StateMachineBot):
         return [
             # Main flow
             StateTransition(
-                GreenDragonsStates.IDLE,
-                GreenDragonsStates.TELEPORT_TO_DRAGONS
+                GreenDragonsStates.IDLE, GreenDragonsStates.TELEPORT_TO_DRAGONS
             ),
             StateTransition(
                 GreenDragonsStates.TELEPORT_TO_DRAGONS,
-                GreenDragonsStates.NAVIGATE_TO_SPOT
-            ),
-            StateTransition(
                 GreenDragonsStates.NAVIGATE_TO_SPOT,
-                GreenDragonsStates.COMBAT
             ),
             StateTransition(
-                GreenDragonsStates.COMBAT,
-                GreenDragonsStates.TELEPORT_TO_BANK
+                GreenDragonsStates.NAVIGATE_TO_SPOT, GreenDragonsStates.COMBAT
             ),
             StateTransition(
-                GreenDragonsStates.TELEPORT_TO_BANK,
-                GreenDragonsStates.BANKING
+                GreenDragonsStates.COMBAT, GreenDragonsStates.TELEPORT_TO_BANK
+            ),
+            StateTransition(
+                GreenDragonsStates.TELEPORT_TO_BANK, GreenDragonsStates.BANKING
             ),
             # Banking completes cycle (no next state = cycle ends)
-
             # Recovery transitions
             StateTransition(
                 GreenDragonsStates.RECOVERY,
-                GreenDragonsStates.IDLE  # Recovery resets to idle
-            )
+                GreenDragonsStates.IDLE,  # Recovery resets to idle
+            ),
         ]
 
     def get_initial_state(self) -> Enum:
@@ -186,7 +186,9 @@ class GreenDragonsStateMachineBot(StateMachineBot):
         logger.info("IDLE: Safety checks passed, proceeding")
         return StateResult.SUCCESS
 
-    def _handle_teleport_to_dragons(self, context: StateExecutionContext) -> StateResult:
+    def _handle_teleport_to_dragons(
+        self, context: StateExecutionContext
+    ) -> StateResult:
         """
         Handle TELEPORT_TO_DRAGONS state - use teleport to get to wilderness.
 

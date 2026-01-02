@@ -3,8 +3,109 @@ Constants and configuration values for OSRSbot.
 
 This module centralizes magic numbers and configuration.
 """
+
 from dataclasses import dataclass, field
-from typing import Tuple, Dict
+from enum import Enum
+from typing import Dict, Tuple
+
+# ============================================================================
+# ENUMERATIONS
+# ============================================================================
+
+
+class MovementStyle(Enum):
+    """Mouse movement styles for different action types."""
+
+    INSTANT = "instant"  # Teleport mouse instantly (dev/testing only)
+    LINEAR = "linear"  # Straight line movement
+    CURVED = "curved"  # Bezier curve movement (most human-like)
+    OVERSHOOT = "overshoot"  # Overshoot then correct (human-like)
+    RANDOM = "random"  # Randomly select from available styles
+
+
+class Prayer(Enum):
+    """Available prayers in OSRS."""
+
+    PROTECT_FROM_MELEE = "protect_from_melee"
+    PROTECT_FROM_MAGIC = "protect_from_magic"
+    PROTECT_FROM_RANGED = "protect_from_ranged"
+    PIETY = "piety"
+    RIGOUR = "rigour"
+    AUGURY = "augury"
+    PRESERVE = "preserve"
+    STEEL_SKIN = "steel_skin"
+    ULTIMATE_STRENGTH = "ultimate_strength"
+    INCREDIBLE_REFLEXES = "incredible_reflexes"
+    EAGLE_EYE = "eagle_eye"
+    MYSTIC_MIGHT = "mystic_might"
+
+
+class Direction(Enum):
+    """Cardinal directions for minimap navigation."""
+
+    UP = "up"  # North
+    DOWN = "down"  # South
+    LEFT = "left"  # West
+    RIGHT = "right"  # East
+
+
+class StatType(Enum):
+    """Player stat types for OCR queries."""
+
+    HP = "hp"
+    PRAYER = "prayer"
+    RUN_ENERGY = "run_energy"
+    SPECIAL_ATTACK = "special_attack"
+
+
+class DropMethod(Enum):
+    """Methods for dropping items from inventory."""
+
+    RIGHT_CLICK = "right_click"  # Right-click → Drop
+    SHIFT_DROP = "shift_drop"  # Shift+Click (RuneLite feature)
+
+
+class ClickType(Enum):
+    """Types of mouse clicks in the game."""
+
+    ATTACK = "attack"  # Red click (combat/aggressive)
+    INTERACT = "interact"  # Yellow click (examine, talk, etc.)
+    MOVEMENT = "movement"  # Walk here
+    INTERFACE = "interface"  # UI interaction
+
+
+class ActionType(Enum):
+    """High-level action types for logging/tracking."""
+
+    DROP = "drop"
+    CLICK = "click"
+    WALK = "walk"
+    WAIT = "wait"
+    COMBAT = "combat"
+    BANK = "bank"
+    TELEPORT = "teleport"
+
+
+class InventoryState(Enum):
+    """Inventory fullness states."""
+
+    EMPTY = "empty"  # 0 items
+    PARTIAL = "partial"  # 1-27 items
+    FULL = "full"  # 28 items
+
+
+class DetectionStatus(Enum):
+    """Status codes for detection operations (OCR, templates, etc.)."""
+
+    SUCCESS = "success"  # Detection succeeded
+    NOT_FOUND = "not_found"  # Target not found
+    AMBIGUOUS = "ambiguous"  # Multiple matches, unclear result
+    ERROR = "error"  # Exception or failure during detection
+
+
+# ============================================================================
+# OCR PREPROCESSING CONFIGURATION
+# ============================================================================
 
 
 @dataclass(frozen=True)
@@ -17,6 +118,7 @@ class PreprocessingStrategy:
 
     Frozen to allow use as dataclass default values.
     """
+
     name: str
     resize_multiplier: int
     contrast_level: float
@@ -50,39 +152,36 @@ class OCRPreprocessingConfig:
     """
 
     strategy_1: PreprocessingStrategy = PreprocessingStrategy(
-        name="High Contrast",
-        resize_multiplier=5,
-        contrast_level=4.0,
-        threshold=61
+        name="High Contrast", resize_multiplier=5, contrast_level=4.0, threshold=61
     )
 
     strategy_2: PreprocessingStrategy = PreprocessingStrategy(
         name="Medium Contrast Low Threshold",
         resize_multiplier=6,
         contrast_level=3.0,
-        threshold=40
+        threshold=40,
     )
 
     strategy_3: PreprocessingStrategy = PreprocessingStrategy(
         name="Medium-High Contrast",
         resize_multiplier=4,
         contrast_level=3.5,
-        threshold=65
+        threshold=65,
     )
 
     strategy_4: PreprocessingStrategy = PreprocessingStrategy(
-        name="Very High Contrast",
-        resize_multiplier=5,
-        contrast_level=5.0,
-        threshold=70
+        name="Very High Contrast", resize_multiplier=5, contrast_level=5.0, threshold=70
     )
 
     strategy_5: PreprocessingStrategy = PreprocessingStrategy(
         name="High Threshold Clean",
         resize_multiplier=5,
         contrast_level=4.0,
-        threshold=100
+        threshold=100,
     )
+
+    # Default correlation threshold for template matching OCR
+    default_correlation_threshold: float = 0.95
 
     def get_all_strategies(self) -> Tuple[PreprocessingStrategy, ...]:
         """Get all strategies as a tuple."""
@@ -91,7 +190,7 @@ class OCRPreprocessingConfig:
             self.strategy_2,
             self.strategy_3,
             self.strategy_4,
-            self.strategy_5
+            self.strategy_5,
         )
 
     def get_strategy(self, index: int) -> PreprocessingStrategy:
@@ -110,7 +209,7 @@ class OCRPreprocessingConfig:
         strategies = self.get_all_strategies()
         if not 0 <= index < len(strategies):
             raise IndexError(
-                f"Strategy index {index} out of range (0-{len(strategies)-1})"
+                f"Strategy index {index} out of range (0-{len(strategies) - 1})"
             )
         return strategies[index]
 
@@ -207,13 +306,14 @@ TESSERACT_CONFIG = TesseractConfig()
 # MOUSE & MOVEMENT CONSTANTS
 # ============================================================================
 
+
 @dataclass
 class BezierCurveConfig:
     """Configuration for Bezier curve mouse movement."""
 
     # Control points are randomly offset by this amount to create natural curves
     control_point_offset_min: int = -100  # pixels
-    control_point_offset_max: int = 100   # pixels
+    control_point_offset_max: int = 100  # pixels
 
     # Minimum steps for smooth curve
     # Lower = faster but choppier, higher = smoother but slower
@@ -238,7 +338,7 @@ class MouseMovementConfig:
     distance_factor: int = 1000  # pixels
 
     # Overshoot behavior (human-like correction)
-    overshoot_distance_min: int = 5   # pixels
+    overshoot_distance_min: int = 5  # pixels
     overshoot_distance_max: int = 20  # pixels
     overshoot_duration_fraction: float = 0.7  # Use 70% of time for overshoot
     correction_duration_fraction: float = 0.3  # Use 30% for correction
@@ -251,6 +351,9 @@ class MouseMovementConfig:
     # Random movement radius for idle actions
     random_movement_radius: int = 50  # pixels
 
+    # PyAutoGUI pause setting (0 = no pause between commands)
+    pyautogui_pause: float = 0.0
+
 
 # Global mouse configuration instances
 BEZIER_CURVE = BezierCurveConfig()
@@ -260,6 +363,7 @@ MOUSE_MOVEMENT = MouseMovementConfig()
 # ============================================================================
 # SCREEN & COLOR DETECTION CONSTANTS
 # ============================================================================
+
 
 @dataclass
 class ColorDetectionConfig:
@@ -271,10 +375,10 @@ class ColorDetectionConfig:
 
     # Color similarity constants
     # Used for calculating how similar two colors are
-    perfect_match: float = 1.0   # 100% match
-    no_match: float = 0.0         # 0% match
-    max_rgb_value: int = 255      # Maximum RGB channel value
-    rgb_channels: int = 3         # Number of color channels (R, G, B)
+    perfect_match: float = 1.0  # 100% match
+    no_match: float = 0.0  # 0% match
+    max_rgb_value: int = 255  # Maximum RGB channel value
+    rgb_channels: int = 3  # Number of color channels (R, G, B)
 
     # Hex color conversion
     hex_base: int = 16  # Hexadecimal base
@@ -296,6 +400,7 @@ COLOR_DETECTION = ColorDetectionConfig()
 # GAME TIMING & LOOP CONSTANTS
 # ============================================================================
 
+
 @dataclass
 class GameTimingConfig:
     """Configuration for game action timings and loops."""
@@ -310,23 +415,36 @@ class GameTimingConfig:
     # Banking loop constants
     deposit_items_max_attempts: int = 12  # Max items to deposit (inventory size)
     teleport_double_click_count: int = 2  # Double-click for teleport
-    bank_click_attempts: int = 2          # Retries for bank booth click
-    walk_to_marker_attempts: int = 2      # Walk retries
+    bank_click_attempts: int = 2  # Retries for bank booth click
+    walk_to_marker_attempts: int = 2  # Walk retries
 
     # Menu/UI constants
-    menu_banner_width: int = 60           # Character width for menu banners
-    default_menu_runs: int = 10           # Default runs if user doesn't specify
-    dev_mode_runs: int = 500              # Runs for dev/testing mode
+    menu_banner_width: int = 60  # Character width for menu banners
+    default_menu_runs: int = 10  # Default runs if user doesn't specify
+    dev_mode_runs: int = 500  # Runs for dev/testing mode
 
     # Combat & script loop delays
     # Combat tick with variance - OSRS game tick is 0.6s
     # Using tuple range (0.55, 0.68) to add anti-detection variance
     combat_tick: Tuple[float, float] = (0.55, 0.68)
-    kill_log_frequency: int = 5           # Log every N kills to reduce spam
+    kill_log_frequency: int = 5  # Log every N kills to reduce spam
 
     # Test script delays
-    test_click_delay: float = 0.1         # Small delay between test clicks
-    test_run_delay: float = 2.0           # Delay between test runs
+    test_click_delay: float = 0.1  # Small delay between test clicks
+    test_run_delay: float = 2.0  # Delay between test runs
+
+    # Color detection wait times
+    color_wait_timeout: float = 10.0  # Timeout for wait_for_color
+    color_check_interval: float = 0.5  # Check interval for color detection
+
+    # State machine timeouts (seconds)
+    teleport_timeout: float = 30.0  # Teleport state timeout
+    navigation_timeout: float = 45.0  # Navigation state timeout
+    combat_timeout: float = 600.0  # Combat state timeout (10 minutes)
+    banking_timeout: float = 60.0  # Banking state timeout
+
+    # HP/Prayer thresholds
+    default_hp_threshold: int = 70  # Default HP threshold for eating
 
 
 # Global game timing configuration
@@ -336,6 +454,7 @@ GAME_TIMING = GameTimingConfig()
 # ============================================================================
 # COORDINATE & BOUNDS CONSTANTS
 # ============================================================================
+
 
 @dataclass
 class CoordinateConfig:
@@ -365,18 +484,32 @@ COORDINATES = CoordinateConfig()
 # OCR TEXT CLEANING CONSTANTS
 # ============================================================================
 
+
 def _get_default_ocr_replacements() -> Dict[str, str]:
     """Factory function for OCR character replacements."""
     return {
-        'i': '1', 'I': '1', 'l': '1', '|': '1',
-        'o': '0', 'O': '0', 'Q': '0', 'D': '0', 'd': '0',
-        'S': '5', 's': '5',
-        'Z': '2', 'z': '2',
-        'B': '8',
-        'g': '9', 'q': '9',
-        'G': '6',
-        'a': '4',
-        ' ': '', '\n': '', '\r': '', '\t': '',
+        "i": "1",
+        "I": "1",
+        "l": "1",
+        "|": "1",
+        "o": "0",
+        "O": "0",
+        "Q": "0",
+        "D": "0",
+        "d": "0",
+        "S": "5",
+        "s": "5",
+        "Z": "2",
+        "z": "2",
+        "B": "8",
+        "g": "9",
+        "q": "9",
+        "G": "6",
+        "a": "4",
+        " ": "",
+        "\n": "",
+        "\r": "",
+        "\t": "",
     }
 
 
@@ -396,6 +529,7 @@ OCR_CHAR_REPLACEMENTS = OCRCharacterReplacements()
 # EXIT CODES
 # ============================================================================
 
+
 @dataclass
 class ExitCodes:
     """Standard exit codes for the application."""
@@ -414,6 +548,7 @@ EXIT_CODES = ExitCodes()
 # ============================================================================
 # VALIDATION RANGES
 # ============================================================================
+
 
 @dataclass
 class ValidationRanges:
@@ -436,6 +571,7 @@ VALIDATION = ValidationRanges()
 # ============================================================================
 # TEMPLATE MATCHING CONSTANTS
 # ============================================================================
+
 
 @dataclass
 class TemplateMatchingConfig:
@@ -477,6 +613,7 @@ TEMPLATE_MATCHING = TemplateMatchingConfig()
 # TARGET SELECTION & SMART CLICKING CONSTANTS
 # ============================================================================
 
+
 @dataclass
 class TargetSelectionConfig:
     """Configuration for intelligent color-based target selection."""
@@ -496,6 +633,9 @@ class TargetSelectionConfig:
     # Use player position as reference for selecting closest target
     use_player_center: bool = True  # Use player position for distance calc
 
+    # Click history tracking size (for detecting stuck behavior)
+    click_history_size: int = 10
+
 
 # Global target selection configuration
 TARGET_SELECTION = TargetSelectionConfig()
@@ -504,6 +644,7 @@ TARGET_SELECTION = TargetSelectionConfig()
 # ============================================================================
 # ANTI-BAN SYSTEM CONSTANTS
 # ============================================================================
+
 
 @dataclass
 class AntiBanConfig:
@@ -524,7 +665,7 @@ class AntiBanConfig:
     # Main breaks to prevent fatigue patterns
     enable_breaks: bool = True
     break_interval_range: Tuple[float, float] = (1800.0, 3600.0)  # 30-60 minutes
-    break_duration_range: Tuple[float, float] = (120.0, 300.0)    # 2-5 minutes
+    break_duration_range: Tuple[float, float] = (120.0, 300.0)  # 2-5 minutes
 
     # ========== MICRO-BREAKS ==========
     # Short pauses between actions (random chance)
@@ -536,8 +677,8 @@ class AntiBanConfig:
     # Randomize timing/speed multipliers per session (±15%)
     # Makes each session feel slightly different
     enable_session_variance: bool = True
-    timing_variance_range: Tuple[float, float] = (0.85, 1.15)      # ±15% timing
-    mouse_speed_variance_range: Tuple[float, float] = (0.9, 1.1)   # ±10% speed
+    timing_variance_range: Tuple[float, float] = (0.85, 1.15)  # ±15% timing
+    mouse_speed_variance_range: Tuple[float, float] = (0.9, 1.1)  # ±10% speed
 
     # ========== IDLE ACTIONS ==========
     # Random actions during waiting periods
@@ -551,6 +692,16 @@ class AntiBanConfig:
     pattern_window: int = 10  # Last 10 actions
     pattern_similarity_threshold: float = 0.8  # 80% similarity = pattern
 
+    # ========== SPECIAL VALUES ==========
+    # Sentinel value for "never break" configuration
+    never_break_sentinel: int = 999999
+
+    # Idle mouse jitter duration (seconds)
+    idle_jitter_duration: Tuple[float, float] = (0.2, 0.8)
+
+    # Idle stats check duration (seconds)
+    idle_stats_check_duration: Tuple[float, float] = (0.5, 1.5)
+
 
 # Global anti-ban configuration
 ANTI_BAN = AntiBanConfig()
@@ -559,6 +710,7 @@ ANTI_BAN = AntiBanConfig()
 # ============================================================================
 # INVENTORY DETECTION CONSTANTS
 # ============================================================================
+
 
 @dataclass
 class InventoryConfig:
@@ -592,6 +744,7 @@ INVENTORY = InventoryConfig()
 # MINIMAP NAVIGATION CONSTANTS
 # ============================================================================
 
+
 @dataclass
 class MinimapNavigationConfig:
     """
@@ -612,17 +765,177 @@ class MinimapNavigationConfig:
 
     # Directional movement deltas (symmetric pairs)
     # Format: (dx, dy) where positive x = right, positive y = down
-    tile_movements: Dict[str, Tuple[int, int]] = field(default_factory=lambda: {
-        "up": (0, -8),      # North
-        "down": (0, 8),     # South
-        "left": (-8, 0),    # West
-        "right": (8, 0),    # East
-    })
+    tile_movements: Dict[str, Tuple[int, int]] = field(
+        default_factory=lambda: {
+            "up": (0, -8),  # North
+            "down": (0, 8),  # South
+            "left": (-8, 0),  # West
+            "right": (8, 0),  # East
+        }
+    )
 
     # Default wait time after minimap click (seconds)
     # Allows character to start moving before next action
     default_wait_time: float = 3.0
 
+    # Minimap radius (pixels) - used for calculations and boundary detection
+    minimap_radius: int = 73
+
 
 # Global minimap navigation configuration
 MINIMAP_NAVIGATION = MinimapNavigationConfig()
+
+
+# ============================================================================
+# LOOT DETECTION CONSTANTS
+# ============================================================================
+
+
+@dataclass
+class LootDetectionConfig:
+    """
+    Configuration for loot detection system.
+
+    Uses color-based detection to find lootable items.
+    """
+
+    # Default loot highlight color (RuneLite purple)
+    default_color: str = "#ff00dc"
+
+    # Color matching tolerance
+    default_tolerance: int = 30
+
+    # Cluster nearby loot positions within this radius
+    cluster_radius: int = 10
+
+    # Delay range after picking up loot (seconds)
+    pickup_delay_range: Tuple[float, float] = (0.5, 0.7)
+
+
+# Global loot detection configuration
+LOOT_DETECTION = LootDetectionConfig()
+
+
+# ============================================================================
+# INVENTORY ACTION CONSTANTS
+# ============================================================================
+
+
+@dataclass
+class InventoryActionConfig:
+    """
+    Configuration for inventory interaction timings.
+
+    These values control the speed and randomization of inventory actions.
+    """
+
+    # Shift-drop key press/release delays (seconds)
+    shift_drop_key_delay: Tuple[float, float] = (0.02, 0.05)
+
+    # Delay after shift-drop action (seconds)
+    shift_drop_delay_range: Tuple[float, float] = (0.25, 0.35)
+
+    # Delay before clicking drop in right-click menu (seconds)
+    right_click_delay: Tuple[float, float] = (0.05, 0.1)
+
+    # Y-offset for drop option in right-click menu (pixels)
+    drop_menu_offset_y: Tuple[float, float] = (38.0, 42.0)
+
+    # Delay after right-click drop action (seconds)
+    drop_delay_range: Tuple[float, float] = (0.5, 0.7)
+
+    # Anti-ban misclick probability (0.0-1.0)
+    misclick_chance: float = 0.02
+
+    # Delay after misclick (seconds)
+    misclick_delay_range: Tuple[float, float] = (0.1, 0.2)
+
+    # Mouse movement duration for misclick (seconds)
+    misclick_movement_duration: Tuple[float, float] = (0.1, 0.3)
+
+
+# Global inventory action configuration
+INVENTORY_ACTIONS = InventoryActionConfig()
+
+
+# ============================================================================
+# COMBAT DETECTION CONSTANTS
+# ============================================================================
+
+
+@dataclass
+class CombatDetectionConfig:
+    """
+    Configuration for combat state detection.
+
+    Uses pixel color detection to identify combat status.
+    """
+
+    # Combat indicator colors (RGB tuples)
+    indicator_green_rgb: Tuple[int, int, int] = (7, 139, 54)  # In combat
+    indicator_red_rgb: Tuple[int, int, int] = (99, 21, 19)  # Taking damage
+
+    # Number of detection attempts for click success
+    click_detection_tries: int = 3
+
+    # Divisor for majority vote (2 = majority)
+    majority_vote_divisor: int = 2
+
+
+# Global combat detection configuration
+COMBAT_DETECTION = CombatDetectionConfig()
+
+
+# ============================================================================
+# PATHFINDING & WALKER CONSTANTS
+# ============================================================================
+
+
+@dataclass
+class PathfindingConfig:
+    """
+    Configuration for pathfinding and navigation.
+
+    Controls walker behavior and arrival detection.
+    """
+
+    # Maximum pathfinding calculation attempts
+    max_attempts: int = 10
+
+    # Timeout for waiting to arrive at destination (seconds)
+    arrival_timeout: float = 10.0
+
+    # Number of checks without movement = stuck
+    arrival_stuck_threshold: int = 5
+
+    # RuneLite camera constants
+    runelite_yaw_max: int = 2048
+    degrees_full_rotation: float = 360.0
+
+
+# Global pathfinding configuration
+PATHFINDING = PathfindingConfig()
+
+
+# ============================================================================
+# STATUS SOCKET SERVICE CONSTANTS
+# ============================================================================
+
+
+@dataclass
+class StatusSocketConfig:
+    """
+    Configuration for live data monitoring via status socket.
+
+    Monitors RuneLite data file for real-time game state.
+    """
+
+    # Default poll interval for checking data file (seconds)
+    poll_interval: float = 0.1
+
+    # Threshold for warning about stale data (seconds)
+    stale_threshold: float = 5.0
+
+
+# Global status socket configuration
+STATUS_SOCKET = StatusSocketConfig()

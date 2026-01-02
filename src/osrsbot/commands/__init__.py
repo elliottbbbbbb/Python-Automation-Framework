@@ -2,4 +2,4 @@
 
 from osrsbot.commands.game_actions import GameActions
 
-__all__ = ['GameActions']
+__all__ = ["GameActions"]

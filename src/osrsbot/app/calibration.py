@@ -56,26 +56,21 @@ class Calibrator:
                 return
             self._capture_coordinate()
 
-        mouse.on_button(
-            lambda: on_left_click(), buttons=(
-                'left',), types=(
-                'down',))
-        mouse.on_button(
-            lambda: on_right_click(), buttons=(
-                'right',), types=(
-                'down',))
+        mouse.on_button(lambda: on_left_click(), buttons=("left",), types=("down",))
+        mouse.on_button(lambda: on_right_click(), buttons=("right",), types=("down",))
 
         self.capturing = True
         try:
             try:
                 import keyboard
-            except ImportError as e:
+            except ImportError:
                 logger.error("keyboard module not installed")
                 print(
-                    "❌ 'keyboard' module required. Install with: pip install keyboard")
+                    "❌ 'keyboard' module required. Install with: pip install keyboard"
+                )
                 return
 
-            keyboard.wait('q')
+            keyboard.wait("q")
         finally:
             self.capturing = False
             mouse.unhook_all()
@@ -106,7 +101,7 @@ class Calibrator:
 
         except Exception as e:
             logger.error(f"Failed to capture color: {e}")
-            print(f"    ❌ Failed to capture color")
+            print("    ❌ Failed to capture color")
 
     def _capture_coordinate(self) -> None:
         if not self.window:
@@ -122,7 +117,8 @@ class Calibrator:
             rel_y = mouse_y - win_y
 
             logger.debug(
-                f"Raw coords: mouse=({mouse_x}, {mouse_y}), window=({win_x}, {win_y})")
+                f"Raw coords: mouse=({mouse_x}, {mouse_y}), window=({win_x}, {win_y})"
+            )
             logger.debug(f"Relative coords calculated: ({rel_x}, {rel_y})")
 
             print(f"\n📍 COORD: ({rel_x}, {rel_y})")
@@ -132,19 +128,18 @@ class Calibrator:
                 logger.debug("Coordinate capture skipped (no name given)")
                 return
 
-            category = input(
-                "   Category (ui/minimap/world/inventory): ").strip() or "ui"
+            category = (
+                input("   Category (ui/minimap/world/inventory): ").strip() or "ui"
+            )
 
             if category not in self.config.data["coordinates"]:
                 logger.debug(f"Creating new category {category}")
                 self.config.data["coordinates"][category] = {}
 
-            self.config.data["coordinates"][category][name] = {
-                "x": rel_x, "y": rel_y}
-            logger.info(
-                f"Saved coordinate: {category}.{name} = ({rel_x}, {rel_y})")
+            self.config.data["coordinates"][category][name] = {"x": rel_x, "y": rel_y}
+            logger.info(f"Saved coordinate: {category}.{name} = ({rel_x}, {rel_y})")
             print(f"   ✅ Saved as '{category}.{name}'")
 
         except Exception as e:
             logger.error(f"Error capturing coordinate: {e}", exc_info=True)
-            print(f"    ❌ Failed to capture coordinate")
+            print("    ❌ Failed to capture coordinate")

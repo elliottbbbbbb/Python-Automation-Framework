@@ -12,15 +12,16 @@ All queries are read-only and cached for performance.
 
 import logging
 import time
-from typing import Optional, List, TYPE_CHECKING
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, List, Optional
 
+from osrsbot.constants import INVENTORY
 from osrsbot.models.config import Config
-from osrsbot.utils.color_helpers import hex_to_rgb, colors_match
+from osrsbot.utils.color_helpers import colors_match, hex_to_rgb
 
 if TYPE_CHECKING:
-    from osrsbot.services.template_match_service import TemplateMatchService
     from osrsbot.services.screen_service import ScreenService
+    from osrsbot.services.template_match_service import TemplateMatchService
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class InventorySnapshot:
     """Snapshot of inventory state at a point in time."""
 
     filled_slots: List[int]  # Slot indices with items (0-27)
-    empty_slots: List[int]   # Slot indices without items (0-27)
+    empty_slots: List[int]  # Slot indices without items (0-27)
     total_items: int
     timestamp: float
 
@@ -51,9 +52,9 @@ class InventoryState:
 
     def __init__(
         self,
-        template_service: 'TemplateMatchService',
-        screen_service: 'ScreenService',
-        config: Config
+        template_service: "TemplateMatchService",
+        screen_service: "ScreenService",
+        config: Config,
     ):
         """
         Initialize inventory state queries.
@@ -72,16 +73,10 @@ class InventoryState:
         self.empty_slot_color = hex_to_rgb(empty_color_hex)
 
         # Get detection TTL from config
-        self.detection_ttl = config.get(
-            "inventory.detection_ttl_seconds",
-            default=1.0
-        )
+        self.detection_ttl = config.get("inventory.detection_ttl_seconds", default=1.0)
 
         # Color tolerance for matching
-        self.color_tolerance = config.get(
-            "inventory.color_tolerance",
-            default=15
-        )
+        self.color_tolerance = config.get("inventory.color_tolerance", default=15)
 
         # Cache
         self._cache: Optional[InventorySnapshot] = None
@@ -153,8 +148,10 @@ class InventoryState:
         Returns:
             True if slot has item, False if empty or invalid index
         """
-        if not (0 <= slot_index <= 27):
-            logger.warning(f"Invalid slot index: {slot_index} (must be 0-27)")
+        if not (0 <= slot_index < INVENTORY.total_slots):
+            logger.warning(
+                f"Invalid slot index: {slot_index} (must be 0-{INVENTORY.total_slots - 1})"
+            )
             return False
 
         snapshot = self.get_snapshot()
@@ -214,9 +211,9 @@ class InventoryState:
             logger.warning("Failed to capture screenshot, returning empty state")
             return InventorySnapshot(
                 filled_slots=[],
-                empty_slots=list(range(28)),
+                empty_slots=list(range(INVENTORY.total_slots)),
                 total_items=0,
-                timestamp=time.time()
+                timestamp=time.time(),
             )
 
         # Detect inventory grid using template matching
@@ -227,9 +224,9 @@ class InventoryState:
             # All slots empty if inventory not detected
             return InventorySnapshot(
                 filled_slots=[],
-                empty_slots=list(range(28)),
+                empty_slots=list(range(INVENTORY.total_slots)),
                 total_items=0,
-                timestamp=time.time()
+                timestamp=time.time(),
             )
 
         # Get the grid
@@ -238,13 +235,13 @@ class InventoryState:
             logger.warning("Inventory grid not visible, returning empty state")
             return InventorySnapshot(
                 filled_slots=[],
-                empty_slots=list(range(28)),
+                empty_slots=list(range(INVENTORY.total_slots)),
                 total_items=0,
-                timestamp=time.time()
+                timestamp=time.time(),
             )
 
         # Check each of 28 slots
-        for slot_index in range(28):
+        for slot_index in range(INVENTORY.total_slots):
             # Get slot element
             slot_element = grid.get_element(slot_index)
             if not slot_element:
@@ -257,7 +254,9 @@ class InventoryState:
 
             try:
                 # Sample pixel color at center (relative to game window)
-                pixel_color = self.screen.get_pixel_color(center_x, center_y, relative=True)
+                pixel_color = self.screen.get_pixel_color(
+                    center_x, center_y, relative=True
+                )
             except Exception as e:
                 logger.warning(f"Could not sample slot {slot_index}: {e}")
                 empty_slots.append(slot_index)
@@ -283,7 +282,7 @@ class InventoryState:
             filled_slots=filled_slots,
             empty_slots=empty_slots,
             total_items=len(filled_slots),
-            timestamp=time.time()
+            timestamp=time.time(),
         )
 
     def clear_cache(self):

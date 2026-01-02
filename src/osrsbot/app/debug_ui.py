@@ -9,14 +9,15 @@ Provides live-updating terminal display showing:
 
 Uses rich.live for non-blocking terminal updates.
 """
-import time
+
 import logging
 import threading
+import time
 from typing import TYPE_CHECKING, Optional
 
+from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
-from rich.layout import Layout
 from rich.text import Text
 
 if TYPE_CHECKING:
@@ -36,11 +37,7 @@ class DebugUI:
     - Anti-ban status
     """
 
-    def __init__(
-        self,
-        bot_instance: 'StateMachineBot',
-        update_interval: float = 0.5
-    ):
+    def __init__(self, bot_instance: "StateMachineBot", update_interval: float = 0.5):
         """
         Initialize debug UI.
 
@@ -65,17 +62,10 @@ class DebugUI:
         self._redirect_logging_to_file()
 
         self.enabled = True
-        self.live = Live(
-            self._build_layout(),
-            refresh_per_second=2,
-            screen=True
-        )
+        self.live = Live(self._build_layout(), refresh_per_second=2, screen=True)
 
         # Start background update thread
-        self.update_thread = threading.Thread(
-            target=self._update_loop,
-            daemon=True
-        )
+        self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
 
         self.live.start()
         self.update_thread.start()
@@ -109,22 +99,17 @@ class DebugUI:
         layout.split(
             Layout(name="header", size=3),
             Layout(name="body"),
-            Layout(name="footer", size=3)
+            Layout(name="footer", size=3),
         )
 
-        layout["body"].split_row(
-            Layout(name="left"),
-            Layout(name="right")
-        )
+        layout["body"].split_row(Layout(name="left"), Layout(name="right"))
 
         layout["left"].split(
-            Layout(name="current_state", ratio=2),
-            Layout(name="events", ratio=3)
+            Layout(name="current_state", ratio=2), Layout(name="events", ratio=3)
         )
 
         layout["right"].split(
-            Layout(name="stats", ratio=1),
-            Layout(name="anti_ban", ratio=1)
+            Layout(name="stats", ratio=1), Layout(name="anti_ban", ratio=1)
         )
 
         # Update panels
@@ -139,8 +124,13 @@ class DebugUI:
 
     def _render_current_state(self) -> Panel:
         """Render current state panel with progress and status."""
-        if not hasattr(self.bot, '_current_state') or self.bot._current_state is None:
-            return Panel("Bot not started", style="dim", title="Current State", border_style="cyan")
+        if not hasattr(self.bot, "_current_state") or self.bot._current_state is None:
+            return Panel(
+                "Bot not started",
+                style="dim",
+                title="Current State",
+                border_style="cyan",
+            )
 
         state = self.bot.get_current_state()
         retry_count = self.bot.get_retry_count(state)
@@ -153,27 +143,35 @@ class DebugUI:
         status_text.append(f"{state.name}", style=f"bold {status_color}")
 
         if metadata:
-            status_text.append(f" ({retry_count}/{metadata.max_retries} retries)", style="dim")
+            status_text.append(
+                f" ({retry_count}/{metadata.max_retries} retries)", style="dim"
+            )
 
         # Add description if available
         if metadata and metadata.description:
             status_text.append(f"\n{metadata.description}", style="dim italic")
 
         # Add game status if available
-        if hasattr(self.bot, 'state'):
+        if hasattr(self.bot, "state"):
             try:
                 hp = self.bot.state.get_hp()
                 combat = self.bot.state.is_in_combat()
 
                 status_text.append("\n\n")
                 status_text.append(f"HP: {hp if hp else '?'}/31  ", style="cyan")
-                status_text.append(f"Combat: {'✓' if combat else '✗'}  ", style="green" if combat else "red")
+                status_text.append(
+                    f"Combat: {'✓' if combat else '✗'}  ",
+                    style="green" if combat else "red",
+                )
 
                 # Inventory status
-                if hasattr(self.bot.state, 'inventory'):
+                if hasattr(self.bot.state, "inventory"):
                     inv_full = self.bot.state.inventory.is_full()
                     filled = self.bot.state.inventory.get_filled_slot_count()
-                    status_text.append(f"Inventory: {filled}/28", style="yellow" if inv_full else "white")
+                    status_text.append(
+                        f"Inventory: {filled}/28",
+                        style="yellow" if inv_full else "white",
+                    )
             except Exception as e:
                 logger.debug(f"Error reading game state: {e}")
 
@@ -214,10 +212,12 @@ class DebugUI:
                     events.append(f"  [red]↳ {entry.error_message}[/red]")
 
             # Get recent anti-ban actions if available
-            if hasattr(self.bot, 'actions') and self.bot.actions.anti_ban:
+            if hasattr(self.bot, "actions") and self.bot.actions.anti_ban:
                 recent_actions = list(self.bot.actions.anti_ban.session.recent_actions)
                 for action in reversed(recent_actions[-5:]):
-                    timestamp = time.strftime("%H:%M:%S", time.localtime(action['timestamp']))
+                    timestamp = time.strftime(
+                        "%H:%M:%S", time.localtime(action["timestamp"])
+                    )
                     events.append(
                         f"[cyan]↻[/cyan] "
                         f"[dim]{timestamp}[/dim] "
@@ -238,11 +238,11 @@ class DebugUI:
 
         try:
             # Get session stats from anti-ban if available
-            if hasattr(self.bot, 'actions') and self.bot.actions.anti_ban:
+            if hasattr(self.bot, "actions") and self.bot.actions.anti_ban:
                 stats = self.bot.actions.anti_ban.get_session_stats()
 
                 # Format uptime
-                uptime = int(stats['uptime_seconds'])
+                uptime = int(stats["uptime_seconds"])
                 hours, remainder = divmod(uptime, 3600)
                 minutes, seconds = divmod(remainder, 60)
                 uptime_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
@@ -254,9 +254,11 @@ class DebugUI:
                 stats_text.append(f"{stats['actions_performed']}\n", style="white")
 
                 # State history count
-                if hasattr(self.bot, '_state_history'):
+                if hasattr(self.bot, "_state_history"):
                     stats_text.append("States: ", style="bold")
-                    stats_text.append(f"{len(self.bot._state_history)}\n", style="white")
+                    stats_text.append(
+                        f"{len(self.bot._state_history)}\n", style="white"
+                    )
             else:
                 stats_text.append("[dim]No session stats available[/dim]")
 
@@ -271,11 +273,11 @@ class DebugUI:
         status_text = Text()
 
         try:
-            if hasattr(self.bot, 'actions') and self.bot.actions.anti_ban:
+            if hasattr(self.bot, "actions") and self.bot.actions.anti_ban:
                 stats = self.bot.actions.anti_ban.get_session_stats()
 
                 # Next break
-                time_to_break = int(stats['time_to_break_seconds'])
+                time_to_break = int(stats["time_to_break_seconds"])
                 break_mins, break_secs = divmod(time_to_break, 60)
 
                 status_text.append("Next Break: ", style="bold")
@@ -287,7 +289,9 @@ class DebugUI:
 
                 # Mouse speed variance
                 status_text.append("Mouse Speed: ", style="bold")
-                status_text.append(f"{stats['mouse_speed_variance']:.2f}x\n", style="white")
+                status_text.append(
+                    f"{stats['mouse_speed_variance']:.2f}x\n", style="white"
+                )
 
                 # Status indicator
                 status_text.append("\n", style="white")
@@ -328,10 +332,10 @@ class DebugUI:
             root_logger.removeHandler(handler)
 
         # Add file handler
-        file_handler = log_module.FileHandler('bot_debug.log', mode='a')
+        file_handler = log_module.FileHandler("bot_debug.log", mode="a")
         file_handler.setLevel(log_module.DEBUG)
         formatter = log_module.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)

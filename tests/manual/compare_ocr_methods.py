@@ -2,21 +2,22 @@
 Compare Tesseract OCR vs Template Matching OCR.
 Tests both methods on OSRS HP orb screenshots.
 """
+
 import sys
-import os
 from pathlib import Path
-from PIL import Image
+
 import cv2
 import numpy as np
+from PIL import Image
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from osrsbot.services.ocr_service import OCRService, OCRRegion
+from osrsbot.services.ocr_service import OCRRegion, OCRService
 from osrsbot.services.template_ocr_service import (
-    TemplateOCRService,
     ORB_GREEN,
     ORB_RED,
+    TemplateOCRService,
 )
 
 
@@ -51,7 +52,9 @@ def compare_ocr_methods(image_path: str, expected_value: int):
         print("-" * 70)
 
         tesseract_ocr = OCRService(debug=True, use_cnn=False)
-        region = OCRRegion(x=0, y=0, width=img_pil.width, height=img_pil.height, name="compare_test")
+        region = OCRRegion(
+            x=0, y=0, width=img_pil.width, height=img_pil.height, name="compare_test"
+        )
 
         # Test preprocessing strategies
         strategies = tesseract_ocr._preprocess_for_numbers(img_pil)
@@ -73,7 +76,7 @@ def compare_ocr_methods(image_path: str, expected_value: int):
             img_np,
             font_name="plain11",
             colors=[ORB_GREEN, ORB_RED],
-            correlation_threshold=0.98
+            correlation_threshold=0.98,
         )
         print(f"Extracted text: '{text_result}'")
 
@@ -82,7 +85,7 @@ def compare_ocr_methods(image_path: str, expected_value: int):
             img_np,
             font_name="plain11",
             colors=[ORB_GREEN, ORB_RED],
-            correlation_threshold=0.98
+            correlation_threshold=0.98,
         )
         print(f"Extracted number: {number_result}")
 
@@ -102,7 +105,7 @@ def compare_ocr_methods(image_path: str, expected_value: int):
                 img_np,
                 font_name="plain11",
                 colors=[ORB_GREEN, ORB_RED],
-                correlation_threshold=threshold
+                correlation_threshold=threshold,
             )
             match_status = "✓" if result == expected_value else "✗"
             print(f"  Threshold {threshold}: {result} {match_status}")
@@ -128,6 +131,7 @@ def compare_ocr_methods(image_path: str, expected_value: int):
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
 
 

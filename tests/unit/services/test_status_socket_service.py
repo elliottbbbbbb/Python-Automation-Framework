@@ -1,11 +1,11 @@
 """Unit tests for StatusSocketService."""
-import json
-import pytest
-import time
-from pathlib import Path
-from unittest.mock import Mock, patch, mock_open
 
-from osrsbot.services.status_socket_service import StatusSocketService, PlayerState
+import json
+import time
+
+import pytest
+
+from osrsbot.services.status_socket_service import PlayerState, StatusSocketService
 
 
 class TestStatusSocketService:
@@ -18,7 +18,7 @@ class TestStatusSocketService:
             "worldPoint": {"x": 3200, "y": 3400, "plane": 0},
             "camera": {"yaw": 512, "pitch": 256},
             "isMoving": False,
-            "animation": -1
+            "animation": -1,
         }
 
     @pytest.fixture
@@ -38,7 +38,7 @@ class TestStatusSocketService:
     def test_get_player_state_valid_data(self, mock_file_path, valid_json_data):
         """Test parsing valid JSON data."""
         # Write valid JSON to file
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -56,7 +56,7 @@ class TestStatusSocketService:
     def test_get_player_state_caching(self, mock_file_path, valid_json_data):
         """Test that state is cached when file hasn't changed."""
         # Write initial data
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -78,7 +78,7 @@ class TestStatusSocketService:
     def test_get_player_state_file_updated(self, mock_file_path, valid_json_data):
         """Test that new data is read when file is modified."""
         # Write initial data
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -87,7 +87,7 @@ class TestStatusSocketService:
         # Modify file
         time.sleep(0.01)  # Ensure different mtime
         valid_json_data["worldPoint"]["x"] = 3250
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         # Read again
@@ -99,7 +99,7 @@ class TestStatusSocketService:
     def test_get_player_state_invalid_json(self, mock_file_path):
         """Test handling of corrupted JSON."""
         # Write invalid JSON
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             f.write("{invalid json")
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -108,10 +108,12 @@ class TestStatusSocketService:
         # Should return None and log warning
         assert state is None
 
-    def test_get_player_state_invalid_json_with_cache(self, mock_file_path, valid_json_data):
+    def test_get_player_state_invalid_json_with_cache(
+        self, mock_file_path, valid_json_data
+    ):
         """Test that cache is used when JSON becomes corrupted."""
         # Write valid data first
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -120,7 +122,7 @@ class TestStatusSocketService:
 
         # Corrupt the file
         time.sleep(0.01)
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             f.write("{corrupt")
 
         # Should return last known good state
@@ -130,7 +132,7 @@ class TestStatusSocketService:
 
     def test_is_available_when_file_exists(self, mock_file_path, valid_json_data):
         """Test is_available returns True when plugin active."""
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -145,7 +147,7 @@ class TestStatusSocketService:
 
     def test_is_available_detects_stale_data(self, mock_file_path, valid_json_data):
         """Test is_available returns False when data is stale."""
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path))
@@ -164,7 +166,7 @@ class TestStatusSocketService:
     def test_wait_for_arrival_success(self, mock_file_path, valid_json_data):
         """Test successful arrival at target."""
         # Player starts at (3200, 3400)
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path), poll_interval=0.01)
@@ -174,10 +176,11 @@ class TestStatusSocketService:
             time.sleep(0.02)
             valid_json_data["worldPoint"]["x"] = 3202
             valid_json_data["worldPoint"]["y"] = 3402
-            with open(mock_file_path, 'w') as f:
+            with open(mock_file_path, "w") as f:
                 json.dump(valid_json_data, f)
 
         import threading
+
         updater = threading.Thread(target=update_position)
         updater.start()
 
@@ -189,7 +192,7 @@ class TestStatusSocketService:
 
     def test_wait_for_arrival_timeout(self, mock_file_path, valid_json_data):
         """Test timeout when player doesn't arrive."""
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path), poll_interval=0.01)
@@ -201,7 +204,7 @@ class TestStatusSocketService:
 
     def test_wait_for_arrival_stuck_detection(self, mock_file_path, valid_json_data):
         """Test detection of stuck player."""
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path), poll_interval=0.01)
@@ -214,7 +217,7 @@ class TestStatusSocketService:
 
     def test_wait_for_arrival_plugin_disconnects(self, mock_file_path, valid_json_data):
         """Test handling when plugin disconnects during wait."""
-        with open(mock_file_path, 'w') as f:
+        with open(mock_file_path, "w") as f:
             json.dump(valid_json_data, f)
 
         service = StatusSocketService(data_file=str(mock_file_path), poll_interval=0.01)
@@ -225,6 +228,7 @@ class TestStatusSocketService:
             mock_file_path.unlink()
 
         import threading
+
         deleter = threading.Thread(target=delete_file)
         deleter.start()
 
@@ -258,7 +262,7 @@ class TestStatusSocketService:
             camera_yaw=1024,
             timestamp=time.time(),
             is_moving=True,
-            animation_id=808
+            animation_id=808,
         )
 
         assert state.world_x == 100
@@ -271,11 +275,7 @@ class TestStatusSocketService:
     def test_player_state_defaults(self):
         """Test PlayerState default values."""
         state = PlayerState(
-            world_x=100,
-            world_y=200,
-            plane=0,
-            camera_yaw=512,
-            timestamp=time.time()
+            world_x=100, world_y=200, plane=0, camera_yaw=512, timestamp=time.time()
         )
 
         assert state.is_moving is False

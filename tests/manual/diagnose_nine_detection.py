@@ -1,13 +1,16 @@
 """Diagnose why 9 is being detected as 4."""
 
 import sys
+
 from PIL import Image
-from osrsbot.services.ocr_service import OCRService, OCRRegion
+
+from osrsbot.services.ocr_service import OCRService
 from osrsbot.utils.ocr_helpers import (
-    preprocess_for_shape_detection,
     count_holes_and_tail,
-    looks_like_nine
+    looks_like_nine,
+    preprocess_for_shape_detection,
 )
+
 
 def diagnose_nine(image_path: str):
     """
@@ -36,19 +39,20 @@ def diagnose_nine(image_path: str):
 
         # Test each strategy with OCR
         print("\n[2] OCR RESULTS PER STRATEGY")
-        import pytesseract
-        from osrsbot.constants import TESSERACT_CONFIG
         import re
+
+        import pytesseract
+
+        from osrsbot.constants import TESSERACT_CONFIG
 
         all_results = []
         for i, strategy_img in enumerate(strategies):
             try:
                 text = pytesseract.image_to_string(
-                    strategy_img,
-                    config=TESSERACT_CONFIG.get_config_string()
+                    strategy_img, config=TESSERACT_CONFIG.get_config_string()
                 )
                 cleaned = text.strip()
-                numbers = re.findall(r'\d+', cleaned)
+                numbers = re.findall(r"\d+", cleaned)
                 result = int(numbers[0]) if numbers else None
                 all_results.append(result)
                 print(f"    Strategy {i}: '{cleaned}' -> {result}")
@@ -58,6 +62,7 @@ def diagnose_nine(image_path: str):
 
         # Show consensus
         from collections import Counter
+
         valid_results = [r for r in all_results if r is not None]
         if valid_results:
             consensus = Counter(valid_results).most_common(1)[0][0]
@@ -80,8 +85,10 @@ def diagnose_nine(image_path: str):
                 if is_nine:
                     nine_votes += 1
 
-                print(f"    Strategy {i}: holes={hole_count}, tail={tail_frac:.3f}, "
-                      f"aspect={aspect:.3f}, is_nine={is_nine}")
+                print(
+                    f"    Strategy {i}: holes={hole_count}, tail={tail_frac:.3f}, "
+                    f"aspect={aspect:.3f}, is_nine={is_nine}"
+                )
             except Exception as e:
                 print(f"    Strategy {i}: Shape detection failed - {e}")
 
@@ -93,13 +100,17 @@ def diagnose_nine(image_path: str):
 
         threshold_met = nine_votes >= SHAPE_DETECTION.min_nine_votes_for_correction
         ocr_agrees = (
-            SHAPE_DETECTION.trust_ocr_with_single_vote and
-            nine_votes >= 1 and
-            9 in valid_results
+            SHAPE_DETECTION.trust_ocr_with_single_vote
+            and nine_votes >= 1
+            and 9 in valid_results
         )
 
-        print(f"    Threshold met ({nine_votes} >= {SHAPE_DETECTION.min_nine_votes_for_correction}): {threshold_met}")
-        print(f"    OCR agrees (votes={nine_votes}, 9 in results={9 in valid_results}): {ocr_agrees}")
+        print(
+            f"    Threshold met ({nine_votes} >= {SHAPE_DETECTION.min_nine_votes_for_correction}): {threshold_met}"
+        )
+        print(
+            f"    OCR agrees (votes={nine_votes}, 9 in results={9 in valid_results}): {ocr_agrees}"
+        )
 
         if consensus == 4:
             if threshold_met or ocr_agrees:
@@ -120,8 +131,12 @@ def diagnose_nine(image_path: str):
         if final_result == 4 and nine_votes > 0:
             print("\n⚠ ISSUE: OCR returning 4 but shape detection found 9 features")
             print("\nPossible solutions:")
-            print(f"  1. Lower min_nine_votes_for_correction (current: {SHAPE_DETECTION.min_nine_votes_for_correction})")
-            print("  2. Adjust shape detection thresholds (hole_count, tail_frac, aspect)")
+            print(
+                f"  1. Lower min_nine_votes_for_correction (current: {SHAPE_DETECTION.min_nine_votes_for_correction})"
+            )
+            print(
+                "  2. Adjust shape detection thresholds (hole_count, tail_frac, aspect)"
+            )
             print("  3. Improve preprocessing to preserve 9's circular feature")
             print("  4. Use CNN classifier instead (more accurate for OSRS fonts)")
         elif final_result == 9 and nine_votes == 0:
@@ -134,11 +149,19 @@ def diagnose_nine(image_path: str):
         # Show shape detection config
         print("\n" + "-" * 70)
         print("CURRENT SHAPE DETECTION CONFIG:")
-        print(f"  min_nine_votes_for_correction: {SHAPE_DETECTION.min_nine_votes_for_correction}")
-        print(f"  trust_ocr_with_single_vote: {SHAPE_DETECTION.trust_ocr_with_single_vote}")
+        print(
+            f"  min_nine_votes_for_correction: {SHAPE_DETECTION.min_nine_votes_for_correction}"
+        )
+        print(
+            f"  trust_ocr_with_single_vote: {SHAPE_DETECTION.trust_ocr_with_single_vote}"
+        )
         print(f"  min_hole_count_for_nine: {SHAPE_DETECTION.min_hole_count_for_nine}")
-        print(f"  min_tail_fraction_for_nine: {SHAPE_DETECTION.min_tail_fraction_for_nine}")
-        print(f"  min_aspect_ratio_for_nine: {SHAPE_DETECTION.min_aspect_ratio_for_nine}")
+        print(
+            f"  min_tail_fraction_for_nine: {SHAPE_DETECTION.min_tail_fraction_for_nine}"
+        )
+        print(
+            f"  min_aspect_ratio_for_nine: {SHAPE_DETECTION.min_aspect_ratio_for_nine}"
+        )
 
     except FileNotFoundError:
         print(f"ERROR: Could not find image at: {image_path}")
@@ -149,7 +172,9 @@ def diagnose_nine(image_path: str):
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

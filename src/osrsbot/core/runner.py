@@ -1,17 +1,17 @@
 import logging
 import os
-from typing import Any, Callable, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Union
 
+from osrsbot.commands.game_actions import GameActions
 from osrsbot.core.game_interface import GameInterface
-from osrsbot.services.mouse_service import MouseService, MouseConfig
-from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.template_ocr_service import TemplateOCRService
-from osrsbot.services.template_match_service import TemplateMatchService
+from osrsbot.models.config import Config
+from osrsbot.queries.game_queries import GameState
 from osrsbot.services.anti_ban_service import AntiBanService
 from osrsbot.services.loot_detection_service import LootDetectionService
-from osrsbot.queries.game_queries import GameState
-from osrsbot.commands.game_actions import GameActions
-from osrsbot.models.config import Config
+from osrsbot.services.mouse_service import MouseConfig, MouseService
+from osrsbot.services.screen_service import ScreenService
+from osrsbot.services.template_match_service import TemplateMatchService
+from osrsbot.services.template_ocr_service import TemplateOCRService
 
 if TYPE_CHECKING:
     from osrsbot.core.base_bot import Bot
@@ -22,10 +22,7 @@ logger = logging.getLogger(__name__)
 class ScriptRunner:
     """Main script runner that sets up everything"""
 
-    def __init__(
-            self,
-            window_title: str,
-            config_file: str = "config.json") -> None:
+    def __init__(self, window_title: str, config_file: str = "config.json") -> None:
         """
         Args:
             window_title: Title of the game window to attach to
@@ -48,49 +45,51 @@ class ScriptRunner:
             logger.info("Config loaded successfully")
         except FileNotFoundError as e:
             logger.error(f"Config file not found: {config_file}")
-            raise FileNotFoundError(
-                f"Config file '{config_file}' not found") from e
+            raise FileNotFoundError(f"Config file '{config_file}' not found") from e
         except Exception as e:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             raise
 
         if window_title:
             self.config.data["window_title"] = window_title
-            logger.debug(
-                f"Updated window title in config to: '{window_title}'")
+            logger.debug(f"Updated window title in config to: '{window_title}'")
 
         try:
             logger.debug("Initializing GameInterface")
             self.interface = GameInterface(self.config)
             logger.info("GameInterface initialized successfully")
         except Exception as e:
-            logger.error(
-                f"Failed to initialize GameInterface: {e}",
-                exc_info=True)
+            logger.error(f"Failed to initialize GameInterface: {e}", exc_info=True)
             raise Exception(
-                f"Could not find or attach to window '{window_title}'") from e
+                f"Could not find or attach to window '{window_title}'"
+            ) from e
 
         try:
             mouse_config_dict = self.config.get("mouse", default={})
             mouse_config = MouseConfig(
                 min_speed=mouse_config_dict.get("min_speed", 0.2),
                 max_speed=mouse_config_dict.get("max_speed", 0.6),
-                overshoot_chance=mouse_config_dict.get(
-                    "overshoot_chance", 0.15),
-                overshoot_distance=mouse_config_dict.get(
-                    "overshoot_distance", 20),
+                overshoot_chance=mouse_config_dict.get("overshoot_chance", 0.15),
+                overshoot_distance=mouse_config_dict.get("overshoot_distance", 20),
                 click_variance=mouse_config_dict.get("click_variance", 3),
                 post_click_delay=(
                     mouse_config_dict.get("post_click_delay_min", 0.05),
-                    mouse_config_dict.get("post_click_delay_max", 0.15)
-                )
+                    mouse_config_dict.get("post_click_delay_max", 0.15),
+                ),
             )
 
-            use_interception = os.getenv("USE_INTERCEPTION", "").lower() in ("1", "true", "yes")
+            use_interception = os.getenv("USE_INTERCEPTION", "").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
 
             if use_interception:
                 try:
-                    from osrsbot.services.interception_mouse_service import InterceptionMouseService
+                    from osrsbot.services.interception_mouse_service import (
+                        InterceptionMouseService,
+                    )
+
                     logger.debug("Initializing InterceptionMouseService (kernel-level)")
                     self.mouse = InterceptionMouseService(mouse_config)
                     logger.info("InterceptionMouseService initialized successfully")
@@ -133,9 +132,10 @@ class ScriptRunner:
             logger.debug("Initializing StatusSocketService")
             status_socket_config = self.config.get("status_socket", default={})
             from osrsbot.services.status_socket_service import StatusSocketService
+
             self.status_socket = StatusSocketService(
                 data_file=status_socket_config.get("data_file", "live_data.json"),
-                poll_interval=status_socket_config.get("poll_interval", 0.1)
+                poll_interval=status_socket_config.get("poll_interval", 0.1),
             )
 
             if self.status_socket.is_available():
@@ -150,20 +150,21 @@ class ScriptRunner:
             if self.status_socket.is_available():
                 logger.debug("Initializing WalkerService")
                 walker_config_dict = self.config.get("walker", default={})
-                from osrsbot.services.walker_service import WalkerService, WalkerConfig
+                from osrsbot.services.walker_service import WalkerConfig, WalkerService
+
                 walker_config = WalkerConfig(
                     minimap_center_x=walker_config_dict.get("minimap_center_x", 654),
                     minimap_center_y=walker_config_dict.get("minimap_center_y", 111),
                     tile_size=walker_config_dict.get("tile_size", 4),
                     arrival_tolerance=walker_config_dict.get("arrival_tolerance", 2),
-                    max_click_distance=walker_config_dict.get("max_click_distance", 15)
+                    max_click_distance=walker_config_dict.get("max_click_distance", 15),
                 )
                 self.walker = WalkerService(
                     config=walker_config,
                     status_socket=self.status_socket,
                     mouse=self.mouse,
                     screen=self.screen,
-                    interface=self.interface
+                    interface=self.interface,
                 )
                 logger.info("WalkerService initialized successfully")
             else:
@@ -174,7 +175,6 @@ class ScriptRunner:
             logger.error(f"Failed to initialize services: {e}", exc_info=True)
             raise
 
-
         try:
             logger.debug("Initializing GameState")
             self.state = GameState(
@@ -182,7 +182,7 @@ class ScriptRunner:
                 self.config,
                 self.ocr,
                 self.screen,
-                self.template_service
+                self.template_service,
             )
             logger.info("GameState initialized successfully")
         except Exception as e:
@@ -202,7 +202,9 @@ class ScriptRunner:
             self.loot_detection = LootDetectionService(self.screen)
             logger.info("LootDetectionService initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize LootDetectionService: {e}", exc_info=True)
+            logger.error(
+                f"Failed to initialize LootDetectionService: {e}", exc_info=True
+            )
             raise
 
         try:
@@ -215,20 +217,18 @@ class ScriptRunner:
                 self.template_service,
                 self.anti_ban,
                 self.loot_detection,
-                walker=self.walker
+                walker=self.walker,
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:
-            logger.error(
-                f"Failed to initialize GameActions: {e}", exc_info=True)
+            logger.error(f"Failed to initialize GameActions: {e}", exc_info=True)
             raise
 
         logger.info("ScriptRunner initialization complete")
 
     def _execute_with_error_handling(
-            self,
-            script_name: str,
-            executable: Callable[[], None]) -> None:
+        self, script_name: str, executable: Callable[[], None]
+    ) -> None:
         """
         Execute a script with standardized error handling and logging.
 
@@ -248,14 +248,11 @@ class ScriptRunner:
             raise
         except Exception as e:
             logger.error(
-                f"Script '{script_name}' failed with error: {e}",
-                exc_info=True)
+                f"Script '{script_name}' failed with error: {e}", exc_info=True
+            )
             raise Exception(f"Script '{script_name}' failed: {e}") from e
 
-    def run_script(
-            self,
-            script: Union[Callable, type, "Bot"],
-            **kwargs: Any) -> None:
+    def run_script(self, script: Union[Callable, type, "Bot"], **kwargs: Any) -> None:
         """
         Run a script, supporting both function-based and class-based bots.
 
@@ -278,7 +275,7 @@ class ScriptRunner:
                     interface=self.interface,
                     state=self.state,
                     actions=self.actions,
-                    config=self.config
+                    config=self.config,
                 )
                 bot_instance.run(**kwargs)
 
@@ -295,18 +292,12 @@ class ScriptRunner:
             self._execute_with_error_handling(script_name, execute_bot_instance)
 
         elif callable(script):
-            script_name = script.__name__ if hasattr(
-                script, '__name__') else 'unknown'
+            script_name = script.__name__ if hasattr(script, "__name__") else "unknown"
             logger.info(f"Starting script function: {script_name}")
             logger.debug(f"Script arguments: {kwargs}")
 
             def execute_function():
-                script(
-                    self.interface,
-                    self.state,
-                    self.actions,
-                    self.config,
-                    **kwargs)
+                script(self.interface, self.state, self.actions, self.config, **kwargs)
 
             self._execute_with_error_handling(script_name, execute_function)
 

@@ -4,18 +4,18 @@ Stats Tracker Bot - Tracks HP, Prayer, Run Energy, and Special Attack using both
 A simple bot that continuously monitors game stats and compares Tesseract OCR vs Template Matching OCR.
 Shows real-time statistics and accuracy comparison.
 """
+
 import logging
-import time
 from enum import Enum
 from typing import Dict, List
 
-from osrsbot.core.state_machine_bot import StateMachineBot
 from osrsbot.core.state_helpers import build_metadata_dict
+from osrsbot.core.state_machine_bot import StateMachineBot
 from osrsbot.core.state_types import (
-    StateResult,
+    StateExecutionContext,
     StateMetadata,
+    StateResult,
     StateTransition,
-    StateExecutionContext
 )
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class HPTrackerStates(Enum):
     """States for stats tracking bot."""
+
     IDLE = "idle"
     TRACKING = "tracking"
     COMPLETE = "complete"
@@ -45,10 +46,46 @@ class HPTrackerBot(StateMachineBot):
 
         # Per-stat tracking
         self.stats = {
-            "hp": {"tess_success": 0, "temp_success": 0, "matches": 0, "mismatches": 0, "tess_fail": 0, "temp_fail": 0, "recent_tess": [], "recent_temp": []},
-            "prayer": {"tess_success": 0, "temp_success": 0, "matches": 0, "mismatches": 0, "tess_fail": 0, "temp_fail": 0, "recent_tess": [], "recent_temp": []},
-            "run": {"tess_success": 0, "temp_success": 0, "matches": 0, "mismatches": 0, "tess_fail": 0, "temp_fail": 0, "recent_tess": [], "recent_temp": []},
-            "spec": {"tess_success": 0, "temp_success": 0, "matches": 0, "mismatches": 0, "tess_fail": 0, "temp_fail": 0, "recent_tess": [], "recent_temp": []},
+            "hp": {
+                "tess_success": 0,
+                "temp_success": 0,
+                "matches": 0,
+                "mismatches": 0,
+                "tess_fail": 0,
+                "temp_fail": 0,
+                "recent_tess": [],
+                "recent_temp": [],
+            },
+            "prayer": {
+                "tess_success": 0,
+                "temp_success": 0,
+                "matches": 0,
+                "mismatches": 0,
+                "tess_fail": 0,
+                "temp_fail": 0,
+                "recent_tess": [],
+                "recent_temp": [],
+            },
+            "run": {
+                "tess_success": 0,
+                "temp_success": 0,
+                "matches": 0,
+                "mismatches": 0,
+                "tess_fail": 0,
+                "temp_fail": 0,
+                "recent_tess": [],
+                "recent_temp": [],
+            },
+            "spec": {
+                "tess_success": 0,
+                "temp_success": 0,
+                "matches": 0,
+                "mismatches": 0,
+                "tess_fail": 0,
+                "temp_fail": 0,
+                "recent_tess": [],
+                "recent_temp": [],
+            },
         }
 
     # ==================== State Machine Configuration ====================
@@ -59,24 +96,27 @@ class HPTrackerBot(StateMachineBot):
 
     def define_state_metadata(self) -> Dict[Enum, StateMetadata]:
         """Define metadata for each state."""
-        return build_metadata_dict(HPTrackerStates, {
-            HPTrackerStates.IDLE: {
-                "name": "Idle",
-                "description": "Initialize HP tracking",
-                "max_retries": 1,
+        return build_metadata_dict(
+            HPTrackerStates,
+            {
+                HPTrackerStates.IDLE: {
+                    "name": "Idle",
+                    "description": "Initialize HP tracking",
+                    "max_retries": 1,
+                },
+                HPTrackerStates.TRACKING: {
+                    "name": "Tracking HP",
+                    "description": "Monitor HP with both OCR methods",
+                    "max_retries": 999999,  # Track indefinitely
+                    "timeout": 3600.0,  # 1 hour timeout per state execution
+                },
+                HPTrackerStates.COMPLETE: {
+                    "name": "Complete",
+                    "description": "Show final statistics",
+                    "max_retries": 1,
+                },
             },
-            HPTrackerStates.TRACKING: {
-                "name": "Tracking HP",
-                "description": "Monitor HP with both OCR methods",
-                "max_retries": 999999,  # Track indefinitely
-                "timeout": 3600.0,  # 1 hour timeout per state execution
-            },
-            HPTrackerStates.COMPLETE: {
-                "name": "Complete",
-                "description": "Show final statistics",
-                "max_retries": 1,
-            },
-        })
+        )
 
     def define_transitions(self) -> List[StateTransition]:
         """Define allowed state transitions."""
@@ -127,10 +167,11 @@ class HPTrackerBot(StateMachineBot):
         try:
             import cv2
             import numpy as np
+
             from osrsbot.services.template_ocr_service import (
-                get_template_ocr_service,
                 ORB_GREEN,
                 ORB_RED,
+                get_template_ocr_service,
             )
 
             template_ocr = get_template_ocr_service()
@@ -160,21 +201,28 @@ class HPTrackerBot(StateMachineBot):
                         w = region_config["width"]
                         h = region_config["height"]
 
-                        # Capture using relative coordinates (ScreenService handles conversion)
-                        pil_img = self.state.screen.capture(region=(x, y, w, h), relative=True)
+                        # Capture using relative coordinates (ScreenService handles
+                        # conversion)
+                        pil_img = self.state.screen.capture(
+                            region=(x, y, w, h), relative=True
+                        )
                         img_np = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
                         # Save debug images for first 3 reads
                         if self.total_reads <= 3:
                             import os
+
                             os.makedirs("ocr_debug", exist_ok=True)
-                            cv2.imwrite(f"ocr_debug/{stat_name}_raw_{self.total_reads}.png", img_np)
+                            cv2.imwrite(
+                                f"ocr_debug/{stat_name}_raw_{self.total_reads}.png",
+                                img_np,
+                            )
 
                         temp_val = template_ocr.extract_number(
                             img_np,
                             font_name="plain11",
                             colors=colors,
-                            correlation_threshold=0.98
+                            correlation_threshold=0.98,
                         )
                     except Exception as e:
                         logger.debug(f"{stat_name} template OCR failed: {e}")
@@ -214,10 +262,10 @@ class HPTrackerBot(StateMachineBot):
 
             logger.info(
                 f"[{self.total_reads:3d}] - "
-                f"HP:/{hp_tm or'XX':>3} - "
-                f"PR:/{pr_tm or'XX':>3} - "
-                f"RUN: {run_tm or'XX':>3} - "
-                f"SPEC:/{spec_tm or'XX':>3} - " 
+                f"HP:/{hp_tm or 'XX':>3} - "
+                f"PR:/{pr_tm or 'XX':>3} - "
+                f"RUN: {run_tm or 'XX':>3} - "
+                f"SPEC:/{spec_tm or 'XX':>3} - "
             )
 
             # Stats every 10 reads
@@ -226,8 +274,16 @@ class HPTrackerBot(StateMachineBot):
                 logger.info(f"STATISTICS (after {self.total_reads} reads)")
                 logger.info("-" * 80)
                 for name, stat in self.stats.items():
-                    tess_rate = (100 * stat["tess_success"] / self.total_reads) if self.total_reads > 0 else 0
-                    temp_rate = (100 * stat["temp_success"] / self.total_reads) if self.total_reads > 0 else 0
+                    tess_rate = (
+                        (100 * stat["tess_success"] / self.total_reads)
+                        if self.total_reads > 0
+                        else 0
+                    )
+                    temp_rate = (
+                        (100 * stat["temp_success"] / self.total_reads)
+                        if self.total_reads > 0
+                        else 0
+                    )
                     logger.info(
                         f"{name.upper():6} - Tess:{stat['tess_success']:3}/{self.total_reads} ({tess_rate:5.1f}%) "
                         f"Temp:{stat['temp_success']:3}/{self.total_reads} ({temp_rate:5.1f}%) "
@@ -244,6 +300,7 @@ class HPTrackerBot(StateMachineBot):
         except Exception as e:
             logger.error(f"Tracking error: {e}")
             import traceback
+
             traceback.print_exc()
             return StateResult.RETRY
 
@@ -262,12 +319,16 @@ class HPTrackerBot(StateMachineBot):
 
         for name, stat in self.stats.items():
             if self.total_reads > 0:
-                tess_rate = (100 * stat["tess_success"] / self.total_reads)
-                temp_rate = (100 * stat["temp_success"] / self.total_reads)
+                tess_rate = 100 * stat["tess_success"] / self.total_reads
+                temp_rate = 100 * stat["temp_success"] / self.total_reads
 
                 logger.info(f"\n{name.upper()}:")
-                logger.info(f"  Tesseract: {stat['tess_success']:3}/{self.total_reads} ({tess_rate:5.1f}%)")
-                logger.info(f"  Template:  {stat['temp_success']:3}/{self.total_reads} ({temp_rate:5.1f}%)")
+                logger.info(
+                    f"  Tesseract: {stat['tess_success']:3}/{self.total_reads} ({tess_rate:5.1f}%)"
+                )
+                logger.info(
+                    f"  Template:  {stat['temp_success']:3}/{self.total_reads} ({temp_rate:5.1f}%)"
+                )
                 logger.info(f"  Matches:   {stat['matches']:3}")
                 logger.info(f"  Mismatches:{stat['mismatches']:3}")
 

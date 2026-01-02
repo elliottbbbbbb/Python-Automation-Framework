@@ -1,8 +1,11 @@
 """Test digit classifier with actual OSRS HP screenshot."""
 
 import sys
+
 from PIL import Image
+
 from osrsbot.services.digit_classifier import get_digit_classifier
+
 
 def test_hp_image(image_path: str):
     """
@@ -33,11 +36,13 @@ def test_hp_image(image_path: str):
         # Save segments for inspection
         for i, seg in enumerate(digit_images):
             seg.save(f"hp_segment_{i}.png")
-            print(f"    Segment {i}: {seg.width}x{seg.height} -> saved as hp_segment_{i}.png")
+            print(
+                f"    Segment {i}: {seg.width}x{seg.height} -> saved as hp_segment_{i}.png"
+            )
 
         # Calculate aspect ratio of the digit region
-        img_gray = img.convert('L')
-        img_array = list(img_gray.getdata())
+        img_gray = img.convert("L")
+        list(img_gray.getdata())
 
         # Predict the number
         print("\nPrediction:")
@@ -65,12 +70,15 @@ def test_hp_image(image_path: str):
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         # Try to use an existing debug image if available
         import os
+
         if os.path.exists("ocr_debug/hp_strategy_0.png"):
             print("No image path provided, using ocr_debug/hp_strategy_0.png")
             test_hp_image("ocr_debug/hp_strategy_0.png")

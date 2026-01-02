@@ -74,6 +74,35 @@ This document lists every file in the codebase and its clear, single responsibil
 - Blacklists inaccessible locations temporarily
 - **Improves**: Color-based clicking reliability
 
+### [status_socket_service.py](src/osrsbot/services/status_socket_service.py) ✨ **NEW**
+**Responsibility**: Real-time player position and camera data from RuneLite Status Socket plugin
+- Monitors `live_data.json` for player state updates
+- File modification time caching to avoid re-parsing
+- Graceful degradation if plugin unavailable
+- Stuck detection (player not moving)
+- **Dependencies**: RuneLite Status Socket plugin (optional)
+- **Used By**: WalkerService for world coordinate navigation
+
+### [walker_service.py](src/osrsbot/services/walker_service.py) ✨ **NEW**
+**Responsibility**: World coordinate pathfinding with camera rotation compensation
+- Converts world tiles to minimap pixels using 2D rotation matrix
+- Handles camera rotation automatically (0-2048 yaw range)
+- Waypoint-based path following
+- Arrival detection with configurable tolerance
+- **Dependencies**: StatusSocketService, MouseService, ScreenService
+- **Key Algorithm**: Rotation matrix for camera angle compensation
+- **Used By**: GameActions (`walk_to_world_coordinate`, `walk_path`)
+
+### [arduino_mouse_service.py](src/osrsbot/services/arduino_mouse_service.py) ✨ **NEW**
+**Responsibility**: Hardware mouse control via Arduino serial connection (optional)
+- Drop-in replacement for MouseService with identical interface
+- Serial communication protocol for movement and clicks
+- Multi-pass position correction (up to 2 retries for accuracy)
+- Automatic fallback to software mouse if Arduino unavailable
+- **Dependencies**: pyserial (optional), Arduino hardware with custom firmware
+- **Use Case**: Enhanced anti-detection through hardware-based input
+- **Status**: Optional feature (disabled by default in config)
+
 ---
 
 ## Controllers (`src/osrsbot/controllers/`)
@@ -164,9 +193,10 @@ This document lists every file in the codebase and its clear, single responsibil
 - **Status**: ✅ **Active** (state machine version)
 
 ### [test_state_machine_bot.py](src/osrsbot/scripts/test_state_machine_bot.py)
-**Responsibility**: Test bot demonstrating StateMachineBot features
-- Tests state transitions and retry logic
-- Used for framework validation
+**Responsibility**: Comprehensive test bot demonstrating all framework features
+- Tests 9 major features: minimap navigation, walker, Arduino mouse, inventory, color detection, templates, OCR, combat
+- Validates state transitions and retry logic
+- Used for framework validation and regression testing
 
 ### [legacy/green_dragons.py](src/osrsbot/scripts/legacy/green_dragons.py)
 **Responsibility**: ⚠️ **DEPRECATED** - Legacy Bot-based Green Dragons implementation
@@ -213,17 +243,17 @@ This document lists every file in the codebase and its clear, single responsibil
 | Category | Count | Purpose |
 |----------|-------|---------|
 | **Core** | 4 | Bot frameworks and window management |
-| **Services** | 7 | Reusable game interaction services |
+| **Services** | 10 | Reusable game interaction services ✨ |
 | **Controllers** | 2 | Action coordination and bot execution |
 | **Queries** | 1 | Game state reading |
-| **Models** | 2 | Configuration and UI element data structures ✨ |
+| **Models** | 2 | Configuration and UI element data structures |
 | **Utils** | 2 | Shared utilities (OCR, colors) |
 | **App** | 2 | CLI and calibration |
 | **Scripts (Active)** | 2 | Bot implementations |
 | **Scripts (Legacy)** | 3 | Deprecated implementations |
 | **Config** | 1 | Constants and configurations |
 | **Entry** | 2 | Package entry points |
-| **Total** | 28 | Active Python files ✨ |
+| **Total** | 31 | Active Python files ✨ |
 
 ---
 
@@ -380,4 +410,20 @@ Longer description explaining:
 
 ---
 
-**Last Updated**: December 11, 2025
+---
+
+## Recent Changes (December 22, 2025)
+
+### ✨ New Services Added
+- **StatusSocketService**: Real-time player position tracking from RuneLite plugin
+- **WalkerService**: Advanced pathfinding with 2D rotation matrix for camera compensation
+- **ArduinoMouseService**: Optional hardware mouse control for enhanced anti-detection
+
+### Updates
+- **test_state_machine_bot.py**: Expanded to test 9 features (was 7)
+- **Service Count**: Increased from 7 to 10 services
+- **Total Files**: Increased from 28 to 31 active Python files
+
+---
+
+**Last Updated**: December 22, 2025

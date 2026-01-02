@@ -4,16 +4,16 @@ WalkerService - Coordinate-based pathfinding with camera rotation compensation.
 Converts world coordinates to minimap pixels using 2D rotation matrix.
 Handles iterative waypoint following for navigation.
 """
-import math
-import time
-import logging
-from dataclasses import dataclass
-from typing import Tuple, Optional, List
 
-from osrsbot.services.status_socket_service import StatusSocketService
+import logging
+import math
+from dataclasses import dataclass
+from typing import List, Optional, Tuple
+
+from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.core.game_interface import GameInterface
+from osrsbot.services.status_socket_service import StatusSocketService
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WalkerConfig:
     """Configuration for walker/pathfinding system."""
+
     minimap_center_x: int = 654
     minimap_center_y: int = 111
     tile_size: int = 4  # Pixels per tile on minimap
@@ -47,7 +48,7 @@ class WalkerService:
         status_socket: StatusSocketService,
         mouse: MouseService,
         screen: ScreenService,
-        interface: GameInterface
+        interface: GameInterface,
     ):
         """
         Initialize walker with required dependencies.
@@ -74,7 +75,7 @@ class WalkerService:
         target_x: int,
         target_y: int,
         path: Optional[List[Tuple[int, int]]] = None,
-        move_style: MovementStyle = "curved"
+        move_style: MovementStyle = "curved",
     ) -> bool:
         """
         Walk to world coordinates.
@@ -96,9 +97,7 @@ class WalkerService:
             return self.walk_path([(target_x, target_y)], move_style=move_style)
 
     def walk_path(
-        self,
-        waypoints: List[Tuple[int, int]],
-        move_style: MovementStyle = "curved"
+        self, waypoints: List[Tuple[int, int]], move_style: MovementStyle = "curved"
     ) -> bool:
         """
         Follow a predefined path of world coordinates.
@@ -133,10 +132,7 @@ class WalkerService:
         return True
 
     def _walk_to_waypoint(
-        self,
-        waypoint_x: int,
-        waypoint_y: int,
-        move_style: MovementStyle
+        self, waypoint_x: int, waypoint_y: int, move_style: MovementStyle
     ) -> bool:
         """
         Walk to a single waypoint with distance-based chunking.
@@ -160,8 +156,7 @@ class WalkerService:
 
             # Calculate distance to waypoint
             distance = self._calculate_distance(
-                state.world_x, state.world_y,
-                waypoint_x, waypoint_y
+                state.world_x, state.world_y, waypoint_x, waypoint_y
             )
 
             # Check if arrived
@@ -177,9 +172,11 @@ class WalkerService:
             if distance > self.config.max_click_distance:
                 # Click max_click_distance tiles in direction of target
                 click_target = self._get_intermediate_point(
-                    state.world_x, state.world_y,
-                    waypoint_x, waypoint_y,
-                    self.config.max_click_distance
+                    state.world_x,
+                    state.world_y,
+                    waypoint_x,
+                    waypoint_y,
+                    self.config.max_click_distance,
                 )
                 logger.debug(
                     f"Target far ({distance:.1f} tiles), "
@@ -191,14 +188,18 @@ class WalkerService:
 
             # Convert to minimap coordinates
             minimap_pos = self.world_to_minimap(
-                click_target[0], click_target[1],
-                state.world_x, state.world_y,
-                state.camera_yaw
+                click_target[0],
+                click_target[1],
+                state.world_x,
+                state.world_y,
+                state.camera_yaw,
             )
 
             if not minimap_pos:
                 logger.warning(
-                    f"Target ({click_target[0]}, {click_target[1]}) out of minimap range"
+                    f"Target ({
+                        click_target[0]}, {
+                        click_target[1]}) out of minimap range"
                 )
                 return False
 
@@ -211,9 +212,10 @@ class WalkerService:
 
             # Wait for movement to start/complete
             if not self.status_socket.wait_for_arrival(
-                waypoint_x, waypoint_y,
+                waypoint_x,
+                waypoint_y,
                 tolerance=self.config.arrival_tolerance,
-                timeout=10.0
+                timeout=10.0,
             ):
                 logger.warning(
                     f"Timeout on attempt {attempt + 1}/{max_attempts} "
@@ -232,12 +234,7 @@ class WalkerService:
         return False
 
     def world_to_minimap(
-        self,
-        world_x: int,
-        world_y: int,
-        player_x: int,
-        player_y: int,
-        camera_yaw: int
+        self, world_x: int, world_y: int, player_x: int, player_y: int, camera_yaw: int
     ) -> Optional[Tuple[int, int]]:
         """
         Convert world tile coordinates to minimap pixel coordinates.
@@ -300,12 +297,7 @@ class WalkerService:
         return (minimap_x, minimap_y)
 
     def _get_intermediate_point(
-        self,
-        start_x: int,
-        start_y: int,
-        end_x: int,
-        end_y: int,
-        max_distance: int
+        self, start_x: int, start_y: int, end_x: int, end_y: int, max_distance: int
     ) -> Tuple[int, int]:
         """
         Get intermediate point max_distance tiles from start toward end.
@@ -336,12 +328,10 @@ class WalkerService:
 
     def _calculate_distance(self, x1: int, y1: int, x2: int, y2: int) -> float:
         """Calculate Euclidean distance between two points."""
-        return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
     def compute_minimap_click(
-        self,
-        target_x: int,
-        target_y: int
+        self, target_x: int, target_y: int
     ) -> Optional[Tuple[int, int]]:
         """
         Calculate minimap pixel coordinates for target world position.
@@ -361,7 +351,5 @@ class WalkerService:
             return None
 
         return self.world_to_minimap(
-            target_x, target_y,
-            state.world_x, state.world_y,
-            state.camera_yaw
+            target_x, target_y, state.world_x, state.world_y, state.camera_yaw
         )

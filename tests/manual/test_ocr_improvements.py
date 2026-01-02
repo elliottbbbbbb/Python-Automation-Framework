@@ -1,9 +1,11 @@
 """Test OCR improvements with drop shadow removal and color-adaptive preprocessing."""
 
 import sys
-import os
+
 from PIL import Image
-from osrsbot.services.ocr_service import OCRService, OCRRegion
+
+from osrsbot.services.ocr_service import OCRRegion, OCRService
+
 
 def test_ocr_improvements(image_path: str, expected_value: int):
     """
@@ -52,7 +54,9 @@ def test_ocr_improvements(image_path: str, expected_value: int):
             img_color_adapted = ocr._color_adaptive_preprocessing(img)
             if img_color_adapted is not None:
                 img_color_adapted.save("debug_color_adapted.png")
-                print(f"    [OK] Color-adaptive preprocessing succeeded for '{color}' text")
+                print(
+                    f"    [OK] Color-adaptive preprocessing succeeded for '{color}' text"
+                )
                 print("    Saved: debug_color_adapted.png")
             else:
                 print(f"    [SKIP] No color-specific preprocessing for '{color}'")
@@ -110,14 +114,18 @@ def test_ocr_improvements(image_path: str, expected_value: int):
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python test_ocr_improvements.py <image_path> <expected_value>")
         print("\nExample:")
         print("  python test_ocr_improvements.py ocr_debug/hp_strategy_0.png 70")
-        print("\nThis will test the new drop shadow removal and color-adaptive preprocessing.")
+        print(
+            "\nThis will test the new drop shadow removal and color-adaptive preprocessing."
+        )
     else:
         image_path = sys.argv[1]
         expected_value = int(sys.argv[2])
