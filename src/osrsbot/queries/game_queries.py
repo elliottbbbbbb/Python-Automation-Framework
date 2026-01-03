@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from osrsbot.models.config import Config
 
 # Import new focused modules
+from osrsbot.queries.bank_queries import BankQueries
 from osrsbot.queries.combat_queries import CombatQueries
 from osrsbot.queries.stat_queries import StatQueries
 from osrsbot.services.template_ocr_service import TemplateOCRService
@@ -62,11 +63,13 @@ class GameState:
                 screen_service, config, template_service
             )
             self.stat_queries = StatQueries(screen_service, ocr_service, config)
+            self.bank_queries = BankQueries(screen_service)
         else:
             self.combat_queries = None
             self.stat_queries = None
+            self.bank_queries = None
             logger.warning(
-                "ScreenService not available - combat and stat queries unavailable"
+                "ScreenService not available - combat, stat, and bank queries unavailable"
             )
 
         # Initialize inventory detection (already exists)

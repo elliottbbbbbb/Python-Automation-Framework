@@ -204,10 +204,10 @@ class InventoryState:
         filled_slots: List[int] = []
         empty_slots: List[int] = []
 
-        # Capture current screen as grayscale for template matching
-        img_gray = self.screen.capture_grayscale()
+        # Capture ONE screenshot and use it for both grid detection and pixel sampling
+        img_color = self.screen.capture()
 
-        if img_gray is None:
+        if img_color is None:
             logger.warning("Failed to capture screenshot, returning empty state")
             return InventorySnapshot(
                 filled_slots=[],
@@ -216,7 +216,16 @@ class InventoryState:
                 timestamp=time.time(),
             )
 
-        # Detect inventory grid using template matching
+        # Convert color PIL image to numpy array for pixel access
+        import numpy as np
+        import cv2
+
+        img_array = np.array(img_color)
+
+        # Convert the SAME image to grayscale for template matching
+        img_gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+
+        # Detect inventory grid using template matching on the SAME screenshot
         detected = self.template_service.detect_grid("inventory", img_gray, force=True)
 
         if not detected:
@@ -249,41 +258,86 @@ class InventoryState:
                 empty_slots.append(slot_index)
                 continue
 
-            # Get center pixel of slot using ScreenService
+            # Multi-point sampling: check 5 pixels (center + 4 around it)
             center_x, center_y = slot_element.center
 
             try:
-                # Sample pixel color at center (relative to game window)
-                pixel_color = self.screen.get_pixel_color(
-                    center_x, center_y, relative=True
-                )
+                # Sample 9 points in a 3x3 grid around center
+                sample_points = [
+                    (center_x - 4, center_y - 4), (center_x, center_y - 4), (center_x + 4, center_y - 4),
+                    (center_x - 4, center_y),     (center_x, center_y),     (center_x + 4, center_y),
+                    (center_x - 4, center_y + 4), (center_x, center_y + 4), (center_x + 4, center_y + 4),
+                ]
+
+                # Collect all pixel colors
+                sampled_colors = []
+                for px, py in sample_points:
+                    try:
+                        pixel_color_sample = tuple(int(c) for c in img_array[py, px])
+                        sampled_colors.append(pixel_color_sample)
+                    except:
+                        pass  # Out of bounds, skip this point
+
+                # Calculate variance of the sampled pixels
+                # Empty slots have low variance (uniform brown color)
+                # Items have high variance (different colors across the icon)
+                if len(sampled_colors) >= 5:
+                    # Calculate std dev across all RGB channels
+                    import statistics
+                    all_values = [c for color in sampled_colors for c in color]
+                    variance = statistics.stdev(all_values) if len(all_values) > 1 else 0
+
+                    # If variance is low, it's likely empty (uniform color)
+                    # If variance is high, it's likely an item (varied colors)
+                    variance_threshold = 10.0
+                    is_empty = variance < variance_threshold
+                    matches_count = int(variance)  # For logging
+                    total_samples = len(sampled_colors)
+                else:
+                    is_empty = True  # Default to empty if can't sample enough points
+                    matches_count = 0
+                    total_samples = len(sampled_colors)
+
+                # Get center pixel for logging
+                pixel_color = tuple(int(c) for c in img_array[center_y, center_x])
+
             except Exception as e:
                 logger.warning(f"Could not sample slot {slot_index}: {e}")
                 empty_slots.append(slot_index)
                 continue
 
-            # Check if pixel matches empty slot color
-            if colors_match(pixel_color, self.empty_slot_color, self.color_tolerance):
-                # Pixel matches empty color → slot is empty
-                empty_slots.append(slot_index)
-                logger.debug(
-                    f"Slot {slot_index}: EMPTY (color={pixel_color}, "
-                    f"expected={self.empty_slot_color})"
-                )
-            else:
-                # Pixel doesn't match → slot has item
-                filled_slots.append(slot_index)
-                logger.debug(
-                    f"Slot {slot_index}: FILLED (color={pixel_color}, "
-                    f"expected={self.empty_slot_color})"
-                )
+            # Calculate per-channel diffs for debugging
+            r_diff = abs(pixel_color[0] - self.empty_slot_color[0])
+            g_diff = abs(pixel_color[1] - self.empty_slot_color[1])
+            b_diff = abs(pixel_color[2] - self.empty_slot_color[2])
 
-        return InventorySnapshot(
+            logger.info(
+                f"Slot {slot_index:2d} @ ({center_x},{center_y}): RGB={pixel_color} vs {self.empty_slot_color}, "
+                f"diffs=[{r_diff},{g_diff},{b_diff}], variance={matches_count}, samples={total_samples} → {'EMPTY' if is_empty else 'FILLED'}"
+            )
+
+            if is_empty:
+                empty_slots.append(slot_index)
+            else:
+                filled_slots.append(slot_index)
+
+        snapshot = InventorySnapshot(
             filled_slots=filled_slots,
             empty_slots=empty_slots,
             total_items=len(filled_slots),
             timestamp=time.time(),
         )
+
+        logger.info("=" * 80)
+        logger.info(
+            f"INVENTORY SCAN COMPLETE: {snapshot.total_items} items detected, "
+            f"{len(snapshot.empty_slots)} empty slots"
+        )
+        logger.info(f"Filled slots: {sorted(snapshot.filled_slots)}")
+        logger.info(f"Empty slots: {sorted(snapshot.empty_slots)}")
+        logger.info("=" * 80)
+
+        return snapshot
 
     def clear_cache(self):
         """Clear cached inventory state, forcing fresh scan on next query."""

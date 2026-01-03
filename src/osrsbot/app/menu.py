@@ -9,7 +9,8 @@ from osrsbot.models.config import Config
 from osrsbot.scripts.comprehensive_state_bot_test import ComprehensiveTestBot
 from osrsbot.scripts.hp_tracker import HPTrackerBot
 from osrsbot.scripts.test_inventory_clicks import test_inventory_clicks
-
+from osrsbot.scripts.bs_flax import grimy_flax
+from osrsbot.scripts.nmz_afk import NMZAfkBot
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,8 @@ def main() -> None:
         print("2. Comprehensive Test Bot (Tests All Framework Features)")
         print("3. Stats Tracker (HP/Prayer/Run/Spec OCR Comparison)")
         print("4. Template Click Test (Test All Template-Matched UI Elements)")
+        print("5. Manual Cleaning Bankstander (Grimy Toadflax)")
+        print("6. NMZ AFK Bot (1 HP Absorption Strategy)")
 
         choice = input("\nSelect: ").strip()
 
@@ -88,16 +91,7 @@ def main() -> None:
                 input("\nPress Enter to start...")
 
                 runner = ScriptRunner(window_title)
-
-                # Manually instantiate bot with debug UI enabled
-                bot = ComprehensiveTestBot(
-                    interface=runner.interface,
-                    state=runner.state,
-                    actions=runner.actions,
-                    config=runner.config,
-                    debug_ui=False,  # Enable debug UI
-                )
-                bot.run(bank_location="", runs=runs)
+                runner.run_script(ComprehensiveTestBot, runs=runs, bank_location="")
             except Exception as e:
                 logger.error(f"Comprehensive Test Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
@@ -116,16 +110,7 @@ def main() -> None:
                 input("\nPress Enter to start...")
 
                 runner = ScriptRunner(window_title)
-
-                # Instantiate HP Tracker bot
-                bot = HPTrackerBot(
-                    interface=runner.interface,
-                    state=runner.state,
-                    actions=runner.actions,
-                    config=runner.config,
-                    debug_ui=False,
-                )
-                bot.run(bank_location="", runs=1)
+                runner.run_script(HPTrackerBot, runs=1, bank_location="")
             except Exception as e:
                 logger.error(f"HP Tracker Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
@@ -155,6 +140,65 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Template Click Test failed: {e}", exc_info=True)
                 print(f"❌ Test error: {e}")
+                sys.exit(1)
+
+        elif choice == "5":
+            logger.info("Starting Manual Cleaning Bankstander")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                runs = get_valid_int("Number of cycles [default: 999]: ", default=999)
+
+                print("\n🌿 Manual Cleaning Bankstander (Grimy Toadflax)")
+                print("This bot will:")
+                print("  1. Click banker to open bank (template matching)")
+                print("  2. Withdraw 28 grimy toadflax (template matching)")
+                print("  3. Click each inventory slot to clean herbs")
+                print("  4. Deposit cleaned toadflax")
+                print("  5. Repeat")
+                print("\nMake sure:")
+                print("  • You are standing near a banker")
+                print("  • You have grimy toadflax in bank")
+                print("  • Herblore 50+ to clean toadflax")
+                print("\n📝 Logs will be saved to: bot_debug.log")
+                print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(grimy_flax, runs=runs, bank_location="")
+            except Exception as e:
+                logger.error(f"Manual Cleaning Bankstander failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "6":
+            logger.info("Starting NMZ AFK Bot")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                runs = get_valid_int("Number of cycles [default: 999]: ", default=999)
+
+                print("\n💤 NMZ AFK Bot (1 HP Absorption Strategy)")
+                print("This bot will:")
+                print("  1. Drink overload potion")
+                print("  2. Lower HP to 1 with rock cake")
+                print("  3. Drink 6 doses of absorption")
+                print("  4. Monitor HP and use locator orb when HP >= 2")
+                print("  5. Re-dose overload every 5 minutes")
+                print("  6. Re-dose absorption every 5 minutes")
+                print("\nMake sure:")
+                print("  • You are INSIDE the NMZ dream (manual entry)")
+                print("  • Inventory has: Overload, Absorption, Rock cake, Locator orb")
+                print("  • Item templates are configured in config.json")
+                print("\n📝 Logs will be saved to: bot_debug.log")
+                print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(NMZAfkBot, runs=runs, bank_location="")
+            except Exception as e:
+                logger.error(f"NMZ AFK Bot failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
                 sys.exit(1)
 
         else:

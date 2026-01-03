@@ -36,21 +36,29 @@ class UIElement:
         y0: Top-left Y (relative to window)
         x1: Bottom-right X (relative to window)
         y1: Bottom-right Y (relative to window)
+        _center_x: Optional pre-calculated center X (avoids rounding errors)
+        _center_y: Optional pre-calculated center Y (avoids rounding errors)
     """
 
     x0: int
     y0: int
     x1: int
     y1: int
+    _center_x: Optional[int] = None
+    _center_y: Optional[int] = None
 
     @property
     def center_x(self) -> int:
         """Center X coordinate (relative to window)"""
+        if self._center_x is not None:
+            return self._center_x
         return self.x0 + (self.x1 - self.x0) // 2
 
     @property
     def center_y(self) -> int:
         """Center Y coordinate (relative to window)"""
+        if self._center_y is not None:
+            return self._center_y
         return self.y0 + (self.y1 - self.y0) // 2
 
     @property
@@ -276,19 +284,24 @@ class UIElementGrid:
         for row in range(self.num_rows):
             for col in range(self.num_cols):
                 # Calculate cell center first (more accurate)
-                center_x = grid_x + (col + 0.5) * cell_w
-                center_y = grid_y + (row + 0.5) * cell_h
+                center_x_float = grid_x + (col + 0.5) * cell_w
+                center_y_float = grid_y + (row + 0.5) * cell_h
+
+                # Round center to int - this is the EXACT center we'll use
+                center_x_int = int(round(center_x_float))
+                center_y_int = int(round(center_y_float))
 
                 # Calculate bounds from center with padding
                 half_w = (cell_w / 2) - self.padding
                 half_h = (cell_h / 2) - self.padding
 
-                x0 = int(center_x - half_w)
-                y0 = int(center_y - half_h)
-                x1 = int(center_x + half_w)
-                y1 = int(center_y + half_h)
+                x0 = int(center_x_float - half_w)
+                y0 = int(center_y_float - half_h)
+                x1 = int(center_x_float + half_w)
+                y1 = int(center_y_float + half_h)
 
-                element = UIElement(x0, y0, x1, y1)
+                # Store the precise center to avoid recalculation rounding errors
+                element = UIElement(x0, y0, x1, y1, _center_x=center_x_int, _center_y=center_y_int)
                 self.elements.append(element)
 
         logger.debug(

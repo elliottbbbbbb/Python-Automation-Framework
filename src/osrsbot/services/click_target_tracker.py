@@ -22,6 +22,7 @@ class ClickRecord:
     timestamp: float
     x: int
     y: int
+    success: bool = True  # Track if click achieved desired outcome
 
 
 @dataclass
@@ -53,17 +54,18 @@ class ClickTargetTracker:
         self._click_history: deque = deque(maxlen=history_size)
         self._blacklist: List[BlacklistEntry] = []
 
-    def add_click(self, x: int, y: int) -> None:
+    def add_click(self, x: int, y: int, success: bool = True) -> None:
         """
         Record a click in history.
 
         Args:
             x: Click X coordinate (relative to window)
             y: Click Y coordinate (relative to window)
+            success: Whether the click achieved its desired outcome
         """
-        record = ClickRecord(timestamp=time.time(), x=x, y=y)
+        record = ClickRecord(timestamp=time.time(), x=x, y=y, success=success)
         self._click_history.append(record)
-        logger.debug(f"Recorded click at ({x}, {y})")
+        logger.debug(f"Recorded click at ({x}, {y}), success={success}")
 
     def get_recent_clicks(self, n: int) -> List[ClickRecord]:
         """
@@ -115,6 +117,59 @@ class ClickTargetTracker:
             f"Stuck detected: last {window} clicks within {threshold_pixels}px"
         )
         return True
+
+    def has_repeated_failures(
+        self, window: int = 6, failure_threshold: int = 3, radius_pixels: int = 100
+    ) -> bool:
+        """
+        Check if recent clicks in the same area repeatedly failed.
+
+        Detects when multiple unsuccessful clicks happen in the same general area,
+        indicating an inaccessible target (e.g., NPC in building).
+
+        Args:
+            window: Number of recent clicks to examine
+            failure_threshold: Minimum failures needed to trigger
+            radius_pixels: Max distance between failed clicks to count as "same area"
+
+        Returns:
+            True if repeated failures detected in same area
+        """
+        recent_clicks = self.get_recent_clicks(window)
+
+        if len(recent_clicks) < failure_threshold:
+            return False
+
+        # Get all failed clicks
+        failed_clicks = [c for c in recent_clicks if not c.success]
+
+        if len(failed_clicks) < failure_threshold:
+            return False
+
+        # Check if failures are clustered in same area
+        # Take the most recent failure as reference point
+        if not failed_clicks:
+            return False
+
+        ref_click = failed_clicks[-1]
+
+        # Count how many failures are within radius of reference
+        clustered_failures = 0
+        for click in failed_clicks:
+            distance = (
+                (click.x - ref_click.x) ** 2 + (click.y - ref_click.y) ** 2
+            ) ** 0.5
+            if distance <= radius_pixels:
+                clustered_failures += 1
+
+        if clustered_failures >= failure_threshold:
+            logger.warning(
+                f"Repeated failures detected: {clustered_failures} failed clicks "
+                f"within {radius_pixels}px of ({ref_click.x}, {ref_click.y})"
+            )
+            return True
+
+        return False
 
     def blacklist_location(
         self, x: int, y: int, duration: float = 12.0, radius: int = 25

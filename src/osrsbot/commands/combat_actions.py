@@ -316,6 +316,32 @@ class CombatActions:
 
         return success
 
+    def mark_last_attack_failed(self) -> None:
+        """
+        Mark the most recent attack click as failed.
+
+        Call this when an attack click doesn't result in combat starting.
+        Enables automatic blacklisting of inaccessible NPCs.
+        """
+        if self._target_tracker._click_history:
+            last_click = self._target_tracker._click_history[-1]
+            last_click.success = False
+            logger.debug(
+                f"Marked last click at ({last_click.x}, {last_click.y}) as failed"
+            )
+
+            # Check for repeated failures and blacklist if needed
+            if self._target_tracker.has_repeated_failures(
+                window=6, failure_threshold=3, radius_pixels=100
+            ):
+                logger.warning("Repeated attack failures detected, blacklisting area")
+                self._target_tracker.blacklist_location(
+                    last_click.x,
+                    last_click.y,
+                    duration=TARGET_SELECTION.blacklist_duration,
+                    radius=TARGET_SELECTION.blacklist_radius,
+                )
+
     def reset_targeting(self) -> None:
         """Clear target tracking and blacklist."""
         self._target_tracker.reset()

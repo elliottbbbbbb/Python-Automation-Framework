@@ -20,10 +20,14 @@ Migration path:
 import logging
 import random
 import time
+from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
+import cv2 as cv
+import numpy as np
 import pyautogui
 
+from osrsbot.commands.bank_actions import BankActions
 from osrsbot.commands.combat_actions import CombatActions
 
 # Import new focused modules
@@ -31,6 +35,7 @@ from osrsbot.commands.inventory_actions import InventoryActions
 from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.models.config import Config
+from osrsbot.queries.bank_queries import BankQueries
 from osrsbot.services.mouse_service import MouseService, MovementStyle
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_match_service import TemplateMatchService
@@ -73,6 +78,9 @@ class GameActions:
         self.coord_resolver = CoordinateResolver(screen, config, template_service)
         self.timing = TimingHelper(config, anti_ban_service)
 
+        # Initialize bank queries
+        bank_queries = BankQueries(screen)
+
         # Initialize focused modules
         self.inventory = InventoryActions(
             mouse, self.coord_resolver, self.timing, anti_ban_service
@@ -80,9 +88,15 @@ class GameActions:
         self.combat = CombatActions(
             mouse, screen, self.coord_resolver, self.timing, config, anti_ban_service
         )
+        self.bank = BankActions(mouse, bank_queries, self.coord_resolver, self.timing)
 
     # ==================== Backward Compatibility Methods ====================
     # These delegate to new modules while maintaining exact same API
+
+    def click_banker(self, banker_templates: List[str], threshold: float = 0.7) -> bool:
+        """Find and click banker (delegates to BankActions)."""
+        return self.bank.click_banker(banker_templates, threshold)
+
 
     # --- Timing/Wait (delegates to TimingHelper) ---
     def wait(self, timing_type: str) -> None:
@@ -206,6 +220,15 @@ class GameActions:
     def reset_click_tracking(self) -> None:
         """Reset target tracking."""
         self.combat.reset_targeting()
+
+    def mark_last_attack_failed(self) -> None:
+        """
+        Mark the most recent attack click as failed.
+
+        Call this when an attack click doesn't result in combat starting.
+        Enables automatic blacklisting of inaccessible NPCs.
+        """
+        self.combat.mark_last_attack_failed()
 
     # --- Legacy methods that stay in facade (not refactored yet) ---
 
@@ -377,9 +400,13 @@ class GameActions:
 
     def bank_deposit_all(self) -> bool:
         """Click bank deposit all button."""
-        if not self.click_coordinate(("ui", "bank_deposit_all")):
-            logger.error("Failed to click deposit all")
+    
+        if not self.click_template(
+            "src\\osrsbot\\images\\bot\\ui_templates\\bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
+        ):
+            logger.error("Failed to click bank deposit all")
             return False
+
 
         self.wait("medium")
         return True
@@ -390,8 +417,10 @@ class GameActions:
             logger.error("Item name cannot be empty")
             return False
 
-        if not self.click_coordinate(("ui", "bank_search")):
-            logger.error("Failed to click bank search")
+        if not self.click_template(
+            "templates/ui/bank_search_box.png", "bank search box", threshold=0.7
+        ):
+            logger.error("Failed to focus bank search box")
             return False
 
         self.wait("short")
@@ -446,3 +475,39 @@ class GameActions:
             return False
 
         return self.walker.walk_path(waypoints, move_style=move_style)
+
+    # ==================== Banking Helper Methods ====================
+    # Delegate to BankActions module
+
+    def is_bank_open(self, search_button_template: str) -> bool:
+        """Check if bank is open (delegates to BankActions)."""
+        return self.bank.is_bank_open(search_button_template)
+
+    def click_banker(
+        self, banker_templates: List[str], threshold: float = 0.7
+    ) -> bool:
+        """Find and click banker (delegates to BankActions)."""
+        return self.bank.click_banker(banker_templates, threshold)
+
+    def click_template(
+        self, template_path: str, item_name: str, threshold: float = 0.7
+    ) -> bool:
+        """Find and click template (delegates to BankActions)."""
+        return self.bank.click_template(template_path, item_name, threshold)
+
+    def bank_search_and_withdraw(
+        self,
+        search_button_template: str,
+        item_template: str,
+        item_name: str,
+        search_text: str,
+        item_threshold: float = 0.7,
+    ) -> bool:
+        """Search and withdraw item (delegates to BankActions)."""
+        return self.bank.search_and_withdraw(
+            search_button_template,
+            item_template,
+            item_name,
+            search_text,
+            item_threshold,
+        )

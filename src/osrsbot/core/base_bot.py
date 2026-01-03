@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from osrsbot.commands.game_actions import GameActions as Actions
 from osrsbot.constants import GAME_TIMING
@@ -28,12 +28,84 @@ class Bot(ABC):
         actions: Actions,
         config: Config,
         script_name: str = "Base Bot",
+        enable_exit_key: bool = False,
+        enable_status_ui: bool = False,
     ):
         self.interface = interface
         self.state = state
         self.actions = actions
         self.config = config
         self.script_name = script_name
+
+        # Optional features
+        self._exit_requested = False
+        self._enable_exit_key = enable_exit_key
+        self._enable_status_ui = enable_status_ui
+
+        # UI state tracking
+        self._ui_state = "STARTING"
+        self._ui_action = "Initializing..."
+
+        # Start optional features
+        if self._enable_exit_key:
+            self._start_keyboard_listener()
+
+    def _start_keyboard_listener(self):
+        """Start a background thread to listen for 'q' key press to exit."""
+
+        def on_press(key):
+            try:
+                if hasattr(key, "char") and key.char == "q":
+                    self._exit_requested = True
+                    logger.info("Exit requested by user (pressed 'q')")
+                    print("\n🛑 Exit requested... finishing current action...\n")
+                    return False  # Stop listener
+            except Exception as e:
+                logger.error(f"Error in keyboard listener: {e}")
+
+        try:
+            from pynput import keyboard as kb
+
+            listener = kb.Listener(on_press=on_press)
+            listener.daemon = True
+            listener.start()
+            logger.info("Keyboard listener started (press 'q' to exit)")
+
+            # Print UI instructions
+            print("\n" + "=" * 60)
+            print(f"{self.script_name.upper()} - CONTROLS")
+            print("=" * 60)
+            print("Press 'q' at any time to gracefully exit")
+            print("=" * 60 + "\n")
+        except ImportError:
+            logger.warning("pynput not installed, 'q' exit feature disabled")
+            print("⚠️  Install pynput for 'q' to exit: pip install pynput\n")
+
+    def _check_exit_requested(self) -> None:
+        """Check if user requested exit via 'q' key and raise KeyboardInterrupt if so."""
+        if self._exit_requested:
+            logger.info("Exit check: User requested exit")
+            raise KeyboardInterrupt("User requested exit via 'q' key")
+
+    def _update_ui(self, state: str, action: str) -> None:
+        """
+        Update the console UI with current state and action.
+
+        Only updates if status UI is enabled.
+
+        Args:
+            state: Current state name (e.g., "BANKING", "COMBAT")
+            action: Current action description (e.g., "Withdrawing items...")
+        """
+        if not self._enable_status_ui:
+            return
+
+        self._ui_state = state
+        self._ui_action = action
+
+        # Simple console UI - just print updates
+        status_line = f"[{state}] {action}"
+        print(f"\r{status_line:<80}", end="", flush=True)
 
     @abstractmethod
     def run_cycle(self, bank_location: str, run_number: int) -> None:
