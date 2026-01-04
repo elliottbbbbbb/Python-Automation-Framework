@@ -96,7 +96,7 @@ success = self.actions.find_and_click_template(template_path, item_name, thresho
 **Example:**
 ```python
 # Click bank search button
-if self.actions.find_and_click_template(
+if self.actions.click_template(
     self._bank_search_template,
     "bank search button",
     threshold=0.7

@@ -128,26 +128,46 @@ class ScriptRunner:
             self.ocr = TemplateOCRService()
             logger.info("TemplateOCRService initialized successfully")
 
-            # Initialize Status Socket Service
-            logger.debug("Initializing StatusSocketService")
+            # Initialize Position Tracking Service
+            # Try Status Socket plugin first, fall back to OCR-based tracking
+            logger.debug("Initializing position tracking service")
             status_socket_config = self.config.get("status_socket", default={})
             from osrsbot.services.status_socket_service import StatusSocketService
+            from osrsbot.services.coordinate_ocr_service import CoordinateOCRService
 
-            self.status_socket = StatusSocketService(
+            # Try RuneLite plugin first
+            status_socket_plugin = StatusSocketService(
                 data_file=status_socket_config.get("data_file", "live_data.json"),
                 poll_interval=status_socket_config.get("poll_interval", 0.1),
             )
 
-            if self.status_socket.is_available():
-                logger.info("StatusSocketService initialized (plugin detected)")
+            if status_socket_plugin.is_available():
+                logger.info("✓ Using StatusSocketService (RuneLite plugin detected)")
+                self.status_socket = status_socket_plugin
+                position_service_available = True
             else:
-                logger.warning(
-                    "Status Socket plugin not detected. Walker disabled. "
-                    "See SETUP_GUIDE.md for installation."
+                logger.info("✗ RuneLite plugin not detected, trying OCR-based tracking")
+                # Fall back to OCR-based coordinate reading
+                ocr_service = CoordinateOCRService(
+                    screen=self.screen,
+                    ocr=self.ocr,
+                    config=self.config
                 )
 
-            # Initialize Walker Service
-            if self.status_socket.is_available():
+                if ocr_service.is_available():
+                    logger.info("✓ Using CoordinateOCRService (reading from screen)")
+                    self.status_socket = ocr_service
+                    position_service_available = True
+                else:
+                    logger.warning(
+                        "✗ Position tracking unavailable (no plugin or OCR). "
+                        "Walker disabled. See PATHFINDING_GUIDE.md"
+                    )
+                    self.status_socket = None
+                    position_service_available = False
+
+            # Initialize Walker Service if we have position tracking
+            if position_service_available and self.status_socket:
                 logger.debug("Initializing WalkerService")
                 walker_config_dict = self.config.get("walker", default={})
                 from osrsbot.services.walker_service import WalkerConfig, WalkerService
@@ -166,9 +186,9 @@ class ScriptRunner:
                     screen=self.screen,
                     interface=self.interface,
                 )
-                logger.info("WalkerService initialized successfully")
+                logger.info("✓ WalkerService initialized successfully")
             else:
-                logger.info("WalkerService disabled (Status Socket not available)")
+                logger.info("✗ WalkerService disabled (no position tracking available)")
                 self.walker = None
 
         except Exception as e:

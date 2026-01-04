@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.osrsbot'
+version = '1.0.0'
+
+sourceCompatibility = '11'
+targetCompatibility = '11'
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repo.runelite.net'
+    }
+}
+
+dependencies {
+    // RuneLite API - using latest stable version
+    compileOnly group: 'net.runelite', name: 'client', version: '1.10.35'
+
+    // Lombok for @Value, @Builder, @Slf4j
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.release = 11
+}
+
+jar {
+    manifest {
+        attributes(
+            'Plugin-Id': 'status-socket',
+            'Plugin-Version': project.version,
+            'Plugin-Description': 'Exports player state to JSON for external automation',
+            'Plugin-Provider': 'OSRS Bot Framework',
+            'Plugin-License': 'BSD-2-Clause'
+        )
+    }
+
+    // Include compiled classes
+    from sourceSets.main.output
+
+    // Include the plugin properties file at JAR root
+    from(projectDir) {
+        include 'runelite-plugin.properties'
+    }
+}
+
+// Create wrapper task for generating gradlew scripts
+wrapper {
+    gradleVersion = '7.6'
+}

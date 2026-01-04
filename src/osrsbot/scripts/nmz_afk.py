@@ -25,6 +25,13 @@ from enum import Enum, auto
 from typing import Optional
 
 from osrsbot.core.state_machine_bot import StateMachineBot, StateResult
+from osrsbot.core.state_helpers import build_metadata_dict
+from osrsbot.core.state_types import (
+    StateExecutionContext,
+    StateMetadata,
+    StateResult,
+    StateTransition
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +39,13 @@ logger = logging.getLogger(__name__)
 class NMZStates(Enum):
     """State definitions for NMZ AFK bot."""
 
-    IDLE = auto()
-    DRINK_OVERLOAD = auto()
-    WAIT_FOR_DAMAGE = auto()
-    LOWER_HP = auto()
-    DRINK_ABSORPTION = auto()
-    COMBAT_LOOP = auto()
-    RECOVERY = auto()
+    IDLE = "idle"
+    DRINK_OVERLOAD = "drink_overload"
+    WAIT_FOR_DAMAGE = "wait_for_damage"
+    LOWER_HP = "lower_hp"
+    DRINK_ABSORPTION = "drink_absorption"
+    COMBAT_LOOP = "combat_loop"
+    RECOVERY = "recovery"
 
 
 class NMZAfkBot(StateMachineBot):
@@ -66,12 +73,12 @@ class NMZAfkBot(StateMachineBot):
         self.TARGET_HP = 1  # Maintain 1 HP
 
         # Item template names (defined in config.json templates section)
-        self.OVERLOAD_TEMPLATE = "overload_potion"
-        self.ABSORPTION_TEMPLATE = "absorption_potion"
-        self.ROCK_CAKE_TEMPLATE = "dwarven_rock_cake"
-        self.LOCATOR_ORB_TEMPLATE = "locator_orb"
+        self.OVERLOAD_TEMPLATE = "src/osrsbot/images/bot/items/overload_potion.png"
+        self.ABSORPTION_TEMPLATE = "src/osrsbot/images/bot/items/absorption_potion.png"
+        self.ROCK_CAKE_TEMPLATE = "src/osrsbot/images/bot/items/dwarven_rock_cake.png"
+        self.LOCATOR_ORB_TEMPLATE = "src/osrsbot/images/bot/items/locator_orb.png"
 
-    def define_states(self) -> dict:
+    def define_states(self) -> type[Enum]:
         """
         Define state machine with automatic retry and failover.
 
@@ -84,43 +91,64 @@ class NMZAfkBot(StateMachineBot):
         - COMBAT_LOOP: Main AFK loop (monitors HP, re-doses timers)
         - RECOVERY: Error recovery state
         """
-        return {
-            NMZStates.IDLE: {
-                "handler": self._idle_state,
-                "max_retries": 2,
-                "failover": NMZStates.RECOVERY,
-            },
-            NMZStates.DRINK_OVERLOAD: {
-                "handler": self._drink_overload_state,
-                "max_retries": 3,
-                "failover": NMZStates.RECOVERY,
-            },
-            NMZStates.WAIT_FOR_DAMAGE: {
-                "handler": self._wait_for_damage_state,
-                "max_retries": 2,
-                "failover": NMZStates.RECOVERY,
-            },
-            NMZStates.LOWER_HP: {
-                "handler": self._lower_hp_state,
-                "max_retries": 3,
-                "failover": NMZStates.RECOVERY,
-            },
-            NMZStates.DRINK_ABSORPTION: {
-                "handler": self._drink_absorption_state,
-                "max_retries": 3,
-                "failover": NMZStates.RECOVERY,
-            },
-            NMZStates.COMBAT_LOOP: {
-                "handler": self._combat_loop_state,
-                "max_retries": 3,
-                "failover": NMZStates.RECOVERY,
-            },
-            NMZStates.RECOVERY: {
-                "handler": self._recovery_state,
-                "max_retries": 2,
-                "failover": NMZStates.IDLE,
-            },
-        }
+        return NMZStates
+        
+
+    def define_transitions(self) -> list[StateTransition]:
+        return [
+            StateTransition(NMZStates.IDLE, NMZStates.DRINK_OVERLOAD),
+            StateTransition(NMZStates.DRINK_OVERLOAD, NMZStates.WAIT_FOR_DAMAGE),
+            StateTransition(NMZStates.WAIT_FOR_DAMAGE, NMZStates.LOWER_HP),
+            StateTransition(NMZStates.LOWER_HP, NMZStates.DRINK_ABSORPTION),
+            StateTransition(NMZStates.DRINK_ABSORPTION, NMZStates.COMBAT_LOOP),
+            StateTransition(NMZStates.COMBAT_LOOP, NMZStates.DRINK_OVERLOAD),
+            StateTransition(NMZStates.COMBAT_LOOP, NMZStates.DRINK_ABSORPTION),
+            StateTransition(NMZStates.COMBAT_LOOP, NMZStates.COMBAT_LOOP),
+            StateTransition(NMZStates.RECOVERY, NMZStates.IDLE),
+        ]
+
+
+    def define_state_metadata(self) -> dict[Enum, StateMetadata]:
+        return build_metadata_dict(
+            NMZStates,
+            {
+                NMZStates.IDLE: {
+                    "name": "Idle",
+                    "description": "Check if initial setup is needed.",
+                    "max_retries": 3,
+                },
+                NMZStates.DRINK_OVERLOAD: {
+                    "name": "Drink Overload",
+                    "description": "Drink overload potion to boost stats.",
+                    "max_retries": 2,
+                },
+                NMZStates.WAIT_FOR_DAMAGE: {
+                    "name": "Wait for Damage",
+                    "description": "Wait for overload to deal damage.",
+                    "max_retries": 3,
+                },
+                NMZStates.LOWER_HP: {
+                    "name": "Lower HP",
+                    "description": "Use rock cake to lower HP to 1.",
+                    "max_retries": 3,
+                },
+                NMZStates.DRINK_ABSORPTION: {
+                    "name": "Drink Absorption",
+                    "description": "Drink absorption potions.",
+                    "max_retries": 2,
+                },
+                NMZStates.COMBAT_LOOP: {
+                    "name": "Combat Loop",
+                    "description": "Main AFK loop monitoring HP and timers.",
+                    "max_retries": 5,
+                },
+                NMZStates.RECOVERY: {
+                    "name": "Recovery",
+                    "description": "Attempt to recover from errors.",
+                    "max_retries": 1,
+                },
+            }
+        )
 
     def get_initial_state(self) -> Enum:
         """Start in IDLE state."""
@@ -185,7 +213,7 @@ class NMZAfkBot(StateMachineBot):
             return False
 
         logger.info(f"Using locator orb (current HP: {current_hp})")
-        if not self.actions.click_item_template(self.LOCATOR_ORB_TEMPLATE):
+        if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
             logger.error("Failed to click locator orb")
             return False
 
@@ -194,7 +222,7 @@ class NMZAfkBot(StateMachineBot):
 
     # ==================== STATE HANDLERS ====================
 
-    def _idle_state(self) -> StateResult:
+    def _handle_idle(self, context: StateExecutionContext) -> StateResult:
         """
         IDLE state - Check if initial setup is needed.
 
@@ -207,13 +235,13 @@ class NMZAfkBot(StateMachineBot):
         # Check if we need to start the initial setup
         if self._needs_overload():
             logger.info("IDLE: Overload timer expired, starting setup")
-            return self.transition(NMZStates.DRINK_OVERLOAD)
+            return StateResult.SUCCESS# Go to DRINK_OVERLOAD
 
         # If timers are valid, go straight to combat loop
         logger.info("IDLE: Timers active, entering combat loop")
-        return self.transition(NMZStates.COMBAT_LOOP)
+        return StateResult.SUCCESS  # Go to COMBAT_LOOP
 
-    def _drink_overload_state(self) -> StateResult:
+    def _handle_drink_overload(self, context: StateExecutionContext) -> StateResult:
         """
         DRINK_OVERLOAD state - Drink overload potion.
 
@@ -225,7 +253,7 @@ class NMZAfkBot(StateMachineBot):
         logger.info("[DRINK_OVERLOAD] Drinking overload potion...")
 
         # Click overload potion in inventory
-        if not self.actions.click_item_template(self.OVERLOAD_TEMPLATE):
+        if not self.actions.click_template(self.OVERLOAD_TEMPLATE, "overload_potion"):
             logger.error("DRINK_OVERLOAD: Failed to find overload potion")
             return StateResult.FAILURE
 
@@ -234,9 +262,9 @@ class NMZAfkBot(StateMachineBot):
         logger.info("DRINK_OVERLOAD: Overload timer started")
 
         self.actions.wait("medium")
-        return self.transition(NMZStates.WAIT_FOR_DAMAGE)
+        return StateResult.SUCCESS  # Go to WAIT_FOR_DAMAGE
 
-    def _wait_for_damage_state(self) -> StateResult:
+    def _handle_wait_for_damage(self, context: StateExecutionContext) -> StateResult:
         """
         WAIT_FOR_DAMAGE state - Wait for overload to deal damage.
 
@@ -264,14 +292,14 @@ class NMZAfkBot(StateMachineBot):
             # If HP dropped significantly, overload is working
             if current_hp <= 60:  # Arbitrary threshold
                 logger.info("WAIT_FOR_DAMAGE: HP dropped, overload is working")
-                return self.transition(NMZStates.LOWER_HP)
+                return StateResult.SUCCESS  # Go to LOWER_HP
 
             self.actions.wait("long")
 
         logger.warning("WAIT_FOR_DAMAGE: Timeout waiting for damage")
-        return self.transition(NMZStates.LOWER_HP)
+        return StateResult.FAILURE
 
-    def _lower_hp_state(self) -> StateResult:
+    def _handle_lower_hp(self, context: StateExecutionContext) -> StateResult:
         """
         LOWER_HP state - Use rock cake to lower HP to 1.
 
@@ -289,11 +317,13 @@ class NMZAfkBot(StateMachineBot):
 
         if current_hp <= 1:
             logger.info("LOWER_HP: Already at 1 HP, skipping")
-            return self.transition(NMZStates.DRINK_ABSORPTION)
+            return StateResult.SUCCESS  # Go to DRINK_ABSORPTION
 
-        # Click rock cake to guzzle
+
+
+        #Click rock cake to guzzle
         logger.info(f"LOWER_HP: Current HP: {current_hp}, using rock cake")
-        if not self.actions.click_item_template(self.ROCK_CAKE_TEMPLATE):
+        if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
             logger.error("LOWER_HP: Failed to find rock cake")
             return StateResult.FAILURE
 
@@ -306,9 +336,9 @@ class NMZAfkBot(StateMachineBot):
             return StateResult.FAILURE
 
         logger.info("LOWER_HP: HP successfully lowered to 1")
-        return self.transition(NMZStates.DRINK_ABSORPTION)
+        return StateResult.SUCCESS  # Go to DRINK_ABSORPTION 
 
-    def _drink_absorption_state(self) -> StateResult:
+    def _handle_drink_absorption(self, context: StateExecutionContext) -> StateResult:
         """
         DRINK_ABSORPTION state - Drink absorption potions.
 
@@ -324,7 +354,7 @@ class NMZAfkBot(StateMachineBot):
         num_doses = 6
         for i in range(1, num_doses + 1):
             logger.info(f"DRINK_ABSORPTION: Dose {i}/{num_doses}")
-            if not self.actions.click_item_template(self.ABSORPTION_TEMPLATE):
+            if not self.actions.click_template(self.ABSORPTION_TEMPLATE, "absorption_potion"):
                 logger.warning(
                     f"DRINK_ABSORPTION: Failed to find absorption potion (dose {i})"
                 )
@@ -337,67 +367,50 @@ class NMZAfkBot(StateMachineBot):
         self._last_absorption_time = time.time()
         logger.info("DRINK_ABSORPTION: Absorption timer started")
 
-        return self.transition(NMZStates.COMBAT_LOOP)
+        return StateResult.SUCCESS  # Go to COMBAT_LOOP
 
-    def _combat_loop_state(self) -> StateResult:
-        """
-        COMBAT_LOOP state - Main AFK loop.
+    def _handle_combat_loop(self, context: StateExecutionContext) -> StateResult:
 
-        Monitors:
-        1. HP level (use locator orb if HP >= 2)
-        2. Overload timer (re-dose every 5 minutes)
-        3. Absorption timer (re-dose every 5 minutes)
+    # Loop for the duration of overload timer
+        while True:
+            current_hp = self._get_hp()
+            if current_hp is None:
+                logger.warning("COMBAT_LOOP: HP detection failed, retrying...")
+                self.actions.wait("medium")
+                continue
 
-        Transitions:
-        - DRINK_OVERLOAD: If overload timer expired
-        - DRINK_ABSORPTION: If absorption timer expired (but overload is valid)
-        - COMBAT_LOOP: Loop continues
-        """
-        logger.info("[COMBAT_LOOP] Monitoring HP and timers...")
+            logger.info(f"COMBAT_LOOP: Current HP: {current_hp}")
 
-        # Check HP first (safety critical)
-        current_hp = self._get_hp()
-        if current_hp is None:
-            logger.warning("COMBAT_LOOP: HP detection failed")
-            return StateResult.FAILURE
+            # SAFETY: Use locator orb if HP >= 2
+            if current_hp >= 2:
+                logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
+                self._use_locator_orb_safe()
 
-        logger.info(f"COMBAT_LOOP: Current HP: {current_hp}")
+            # Check timers
+            overload_elapsed = time.time() - self._last_overload_time
+            absorption_elapsed = time.time() - self._last_absorption_time
 
-        # SAFETY CHECK: Use locator orb if HP >= 2
-        if current_hp >= 2:
-            logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
-            if not self._use_locator_orb_safe():
-                logger.error("COMBAT_LOOP: Failed to use locator orb")
-                return StateResult.FAILURE
+            if overload_elapsed >= self.OVERLOAD_DURATION:
+                logger.info("COMBAT_LOOP: Overload expired, re-dosing")
+                return StateResult.FAILURE  # Transition to DRINK_OVERLOAD
 
-        # Check overload timer
-        if self._needs_overload():
-            logger.info("COMBAT_LOOP: Overload timer expired, re-dosing")
-            return self.transition(NMZStates.DRINK_OVERLOAD)
+            if absorption_elapsed >= self.ABSORPTION_DURATION:
+                logger.info("COMBAT_LOOP: Absorption expired, re-dosing")
+                return StateResult.FAILURE  # Transition to DRINK_ABSORPTION
 
-        # Check absorption timer
-        if self._needs_absorption():
-            logger.info("COMBAT_LOOP: Absorption timer expired, re-dosing")
-            return self.transition(NMZStates.DRINK_ABSORPTION)
+            # Log time remaining
+            overload_remaining = self.OVERLOAD_DURATION - overload_elapsed
+            absorption_remaining = self.ABSORPTION_DURATION - absorption_elapsed
+            logger.info(
+                f"COMBAT_LOOP: Overload: {overload_remaining:.0f}s, "
+                f"Absorption: {absorption_remaining:.0f}s"
+            )
 
-        # Calculate time remaining on timers
-        overload_remaining = (
-            self.OVERLOAD_DURATION - (time.time() - self._last_overload_time)
-        )
-        absorption_remaining = (
-            self.ABSORPTION_DURATION - (time.time() - self._last_absorption_time)
-        )
+            # Wait before next loop iteration
+            self.actions.wait("medium")
 
-        logger.info(
-            f"COMBAT_LOOP: Overload: {overload_remaining:.0f}s, "
-            f"Absorption: {absorption_remaining:.0f}s"
-        )
 
-        # Wait before next check
-        self.actions.wait("long")
-        return StateResult.SUCCESS  # Stay in COMBAT_LOOP
-
-    def _recovery_state(self) -> StateResult:
+    def _handle_recovery(self, context: StateExecutionContext) -> StateResult:
         """
         RECOVERY state - Handle errors and reset.
 
@@ -415,4 +428,4 @@ class NMZAfkBot(StateMachineBot):
         self.actions.wait("long")
 
         logger.info("RECOVERY: Timers reset, returning to IDLE")
-        return self.transition(NMZStates.IDLE)
+        return StateResult.SUCCESS  # Go to IDLE
