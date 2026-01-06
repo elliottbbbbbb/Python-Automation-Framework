@@ -20,7 +20,17 @@
     "combat_indicator_green": "#078B36",
     "combat_indicator_red": "#63150D",
     "combat_indicator_teal": "#068a34",
-    "1": "#596E13"
+    "1": "#596E13",
+    "clay_rock": "#CD853F",
+    "copper_rock": "#B87333",
+    "tin_rock": "#708090",
+    "iron_rock": "#8B7355",
+    "coal_rock": "#36454F",
+    "gold_rock": "#FFD700",
+    "mithril_rock": "#4682B4",
+    "adamantite_rock": "#50C878",
+    "runite_rock": "#00CED1",
+    "granite_rock": "#A9A9A9"
   },
   "coordinates": {
     "inventory": {
@@ -135,6 +145,12 @@
         "y": 169,
         "width": 35,
         "height": 20
+      },
+      "world_coord_region": {
+        "x": 50,
+        "y": 305,
+        "width": 100,
+        "height": 21
       }
     }
   },
@@ -178,7 +194,7 @@
   },
   "status_socket": {
     "enabled": true,
-    "data_file": "live_data.json",
+    "data_file": "C:\\Users\\elliott\\.runelite\\live_data.json",
     "poll_interval": 0.1
   },
   "walker": {
@@ -197,10 +213,15 @@
     "connection_timeout": 2.0
   },
   "templates": {
-    "ui_grids": {
-      "inventory": {
-        "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
-        "rows": 7,
+    "overload_potion": "src/osrsbot/images/bot/items/overload_potion.png",
+    "absorption_potion": "src/osrsbot/images/bot/items/absorption_potion.png",
+    "dwarven_rock_cake": "src/osrsbot/images/bot/items/dwarven_rock_cake.png",
+    "locator_orb": "src/osrsbot/images/bot/items/locator_orb.png"
+  },
+  "ui_grids": {
+    "inventory": {
+      "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+      "rows": 7,
         "cols": 4,
         "threshold": 0.40,
         "sticky": true,
@@ -324,4 +345,3 @@
       }
     }
   }
-}

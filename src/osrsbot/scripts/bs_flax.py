@@ -66,7 +66,7 @@ class grimy_flax(BankstanderBot):
 
             # Click each inventory slot (1-28) to clean herbs
             herbs_this_cycle = 0
-
+            # NOTE: Lazily implemented - to be moved to game actions later
             for slot in range(1, 29):
                 # Check for exit request
                 self._check_exit_requested()

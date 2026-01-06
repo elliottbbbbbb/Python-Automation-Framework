@@ -68,10 +68,12 @@ class NMZAfkBot(StateMachineBot):
 
         # Constants
         self.OVERLOAD_DURATION = 300  # 5 minutes
-        self.ABSORPTION_DURATION = 300  # 5 minutes
+        self.ABSORPTION_DURATION = 390  # 6 minutes 30 seconds
         self.OVERLOAD_DAMAGE = 50  # Overload deals 50 damage
         self.TARGET_HP = 1  # Maintain 1 HP
 
+        # NOTE: Lazily hardcoded template paths for now.
+        # Should be moved to TemplateMatchService/config once this bot is stable.
         # Item template names (defined in config.json templates section)
         self.OVERLOAD_TEMPLATE = "src/osrsbot/images/bot/items/overload_potion.png"
         self.ABSORPTION_TEMPLATE = "src/osrsbot/images/bot/items/absorption_potion.png"
@@ -212,6 +214,7 @@ class NMZAfkBot(StateMachineBot):
             )
             return False
 
+        
         logger.info(f"Using locator orb (current HP: {current_hp})")
         if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
             logger.error("Failed to click locator orb")
@@ -290,8 +293,9 @@ class NMZAfkBot(StateMachineBot):
             logger.info(f"WAIT_FOR_DAMAGE: Current HP: {current_hp}")
 
             # If HP dropped significantly, overload is working
-            if current_hp <= 60:  # Arbitrary threshold
+            if current_hp <= 50:  # Arbitrary threshold
                 logger.info("WAIT_FOR_DAMAGE: HP dropped, overload is working")
+                time.sleep(5)
                 return StateResult.SUCCESS  # Go to LOWER_HP
 
             self.actions.wait("long")
@@ -319,12 +323,10 @@ class NMZAfkBot(StateMachineBot):
             logger.info("LOWER_HP: Already at 1 HP, skipping")
             return StateResult.SUCCESS  # Go to DRINK_ABSORPTION
 
-
-
         #Click rock cake to guzzle
-        logger.info(f"LOWER_HP: Current HP: {current_hp}, using rock cake")
+        logger.info(f"LOWER_HP: Current HP: {current_hp}, using locator orb")
         if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
-            logger.error("LOWER_HP: Failed to find rock cake")
+            logger.error("LOWER_HP: Failed to find locator orb")
             return StateResult.FAILURE
 
         self.actions.wait("medium")
@@ -381,30 +383,36 @@ class NMZAfkBot(StateMachineBot):
 
             logger.info(f"COMBAT_LOOP: Current HP: {current_hp}")
 
-            # SAFETY: Use locator orb if HP >= 2
-            if current_hp >= 2:
-                logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
-                self._use_locator_orb_safe()
-
             # Check timers
             overload_elapsed = time.time() - self._last_overload_time
             absorption_elapsed = time.time() - self._last_absorption_time
 
+            if current_hp >= 2 and 7 < overload_elapsed < 270:
+                logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
+                self._use_locator_orb_safe()
+
             if overload_elapsed >= self.OVERLOAD_DURATION:
                 logger.info("COMBAT_LOOP: Overload expired, re-dosing")
-                return StateResult.FAILURE  # Transition to DRINK_OVERLOAD
+                self.actions.click_template(self.OVERLOAD_TEMPLATE, "overload_potion")
+                self._last_overload_time = time.time()
 
             if absorption_elapsed >= self.ABSORPTION_DURATION:
                 logger.info("COMBAT_LOOP: Absorption expired, re-dosing")
-                return StateResult.FAILURE  # Transition to DRINK_ABSORPTION
+                DOSES = 6
+                for _ in range(1, DOSES + 1):
+                    self.actions.click_template(self.ABSORPTION_TEMPLATE, "absorption_potion")
+                self._last_absorption_time = time.time()
 
             # Log time remaining
             overload_remaining = self.OVERLOAD_DURATION - overload_elapsed
             absorption_remaining = self.ABSORPTION_DURATION - absorption_elapsed
+            
             logger.info(
-                f"COMBAT_LOOP: Overload: {overload_remaining:.0f}s, "
-                f"Absorption: {absorption_remaining:.0f}s"
-            )
+                f"COMBAT_LOOP: Overload Remaining Time: {overload_remaining:.0f}s,\n Absorption Remaining Time: {absorption_remaining:.0f}s"
+                        )
+
+            logger.info(f"COMBAT LOOP: Overload Elapsed Time: {overload_elapsed:.0f}s,\nAbsorption Elapsed Time: {absorption_elapsed:.0f}s"
+                        )
 
             # Wait before next loop iteration
             self.actions.wait("medium")

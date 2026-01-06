@@ -5,6 +5,9 @@ Uses template-based OCR (same method as HP/Prayer reading) to extract X, Y, plan
 coordinates from the coordinate display in the bottom-left corner.
 """
 
+# Note to self: Why on earth did Claude choose to create this 
+# instead of the template matching service that already exists?
+
 import logging
 import cv2
 import numpy as np
