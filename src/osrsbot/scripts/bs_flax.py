@@ -7,6 +7,8 @@ This is the simplified version that uses the reusable BankstanderBot base class.
 All banking logic is handled by the base class - we just define item processing!
 """
 
+# NOTE KNOWN_GOOD / PRODUCTION
+
 import logging
 import random
 import time

@@ -115,6 +115,8 @@ class UIElementGrid:
         ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
         padding: int = TEMPLATE_MATCHING.default_padding,
         border_offset: int = 0,
+        border_offset_x: Optional[int] = None,
+        border_offset_y: Optional[int] = None,
     ):
         """
         Initialize grid template.
@@ -129,6 +131,8 @@ class UIElementGrid:
             ttl_seconds: Cache time-to-live in seconds
             padding: Pixels to subtract from each cell edge (avoid clicking borders)
             border_offset: Pixels of border in template image to exclude from grid area
+            border_offset_x: Optional horizontal border offset (overrides border_offset)
+            border_offset_y: Optional vertical border offset (overrides border_offset)
         """
         self.name = name
         self.template_path = template_path
@@ -139,6 +143,8 @@ class UIElementGrid:
         self.ttl_seconds = ttl_seconds
         self.padding = padding
         self.border_offset = border_offset
+        self.border_offset_x = border_offset_x if border_offset_x is not None else border_offset
+        self.border_offset_y = border_offset_y if border_offset_y is not None else border_offset
 
         # Load template image
         self.template = self._load_template()
@@ -272,10 +278,11 @@ class UIElementGrid:
         """
         # Adjust for border offset (template image may include border pixels)
         # The actual grid area is smaller than the template
-        grid_x = x + self.border_offset
-        grid_y = y + self.border_offset
-        grid_w = w - (2 * self.border_offset)
-        grid_h = h - (2 * self.border_offset)
+        # Use separate X and Y offsets if provided
+        grid_x = x + self.border_offset_x
+        grid_y = y + self.border_offset_y
+        grid_w = w - (2 * self.border_offset_x)
+        grid_h = h - (2 * self.border_offset_y)
 
         cell_w = grid_w / self.num_cols
         cell_h = grid_h / self.num_rows

@@ -1,9 +1,11 @@
 import logging
 import os
 from typing import TYPE_CHECKING, Any, Callable, Union
+from pathlib import Path
 
 from osrsbot.commands.game_actions import GameActions
 from osrsbot.core.game_interface import GameInterface
+from osrsbot.core.ui_manager import UIManager
 from osrsbot.models.config import Config
 from osrsbot.queries.game_queries import GameState
 from osrsbot.services.anti_ban_service import AntiBanService
@@ -78,34 +80,67 @@ class ScriptRunner:
                 ),
             )
 
+            # Load .env file if present so local env config works when launching via scripts
+            env_path = Path(self.config.config_file.parent, ".env") if hasattr(self, 'config') else Path(".env")
+            if env_path.exists():
+                try:
+                    for raw in env_path.read_text(encoding='utf-8').splitlines():
+                        line = raw.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        if '=' not in line:
+                            continue
+                        k, v = line.split('=', 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        # don't overwrite existing environment variables
+                        os.environ.setdefault(k, v)
+                except Exception:
+                    logger.debug("Failed to load .env file for runner", exc_info=True)
+
+            use_win32 = os.getenv("USE_WIN32", "").lower() in ("1", "true", "yes")
             use_interception = os.getenv("USE_INTERCEPTION", "").lower() in (
                 "1",
                 "true",
                 "yes",
             )
 
-            if use_interception:
+            # Prefer Win32 if explicitly requested
+            if use_win32:
                 try:
-                    from osrsbot.services.interception_mouse_service import (
-                        InterceptionMouseService,
-                    )
+                    from osrsbot.services.win32_mouse_service import Win32MouseService
 
-                    logger.debug("Initializing InterceptionMouseService (kernel-level)")
-                    self.mouse = InterceptionMouseService(mouse_config)
-                    logger.info("InterceptionMouseService initialized successfully")
-                except (ImportError, RuntimeError) as e:
-                    logger.warning(
-                        f"InterceptionMouseService not available: {e}. "
-                        "Falling back to MouseService. "
-                        "To use Interception: install driver and reboot system (see INTERCEPTION_SETUP.md)"
-                    )
-                    logger.debug("Initializing MouseService (fallback)")
+                    logger.debug("Initializing Win32MouseService (SendInput)")
+                    self.mouse = Win32MouseService(mouse_config)
+                    logger.info("Win32MouseService initialized successfully")
+                except Exception as e:
+                    logger.warning(f"Win32MouseService not available: {e}. Falling back to other services.")
+                    use_win32 = False
+
+            # If Win32 was requested and initialized above, keep it.
+            if not use_win32:
+                if use_interception:
+                    try:
+                        from osrsbot.services.interception_mouse_service import (
+                            InterceptionMouseService,
+                        )
+
+                        logger.debug("Initializing InterceptionMouseService (kernel-level)")
+                        self.mouse = InterceptionMouseService(mouse_config)
+                        logger.info("InterceptionMouseService initialized successfully")
+                    except (ImportError, RuntimeError) as e:
+                        logger.warning(
+                            f"InterceptionMouseService not available: {e}. "
+                            "Falling back to MouseService. "
+                            "To use Interception: install driver and reboot system (see INTERCEPTION_SETUP.md)"
+                        )
+                        logger.debug("Initializing MouseService (fallback)")
+                        self.mouse = MouseService(mouse_config)
+                        logger.info("MouseService initialized successfully (fallback)")
+                else:
+                    logger.debug("Initializing MouseService")
                     self.mouse = MouseService(mouse_config)
-                    logger.info("MouseService initialized successfully (fallback)")
-            else:
-                logger.debug("Initializing MouseService")
-                self.mouse = MouseService(mouse_config)
-                logger.info("MouseService initialized successfully")
+                    logger.info("MouseService initialized successfully")
 
             logger.debug("Initializing ScreenService")
             self.screen = ScreenService(window_getter=self.interface.get_bounds)
@@ -123,6 +158,15 @@ class ScriptRunner:
                     "Template matching features will not be available."
                 )
                 self.template_service = None
+
+            # Initialize UIManager
+            logger.debug("Initializing UIManager")
+            self.ui_manager = UIManager(self.template_service)
+            if self.template_service:
+                self.ui_manager.sync_from_template_service()
+                logger.info(f"UIManager initialized with {len(self.ui_manager.grids)} grids and {len(self.ui_manager.buttons)} buttons")
+            else:
+                logger.info("UIManager initialized (no templates available)")
 
             logger.debug("Initializing TemplateOCRService")
             self.ocr = TemplateOCRService()
@@ -238,6 +282,7 @@ class ScriptRunner:
                 self.anti_ban,
                 self.loot_detection,
                 walker=self.walker,
+                ui_manager=self.ui_manager,
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:

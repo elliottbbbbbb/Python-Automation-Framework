@@ -12,7 +12,7 @@ Responsibilities:
 """
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Dict
 
 import cv2
 import numpy as np
@@ -159,3 +159,102 @@ class StatQueries:
             logger.debug(f"get_run_energy: {energy}")
 
         return energy
+
+    def get_special_attack_percentage(self, force: bool = False) -> Optional[int]:
+        """
+        Get current special attack percentage (0-100).
+
+        Args:
+            force: Currently ignored (OCR is fast enough)
+
+        Returns:
+            Current special attack percentage or None if OCR failed
+        """
+        spec_region_config = self.config.get(
+            "coordinates", "ocr", "special_attack_region"
+        )
+        if not spec_region_config:
+            logger.warning("special_attack_region not in config")
+            return None
+
+        x, y = spec_region_config["x"], spec_region_config["y"]
+        width, height = spec_region_config["width"], spec_region_config["height"]
+
+        img = self.screen.capture(region=(x, y, width, height), relative=True)
+        if img is None:
+            logger.debug("get_special_attack_percentage: Failed to capture screen region")
+            return None
+
+        # Convert PIL to numpy array for OCR
+        img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+        percentage = self.ocr.extract_number(
+            img_np, font_name="plain11", colors=[YELLOW], correlation_threshold=0.95
+        )
+
+        if percentage is None:
+            logger.debug("get_special_attack_percentage: OCR returned None")
+        else:
+            logger.debug(f"get_special_attack_percentage: {percentage}")
+
+        return percentage
+
+    def get_all_stats(self, force: bool = False) -> Dict[str, Optional[int]]:
+        """
+        Read all player stats using template OCR.
+
+        Returns:
+            dict with keys: hp, prayer, run, spec
+        """
+        return {
+            "hp": self._read_stat(
+                region_key="hp_region",
+                colors=[ORB_GREEN, ORB_RED],
+            ),
+            "prayer": self._read_stat(
+                region_key="prayer_region",
+                colors=[CYAN],
+            ),
+            "run": self._read_stat(
+                region_key="run_energy_region",
+                colors=[YELLOW],
+            ),
+            "spec": self._read_stat(
+                region_key="special_attack_region",
+                colors=[YELLOW],
+            ),
+        }
+
+    def _read_stat(
+        self,
+        region_key: str,
+        colors: list,
+        threshold: float = 0.95,
+    ) -> Optional[int]:
+        """
+        Internal helper to OCR a numeric stat from a region.
+        """
+        region = self.config.get("coordinates", "ocr", region_key)
+        if not region:
+            return None
+
+        img = self.screen.capture(
+            region=(
+                region["x"],
+                region["y"],
+                region["width"],
+                region["height"],
+            ),
+            relative=True,
+        )
+        if img is None:
+            return None
+
+        img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+        return self.ocr.extract_number(
+            img_np,
+            font_name="plain11",
+            colors=colors,
+            correlation_threshold=threshold,
+        )

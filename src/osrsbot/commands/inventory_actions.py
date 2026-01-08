@@ -170,12 +170,29 @@ class InventoryActions:
                 delay *= self.anti_ban.get_timing_variance()
             time.sleep(delay)
         else:
-            # Right-click drop
-            pyautogui.rightClick(abs_x, abs_y)
+            # Right-click drop using MouseService so micro-jitter and humanization apply
+            self.mouse.click_at(
+                abs_x,
+                abs_y,
+                button="right",
+                move_style="curved",
+                speed_multiplier=self.timing.get_mouse_speed_multiplier(),
+            )
+
             time.sleep(random.uniform(*INVENTORY_ACTIONS.right_click_delay))
 
             drop_offset_y = random.uniform(*INVENTORY_ACTIONS.drop_menu_offset_y)
-            pyautogui.click(abs_x, abs_y + drop_offset_y)
+            menu_x = abs_x
+            menu_y = int(abs_y + drop_offset_y)
+
+            # Click the context-menu entry
+            self.mouse.click_at(
+                menu_x,
+                menu_y,
+                button="left",
+                move_style="linear",
+                speed_multiplier=self.timing.get_mouse_speed_multiplier(),
+            )
 
             delay = random.uniform(*INVENTORY_ACTIONS.drop_delay_range)
             if self.anti_ban:

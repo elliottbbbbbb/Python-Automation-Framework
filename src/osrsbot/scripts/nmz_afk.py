@@ -19,7 +19,10 @@ Requirements:
 - Ignores power-ups
 """
 
+# NOTE KNOWN_GOOD / PRODUCTION
+
 import logging
+import random
 import time
 from enum import Enum, auto
 from typing import Optional
@@ -131,8 +134,8 @@ class NMZAfkBot(StateMachineBot):
                 },
                 NMZStates.LOWER_HP: {
                     "name": "Lower HP",
-                    "description": "Use rock cake to lower HP to 1.",
-                    "max_retries": 3,
+                    "description": "Use locator orb to lower HP to 1.",
+                    "max_retries": 6,
                 },
                 NMZStates.DRINK_ABSORPTION: {
                     "name": "Drink Absorption",
@@ -157,6 +160,37 @@ class NMZAfkBot(StateMachineBot):
         return NMZStates.IDLE
 
     # ==================== HELPER METHODS ====================
+
+    def _get_all_stats(self) -> dict[str, Optional[int]]:
+        """
+        Get all player stats using template OCR.
+
+        Returns:
+            dict with keys: hp, prayer, run, spec
+        """
+        return self.state.get_all_stats(force=True)
+
+    # NOTE to be moved to utility/anti-ban module later
+    def human_sleep(self, total_time, chunks=3):
+        remaining = total_time
+        for _ in range(chunks):
+            chunk = random.uniform(0, remaining)
+            time.sleep(chunk)
+            remaining -= chunk
+            if remaining > 0:
+                time.sleep(remaining)
+
+    def _get_special_attack_percentage(self) -> Optional[int]:
+        """
+        Get current special attack percentage using template OCR (fast).
+
+        Returns:
+            Current special attack percentage or None if detection fails
+        """
+        spec = self.state.get_special_attack_percentage(force=True)
+        if spec is None:
+            logger.warning("Failed to read special attack percentage")
+        return spec
 
     def _get_hp(self) -> Optional[int]:
         """
@@ -216,6 +250,7 @@ class NMZAfkBot(StateMachineBot):
 
         
         logger.info(f"Using locator orb (current HP: {current_hp})")
+        
         if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
             logger.error("Failed to click locator orb")
             return False
@@ -375,6 +410,17 @@ class NMZAfkBot(StateMachineBot):
 
     # Loop for the duration of overload timer
         while True:
+            stats = self._get_all_stats()
+            hp = stats.get("hp")
+            prayer = stats.get("prayer")
+            run = stats.get("run")
+            spec = stats.get("spec")
+            logger.info(f"COMBAT_LOOP: Stats - HP: {hp}, Prayer: {prayer}, Run: {run}, Spec: {spec}")
+            current_spec = self._get_special_attack_percentage()
+            if current_spec is None:
+                logger.warning("COMBAT_LOOP: Special attack detection failed, retrying...")
+                self.actions.wait("medium")
+                continue
             current_hp = self._get_hp()
             if current_hp is None:
                 logger.warning("COMBAT_LOOP: HP detection failed, retrying...")
@@ -387,21 +433,28 @@ class NMZAfkBot(StateMachineBot):
             overload_elapsed = time.time() - self._last_overload_time
             absorption_elapsed = time.time() - self._last_absorption_time
 
+            logger.info(f"COMBAT_LOOP: Special Attack: {current_spec}%")
+
             if current_hp >= 2 and 7 < overload_elapsed < 270:
+                self.human_sleep(2.5, chunks=3)
                 logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
                 self._use_locator_orb_safe()
 
             if overload_elapsed >= self.OVERLOAD_DURATION:
+                self.human_sleep(2.5, chunks=3)
                 logger.info("COMBAT_LOOP: Overload expired, re-dosing")
                 self.actions.click_template(self.OVERLOAD_TEMPLATE, "overload_potion")
                 self._last_overload_time = time.time()
 
             if absorption_elapsed >= self.ABSORPTION_DURATION:
+                self.human_sleep(2.5, chunks=3)
                 logger.info("COMBAT_LOOP: Absorption expired, re-dosing")
-                DOSES = 6
+                DOSES = 5
                 for _ in range(1, DOSES + 1):
                     self.actions.click_template(self.ABSORPTION_TEMPLATE, "absorption_potion")
                 self._last_absorption_time = time.time()
+
+
 
             # Log time remaining
             overload_remaining = self.OVERLOAD_DURATION - overload_elapsed

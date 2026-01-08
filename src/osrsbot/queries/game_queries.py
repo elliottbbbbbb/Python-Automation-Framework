@@ -104,6 +104,10 @@ class GameState:
         return False
 
     # --- Stat Queries (delegate to StatQueries) ---
+    def get_all_stats(self, force: bool = False) -> dict[str, Optional[int]]:
+        if self.stat_queries:
+            return self.stat_queries.get_all_stats(force)
+
     def get_hp(self, force: bool = False) -> Optional[int]:
         """Get current HP."""
         if self.stat_queries:
@@ -128,6 +132,14 @@ class GameState:
         """Get current run energy."""
         if self.stat_queries:
             return self.stat_queries.get_run_energy(force)
+
+        logger.error("StatQueries not available")
+        return None
+
+    def get_special_attack_percentage(self, force: bool = False) -> Optional[int]:
+        """Get current special attack percentage."""
+        if self.stat_queries:
+            return self.stat_queries.get_special_attack_percentage(force)
 
         logger.error("StatQueries not available")
         return None

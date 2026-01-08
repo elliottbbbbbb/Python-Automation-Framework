@@ -62,6 +62,7 @@ class GameActions:
         anti_ban_service: Optional[Any] = None,
         loot_detection_service: Optional[Any] = None,
         walker: Optional[Any] = None,
+        ui_manager: Optional[Any] = None,
     ):
         """Initialize actions with services."""
         # Services (keep for backward compatibility and delegation)
@@ -73,6 +74,7 @@ class GameActions:
         self.anti_ban = anti_ban_service
         self.loot_detection = loot_detection_service
         self.walker = walker
+        self.ui_manager = ui_manager
 
         # Initialize shared utilities
         self.coord_resolver = CoordinateResolver(screen, config, template_service)

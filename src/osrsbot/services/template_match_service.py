@@ -96,6 +96,8 @@ class TemplateMatchService:
         ttl_seconds: float = TEMPLATE_MATCHING.default_ttl_seconds,
         padding: int = TEMPLATE_MATCHING.default_padding,
         border_offset: int = 0,
+        border_offset_x: Optional[int] = None,
+        border_offset_y: Optional[int] = None,
     ) -> None:
         """
         Register a grid template (inventory, prayer, equipment).
@@ -110,6 +112,8 @@ class TemplateMatchService:
             ttl_seconds: Cache time-to-live
             padding: Pixels to subtract from each cell edge
             border_offset: Pixels of border in template to exclude from grid area
+            border_offset_x: Optional horizontal border offset (overrides border_offset)
+            border_offset_y: Optional vertical border offset (overrides border_offset)
 
         Example:
             service.register_grid(
@@ -131,6 +135,8 @@ class TemplateMatchService:
             ttl_seconds=ttl_seconds,
             padding=padding,
             border_offset=border_offset,
+            border_offset_x=border_offset_x,
+            border_offset_y=border_offset_y,
         )
         self.grids[name] = grid
         logger.info(f"Registered grid: {name} ({num_rows}×{num_cols})")
@@ -203,6 +209,8 @@ class TemplateMatchService:
                 ttl_seconds=grid_config.get("ttl_seconds", 5.0),
                 padding=grid_config.get("padding", 4),
                 border_offset=grid_config.get("border_offset", 0),
+                border_offset_x=grid_config.get("border_offset_x"),
+                border_offset_y=grid_config.get("border_offset_y"),
             )
 
         # Load buttons

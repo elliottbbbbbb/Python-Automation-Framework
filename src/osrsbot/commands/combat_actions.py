@@ -316,6 +316,7 @@ class CombatActions:
 
         return success
 
+    # NOTE: The good click templates do not currently work.
     def mark_last_attack_failed(self) -> None:
         """
         Mark the most recent attack click as failed.

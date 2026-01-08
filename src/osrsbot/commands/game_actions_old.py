@@ -323,13 +323,29 @@ class GameActions:
                 delay *= self.anti_ban.get_timing_variance()
             time.sleep(delay)
         else:
-            pyautogui.rightClick(abs_x, abs_y)
+            # Use mouse service for right-click + menu selection to ensure micro-jitter
+            self.mouse.click_at(
+                abs_x,
+                abs_y,
+                button="right",
+                move_style="curved",
+                speed_multiplier=self._get_mouse_speed_multiplier(),
+            )
 
             menu_delay = random.uniform(0.05, 0.1)
             time.sleep(menu_delay)
 
             drop_offset_y = random.uniform(38, 42)
-            pyautogui.click(abs_x, abs_y + drop_offset_y)
+            menu_x = abs_x
+            menu_y = int(abs_y + drop_offset_y)
+
+            self.mouse.click_at(
+                menu_x,
+                menu_y,
+                button="left",
+                move_style="linear",
+                speed_multiplier=self._get_mouse_speed_multiplier(),
+            )
 
             delay = random.uniform(0.5, 0.7)
             if self.anti_ban:
@@ -367,9 +383,17 @@ class GameActions:
                     "coordinates", "inventory", f"slot_{wrong_slot}"
                 )
                 if coord:
-                    abs_x, abs_y = self._to_absolute(coord["x"], coord["y"])
-                    pyautogui.moveTo(abs_x, abs_y, duration=random.uniform(0.1, 0.3))
-                    time.sleep(random.uniform(0.1, 0.2))
+                        abs_x, abs_y = self._to_absolute(coord["x"], coord["y"])
+                        # Use the configured mouse service to move (no click) so movement
+                        # is humanized and consistent across drivers.
+                        self.mouse.move_to(
+                            abs_x,
+                            abs_y,
+                            style="linear",
+                            duration=random.uniform(0.1, 0.3),
+                            speed_multiplier=self._get_mouse_speed_multiplier(),
+                        )
+                        time.sleep(random.uniform(0.1, 0.2))
 
             if self.drop_item(slot, shift_drop=False):
                 dropped += 1
