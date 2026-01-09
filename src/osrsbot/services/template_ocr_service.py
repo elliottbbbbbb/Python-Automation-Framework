@@ -42,6 +42,10 @@ YELLOW = Color(lower=(255, 255, 0), upper=(255, 255, 0))
 CYAN = Color(lower=(0, 255, 255), upper=(0, 255, 255))
 # WHITE for white text
 WHITE = Color(lower=(200, 200, 200), upper=(255, 255, 255))
+# GRAY for dimmer text (like coordinates)
+GRAY = Color(lower=(150, 150, 150), upper=(255, 255, 255))
+# LIGHT_GRAY for very dim text (like world coordinates - RGB ~70-255)
+LIGHT_GRAY = Color(lower=(70, 70, 60), upper=(255, 255, 255))
 
 
 def isolate_colors(image: np.ndarray, colors: List[Color]) -> np.ndarray:

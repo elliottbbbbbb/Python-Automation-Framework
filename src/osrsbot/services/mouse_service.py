@@ -7,16 +7,15 @@ Inspired by OSBC's Bezier curve implementation but with added flexibility.
 import logging
 import random
 import time
+import math
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
 import pyautogui
 
-from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT
+from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT, MovementStyle
 
 logger = logging.getLogger(__name__)
-
-MovementStyle = Literal["instant", "linear", "curved", "overshoot", "random"]
 
 
 @dataclass
@@ -84,6 +83,14 @@ class MouseService:
 
             # Apply anti-ban speed variance
             duration *= speed_multiplier
+
+            # Introduce small variation so repeated 'curved' calls don't look identical
+            if style == "curved":
+                r = random.random()
+                if r < 0.12:
+                    style = "linear"
+                elif r < 0.28:
+                    style = "overshoot"
 
             if style == "instant":
                 pyautogui.moveTo(x, y, duration=0)
@@ -202,48 +209,87 @@ class MouseService:
         Creates a smooth curved path with random control points.
         Uses configuration from constants.BEZIER_CURVE.
         """
-        cp1_x = start_x + random.randint(
-            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
-        )
-        cp1_y = start_y + random.randint(
-            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
-        )
-        cp2_x = end_x + random.randint(
-            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
-        )
-        cp2_y = end_y + random.randint(
-            BEZIER_CURVE.control_point_offset_min, BEZIER_CURVE.control_point_offset_max
-        )
+        # Improved control points: place them along the line and offset perpendicular
+        dx = end_x - start_x
+        dy = end_y - start_y
+        dist = math.hypot(dx, dy)
 
-        steps = max(
-            BEZIER_CURVE.min_steps, int(duration * BEZIER_CURVE.steps_per_second)
-        )
+        # Base control offsets scale with distance for natural curves
+        base_off = int(max(1, dist * 0.2))
+        off_min = BEZIER_CURVE.control_point_offset_min
+        off_max = BEZIER_CURVE.control_point_offset_max
+
+        # Compute unit perpendicular vector
+        if dist == 0:
+            perp_x, perp_y = 0, 0
+        else:
+            ux = dx / dist
+            uy = dy / dist
+            perp_x = -uy
+            perp_y = ux
+
+        # Place control points at 1/3 and 2/3 along the line, offset by perpendicular jitter
+        cp1_base_x = start_x + dx * 0.33
+        cp1_base_y = start_y + dy * 0.33
+        cp2_base_x = start_x + dx * 0.66
+        cp2_base_y = start_y + dy * 0.66
+
+        # Random perpendicular offset magnitude
+        mag1 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
+        mag2 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
+        # Randomly flip direction
+        if random.random() < 0.5:
+            mag1 *= -1
+        if random.random() < 0.5:
+            mag2 *= -1
+
+        cp1_x = cp1_base_x + perp_x * mag1
+        cp1_y = cp1_base_y + perp_y * mag1
+        cp2_x = cp2_base_x + perp_x * mag2
+        cp2_y = cp2_base_y + perp_y * mag2
+
+        steps = max(BEZIER_CURVE.min_steps, int(duration * BEZIER_CURVE.steps_per_second))
+
+        # easing function for more human-like velocity (ease-in-out)
+        def ease_in_out(t: float) -> float:
+            if t < 0.5:
+                return 2 * t * t
+            return 1 - pow(-2 * t + 2, 2) / 2
 
         start_time = time.time()
 
         for i in range(steps + 1):
             t = i / steps
-            elapsed = time.time() - start_time
+            u = ease_in_out(t)
 
+            # Cubic Bezier with eased parameter
             x = (
-                (1 - t) ** 3 * start_x
-                + 3 * (1 - t) ** 2 * t * cp1_x
-                + 3 * (1 - t) * t**2 * cp2_x
-                + t**3 * end_x
+                (1 - u) ** 3 * start_x
+                + 3 * (1 - u) ** 2 * u * cp1_x
+                + 3 * (1 - u) * u ** 2 * cp2_x
+                + u ** 3 * end_x
             )
             y = (
-                (1 - t) ** 3 * start_y
-                + 3 * (1 - t) ** 2 * t * cp1_y
-                + 3 * (1 - t) * t**2 * cp2_y
-                + t**3 * end_y
+                (1 - u) ** 3 * start_y
+                + 3 * (1 - u) ** 2 * u * cp1_y
+                + 3 * (1 - u) * u ** 2 * cp2_y
+                + u ** 3 * end_y
             )
 
-            pyautogui.moveTo(int(x), int(y))
+            # occasional tiny hand jitter to simulate micro-corrections
+            if random.random() < 0.08:
+                jitter = random.uniform(-1.2, 1.2)
+                x += jitter
+                y += random.uniform(-1.2, 1.2)
 
-            expected_time = (i / steps) * duration
+            pyautogui.moveTo(int(round(x)), int(round(y)))
+
+            elapsed = time.time() - start_time
+            expected_time = ease_in_out(i / steps) * duration
             sleep_time = expected_time - elapsed
             if sleep_time > 0:
-                time.sleep(sleep_time)
+                # add tiny variance to timing to avoid perfect schedule
+                time.sleep(sleep_time * random.uniform(0.85, 1.15))
 
     def _move_with_overshoot(
         self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float

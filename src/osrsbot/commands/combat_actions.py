@@ -18,10 +18,10 @@ Responsibilities:
 import logging
 from typing import Any, Optional, Tuple
 
-from osrsbot.constants import COLOR_DETECTION, TARGET_SELECTION
+from osrsbot.constants import COLOR_DETECTION, MovementStyle, TARGET_SELECTION
 from osrsbot.models.config import Config
 from osrsbot.services.click_target_tracker import ClickTargetTracker
-from osrsbot.services.mouse_service import MouseService, MovementStyle
+from osrsbot.services.mouse_service import MouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.utils.coordinate_helpers import CoordinateResolver
 from osrsbot.utils.timing_helpers import TimingHelper
@@ -315,6 +315,33 @@ class CombatActions:
                 self.anti_ban.record_action(f"click_{color_name}")
 
         return success
+
+    # NOTE: The good click templates do not currently work.
+    def mark_last_attack_failed(self) -> None:
+        """
+        Mark the most recent attack click as failed.
+
+        Call this when an attack click doesn't result in combat starting.
+        Enables automatic blacklisting of inaccessible NPCs.
+        """
+        if self._target_tracker._click_history:
+            last_click = self._target_tracker._click_history[-1]
+            last_click.success = False
+            logger.debug(
+                f"Marked last click at ({last_click.x}, {last_click.y}) as failed"
+            )
+
+            # Check for repeated failures and blacklist if needed
+            if self._target_tracker.has_repeated_failures(
+                window=6, failure_threshold=3, radius_pixels=100
+            ):
+                logger.warning("Repeated attack failures detected, blacklisting area")
+                self._target_tracker.blacklist_location(
+                    last_click.x,
+                    last_click.y,
+                    duration=TARGET_SELECTION.blacklist_duration,
+                    radius=TARGET_SELECTION.blacklist_radius,
+                )
 
     def reset_targeting(self) -> None:
         """Clear target tracking and blacklist."""

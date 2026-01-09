@@ -10,8 +10,9 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+from osrsbot.constants import MovementStyle
 from osrsbot.core.game_interface import GameInterface
-from osrsbot.services.mouse_service import MouseService, MovementStyle
+from osrsbot.services.mouse_service import MouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.status_socket_service import StatusSocketService
 

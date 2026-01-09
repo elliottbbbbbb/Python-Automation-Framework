@@ -188,6 +188,12 @@ class StateMachineBot(Bot):
         states_executed = 0
 
         while states_executed < max_states:
+            # Check for scheduled break BEFORE state execution
+            if hasattr(self, "actions") and self.actions.anti_ban:
+                if self.actions.anti_ban.should_take_break():
+                    logger.info(f"Anti-ban: Break triggered before {self._current_state.value}")
+                    self.actions.anti_ban.execute_break()
+
             # Random idle actions between states
             if hasattr(self, "actions") and self.actions.anti_ban:
                 if self.actions.anti_ban.should_idle_action():
@@ -204,6 +210,11 @@ class StateMachineBot(Bot):
                 self.actions.anti_ban.record_action(
                     f"state_{self._current_state.value}"
                 )
+
+            # Micro-break chance AFTER state execution (8% default)
+            if hasattr(self, "actions") and self.actions.anti_ban:
+                if self.actions.anti_ban.should_micro_break():
+                    self.actions.anti_ban.execute_micro_break()
 
             # Get next state based on result
             next_state = self._get_next_state(self._current_state, result)

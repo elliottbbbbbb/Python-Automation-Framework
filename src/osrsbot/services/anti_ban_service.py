@@ -376,7 +376,7 @@ class AntiBanService:
         new_y = current_y + jitter_y
 
         logger.debug(f"Idle action: mouse jitter ({jitter_x}, {jitter_y})")
-        mouse.move_to(new_x, new_y, move_style="curved")
+        mouse.move_to(new_x, new_y, style="instant")
 
         # Small pause
         time.sleep(random.uniform(0.2, 0.8))

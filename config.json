@@ -20,7 +20,17 @@
     "combat_indicator_green": "#078B36",
     "combat_indicator_red": "#63150D",
     "combat_indicator_teal": "#068a34",
-    "1": "#596E13"
+    "1": "#596E13",
+    "clay_rock": "#CD853F",
+    "copper_rock": "#B87333",
+    "tin_rock": "#708090",
+    "iron_rock": "#8B7355",
+    "coal_rock": "#36454F",
+    "gold_rock": "#FFD700",
+    "mithril_rock": "#4682B4",
+    "adamantite_rock": "#50C878",
+    "runite_rock": "#00CED1",
+    "granite_rock": "#A9A9A9"
   },
   "coordinates": {
     "inventory": {
@@ -135,6 +145,12 @@
         "y": 169,
         "width": 35,
         "height": 20
+      },
+      "world_coord_region": {
+        "x": 50,
+        "y": 305,
+        "width": 100,
+        "height": 21
       }
     }
   },
@@ -178,7 +194,7 @@
   },
   "status_socket": {
     "enabled": true,
-    "data_file": "live_data.json",
+    "data_file": "C:\\Users\\elliott\\.runelite\\live_data.json",
     "poll_interval": 0.1
   },
   "walker": {
@@ -197,62 +213,70 @@
     "connection_timeout": 2.0
   },
   "templates": {
+    "overload_potion": "src/osrsbot/images/bot/items/overload_potion.png",
+    "absorption_potion": "src/osrsbot/images/bot/items/absorption_potion.png",
+    "dwarven_rock_cake": "src/osrsbot/images/bot/items/dwarven_rock_cake.png",
+    "locator_orb": "src/osrsbot/images/bot/items/locator_orb.png",
+
     "ui_grids": {
       "inventory": {
         "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
         "rows": 7,
         "cols": 4,
-        "threshold": 0.40,
+        "threshold": 0.30,
+        "sticky": true,
+        "padding": 0,
+        "border_offset": 20
+      },
+      "equipment": {
+        "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+        "rows": 7,
+        "cols": 2,
+        "threshold": 0.30,
         "sticky": true,
         "padding": 0,
         "border_offset": 13
       },
-      "equipment": {
-        "path": "src/osrsbot/images/bot/ui_templates/equipment.PNG",
-        "rows": 7,
-        "cols": 2,
-        "threshold": 0.50,
-        "sticky": true,
-        "padding": 0,
-        "border_offset": 10
-      },
       "prayer": {
-        "path": "src/osrsbot/images/bot/ui_templates/prayer.PNG",
+        "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
         "rows": 6,
         "cols": 5,
-        "threshold": 0.50,
+        "threshold": 0.30,
         "sticky": true,
         "padding": 0,
-        "border_offset": 10
+        "border_offset": 13
       },
       "spellbook": {
-        "path": "src/osrsbot/images/bot/ui_templates/spellbook.PNG",
-        "rows": 7,
-        "cols": 4,
-        "threshold": 0.50,
+        "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+        "rows": 10,
+        "cols": 7,
+        "threshold": 0.30,
         "sticky": true,
-        "padding": 0,
-        "border_offset": 10
+        "padding": 2,
+        "border_offset": 15,
+        "border_offset_x": 22,
+        "border_offset_y": 12
       },
       "minimap": {
-        "path": "src/osrsbot/images/bot/ui_templates/minimap.png",
+        "path": "src/osrsbot/images/bot/ui_templates/minimap_fixed.png",
         "rows": 1,
         "cols": 1,
-        "threshold": 0.70,
+        "threshold": 0.55,
         "sticky": true
       },
       "chat": {
         "path": "src/osrsbot/images/bot/ui_templates/chat.png",
         "rows": 1,
         "cols": 1,
-        "threshold": 0.70,
+        "threshold": 0.40,
         "sticky": true
       }
     },
+
     "ui_buttons": {
       "inventory_tab": {
         "path": "src/osrsbot/images/bot/ui_templates/inventory.png",
-        "threshold": 0.70
+        "threshold": 0.50
       },
       "equipment_tab": {
         "path": "src/osrsbot/images/bot/ui_templates/equipment.PNG",
@@ -308,19 +332,19 @@
       },
       "good_click_1": {
         "path": "src/osrsbot/images/bot/mouse_clicks/red_1.png",
-        "threshold": 0.49
+        "threshold": 0.89
       },
       "good_click_2": {
         "path": "src/osrsbot/images/bot/mouse_clicks/red_2.png",
-        "threshold": 0.49
+        "threshold": 0.89
       },
       "good_click_3": {
         "path": "src/osrsbot/images/bot/mouse_clicks/red_3.png",
-        "threshold": 0.49
+        "threshold": 0.89
       },
       "good_click_4": {
         "path": "src/osrsbot/images/bot/mouse_clicks/red_4.png",
-        "threshold": 0.49
+        "threshold": 0.89
       }
     }
   }

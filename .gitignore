@@ -140,6 +140,20 @@ segmentation_debug/
 *.jpg
 *.jpeg
 
+# Debug and test scripts (temporary development files)
+analyze_coord_color.py
+debug_coordinate_region.py
+debug_ocr_colors.py
+inspect_templates.py
+test_coord_text.py
+test_coordinate_ocr.py
+test_simple_pathfinding.py
+
+# Gradle build artifacts
+.gradle/
+gradle.zip
+build/
+
 # Video recordings (bot demos, debugging recordings)
 *.mp4
 *.avi

@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from osrsbot.models.config import Config
 
 # Import new focused modules
+from osrsbot.queries.bank_queries import BankQueries
 from osrsbot.queries.combat_queries import CombatQueries
 from osrsbot.queries.stat_queries import StatQueries
 from osrsbot.services.template_ocr_service import TemplateOCRService
@@ -62,11 +63,13 @@ class GameState:
                 screen_service, config, template_service
             )
             self.stat_queries = StatQueries(screen_service, ocr_service, config)
+            self.bank_queries = BankQueries(screen_service)
         else:
             self.combat_queries = None
             self.stat_queries = None
+            self.bank_queries = None
             logger.warning(
-                "ScreenService not available - combat and stat queries unavailable"
+                "ScreenService not available - combat, stat, and bank queries unavailable"
             )
 
         # Initialize inventory detection (already exists)
@@ -101,6 +104,10 @@ class GameState:
         return False
 
     # --- Stat Queries (delegate to StatQueries) ---
+    def get_all_stats(self, force: bool = False) -> dict[str, Optional[int]]:
+        if self.stat_queries:
+            return self.stat_queries.get_all_stats(force)
+
     def get_hp(self, force: bool = False) -> Optional[int]:
         """Get current HP."""
         if self.stat_queries:
@@ -125,6 +132,14 @@ class GameState:
         """Get current run energy."""
         if self.stat_queries:
             return self.stat_queries.get_run_energy(force)
+
+        logger.error("StatQueries not available")
+        return None
+
+    def get_special_attack_percentage(self, force: bool = False) -> Optional[int]:
+        """Get current special attack percentage."""
+        if self.stat_queries:
+            return self.stat_queries.get_special_attack_percentage(force)
 
         logger.error("StatQueries not available")
         return None

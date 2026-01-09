@@ -6,21 +6,18 @@ This module centralizes magic numbers and configuration.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Tuple
+from typing import Dict, Literal, Tuple
+
+# ============================================================================
+# TYPE ALIASES
+# ============================================================================
+
+# Mouse movement styles (used as string literals for simpler comparisons)
+MovementStyle = Literal["instant", "linear", "curved", "overshoot", "random"]
 
 # ============================================================================
 # ENUMERATIONS
 # ============================================================================
-
-
-class MovementStyle(Enum):
-    """Mouse movement styles for different action types."""
-
-    INSTANT = "instant"  # Teleport mouse instantly (dev/testing only)
-    LINEAR = "linear"  # Straight line movement
-    CURVED = "curved"  # Bezier curve movement (most human-like)
-    OVERSHOOT = "overshoot"  # Overshoot then correct (human-like)
-    RANDOM = "random"  # Randomly select from available styles
 
 
 class Prayer(Enum):

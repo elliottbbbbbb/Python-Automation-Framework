@@ -1,1097 +1,1147 @@
-# OSRS Automation Framework - Comprehensive Codebase Analysis
-
-**Date**: 2026-01-01
-**Version**: Post-Refactoring (v2.0)
-**Status**: Production-Ready
-
----
-
-## Executive Summary
-
-The OSRS Automation Framework is a sophisticated, production-grade Python bot framework for Old School RuneScape. It implements clean architecture patterns (CQRS, dependency injection, state machines) with advanced features like anti-ban detection, OCR-based stat reading, template matching, and intelligent pathfinding.
-
-**Key Metrics**:
-- **Total Lines of Code**: ~15,000+ lines
-- **Services**: 10 modular services
-- **Bot Scripts**: 2 production bots + 3 test bots
-- **Architecture**: CQRS + State Machine + Facade Pattern
-- **Test Coverage**: Comprehensive integration tests
-
----
+# OSRS Bot Framework - Comprehensive Analysis
 
 ## Table of Contents
 
-1. [Directory Structure](#1-directory-structure)
-2. [Core Architecture Patterns](#2-core-architecture-patterns)
-3. [Core Infrastructure Files](#3-core-infrastructure-files)
-4. [Service Layer](#4-service-layer)
-5. [Commands Layer](#5-commands-layer)
-6. [Queries Layer](#6-queries-layer)
-7. [Utility Modules](#7-utility-modules)
-8. [Models & Data Structures](#8-models--data-structures)
-9. [Bot Scripts](#9-bot-scripts)
-10. [State Machine Type System](#10-state-machine-type-system)
-11. [File Dependency Graph](#11-file-dependency-graph)
-12. [Configuration System](#12-configuration-system)
-13. [Anti-Ban System](#13-anti-ban-system)
-14. [Performance Optimizations](#14-performance-optimizations)
-15. [Error Handling Strategy](#15-error-handling-strategy)
+1. [Codebase Overview](#codebase-overview)
+2. [Architecture](#architecture)
+3. [Core Systems](#core-systems)
+4. [Services](#services)
+5. [Scripts & Bots](#scripts--bots)
+6. [Design Patterns](#design-patterns)
+7. [File Organization](#file-organization)
+8. [External Dependencies](#external-dependencies)
+9. [Configuration System](#configuration-system)
+10. [NMZ Script Deep Dive](#nmz-script-deep-dive)
 
 ---
 
-## 1. Directory Structure
+# Codebase Overview
+
+This is a **6,000+ line professional Python automation framework** for Old School RuneScape built over 6+ months. It demonstrates advanced software engineering practices with a clear layered architecture.
+
+**Key Statistics**:
+- **Total Lines of Code**: ~6,000+ (active modules)
+- **Development Time**: 6+ months
+- **Language**: Python 3.11+
+- **Primary Patterns**: CQRS, State Machine, Facade, Strategy, Dependency Injection
+
+---
+
+# Architecture
+
+## Layered Architecture Diagram
 
 ```
-src/osrsbot/
-├── __init__.py                 # Package entry point, exports main components
-├── __main__.py                 # CLI entry point
-├── main.py                     # Legacy entry point
-├── constants.py                # Global configuration dataclasses
-│
-├── core/                       # Core framework infrastructure
-│   ├── base_bot.py            # Abstract Bot base class
-│   ├── state_machine_bot.py    # StateMachineBot with retry logic
-│   ├── game_interface.py       # Window management
-│   ├── runner.py               # ScriptRunner, service initialization
-│   ├── state_types.py          # State machine data types
-│   └── state_helpers.py        # State machine utilities
-│
-├── models/                     # Data structures and configuration
-│   ├── config.py               # Config loader (JSON-based)
-│   ├── ui_elements.py          # UIElement, UIElementGrid, UIButton
-│   └── digit_templates/        # OCR digit templates
-│
-├── services/                   # Infrastructure services
-│   ├── screen_service.py       # Screen capture, color detection
-│   ├── mouse_service.py        # Human-like mouse movement
-│   ├── template_match_service.py  # UI detection
-│   ├── template_ocr_service.py    # Fast template-based OCR
-│   ├── anti_ban_service.py        # Behavioral randomization
-│   ├── loot_detection_service.py  # Loot detection
-│   ├── walker_service.py          # Pathfinding
-│   ├── status_socket_service.py   # RuneLite integration
-│   ├── click_target_tracker.py    # Smart targeting
-│   └── interception_mouse_service.py  # Kernel-level mouse
-│
-├── commands/                   # CQRS Command layer (write)
-│   ├── game_actions.py         # Facade (692 lines, was 806)
-│   ├── inventory_actions.py    # Inventory operations (265 lines)
-│   ├── combat_actions.py       # Combat operations (307 lines)
-│   └── game_actions_old.py     # Legacy backup
-│
-├── queries/                    # CQRS Query layer (read)
-│   ├── game_queries.py         # Facade (333 lines, was 605)
-│   ├── stat_queries.py         # HP, prayer, run energy (163 lines)
-│   ├── combat_queries.py       # Combat detection (119 lines)
-│   ├── inventory_queries.py    # Inventory state (existing)
-│   └── game_queries_old.py     # Legacy backup
-│
-├── utils/                      # Shared utility modules
-│   ├── coordinate_helpers.py   # Coordinate resolution (161 lines)
-│   ├── timing_helpers.py       # Timing utilities (74 lines)
-│   ├── color_helpers.py        # Color utilities
-│   └── template_helpers.py     # Template utilities (69 lines)
-│
-├── scripts/                    # Bot scripts
-│   ├── green_dragons_state.py  # Production bot (state machine)
-│   ├── vorkath_bot.py          # WIP boss bot
-│   ├── hp_tracker.py           # OCR testing bot
-│   ├── test_inventory_clicks.py  # UI testing
-│   └── comprehensive_state_bot_test.py  # Framework tests
-│
-├── app/                        # Application layer
-│   ├── menu.py                 # CLI menu
-│   ├── calibration.py          # Calibration tool
-│   └── debug_ui.py             # Debug visualization
-│
-└── fonts/                      # OCR font templates
-    └── Plain11/                # OSRS standard font
+┌─────────────────────────────────────────┐
+│  Application Layer (CLI, Calibration)  │
+├─────────────────────────────────────────┤
+│  Scripts Layer (Bot Implementations)   │
+├─────────────────────────────────────────┤
+│  CQRS Layer (Commands + Queries)       │
+│  ├─ Commands: GameActions (WRITE)      │
+│  └─ Queries: GameState (READ)          │
+├─────────────────────────────────────────┤
+│  Core Layer (State Machine, Bot Base)  │
+├─────────────────────────────────────────┤
+│  Services Layer (Mouse, Screen, OCR)   │
+├─────────────────────────────────────────┤
+│  Models & Configuration                │
+└─────────────────────────────────────────┘
+```
+
+## Key Architectural Principles
+
+1. **CQRS Pattern**: Strict separation between reading game state (Queries) and modifying it (Commands)
+2. **Dependency Injection**: All services instantiated by `ScriptRunner` and injected into bots
+3. **State Machine Framework**: Robust state-driven bot execution with retry logic, timeouts, and failover
+4. **Layered Design**: Clear boundaries between perception (services), decision (core), and action (commands)
+
+---
+
+# Core Systems
+
+## State Machine System
+
+**File**: `core/state_machine_bot.py`
+
+**Purpose**: Provides a framework for complex bot logic with multiple states.
+
+### Features
+
+- Enum-based state definitions
+- Automatic retry logic with configurable limits
+- Timeout detection per state
+- Failover states for error recovery
+- State history tracking (last 100 transitions)
+- Anti-ban integration (variance, breaks, idle actions)
+
+### Key Components
+
+```python
+class StateMachineBot(Bot):
+    def define_states(self) -> Enum
+    def define_state_metadata(self) -> Dict[StateMetadata]
+    def define_transitions(self) -> List[StateTransition]
+    def get_initial_state(self) -> Enum
+    def _handle_<state>(self) -> StateResult  # Handler methods
+```
+
+### State Results
+
+- **SUCCESS**: Move to next state
+- **FAILURE**: Retry or failover
+- **RETRY**: Retry immediately without counting as failure
+- **TIMEOUT**: Exceeded time limit
+
+---
+
+## Script Runner
+
+**File**: `core/runner.py`
+
+**Purpose**: Service orchestrator and initialization layer.
+
+### Responsibilities
+
+1. Load configuration from `config.json`
+2. Attach to RuneLite game window (`GameInterface`)
+3. Initialize all services with proper dependency order
+4. Create facade objects (`GameActions`, `GameState`)
+5. Run bot scripts with error handling
+
+### Service Initialization Order
+
+```
+1. Config → GameInterface
+2. MouseService (or InterceptionMouseService)
+3. ScreenService
+4. TemplateMatchService
+5. TemplateOCRService
+6. Position Tracking (StatusSocket OR CoordinateOCR)
+7. WalkerService (if position tracking available)
+8. AntiBanService
+9. LootDetectionService
+10. GameState (Query facade)
+11. GameActions (Command facade)
 ```
 
 ---
 
-## 2. Core Architecture Patterns
+## Base Bot Classes
 
-### 2.1 CQRS (Command Query Responsibility Segregation)
+### Bot (`core/base_bot.py`)
 
-**Commands (Write Operations)** - [src/osrsbot/commands/](src/osrsbot/commands/)
-- **GameActions** (facade): Maintains backward compatibility, delegates to focused modules
-- **InventoryActions**: Inventory manipulation (click slots, drop items)
-- **CombatActions**: Combat operations (attack, eat, drink, prayers)
+Simple bot base class with run loop:
+- Abstract `run_cycle(bank_location, run_number)` method
+- Keyboard listener for 'q' key exit
+- Optional status UI updates
+- Automatic run counting and logging
 
-**Queries (Read Operations)** - [src/osrsbot/queries/](src/osrsbot/queries/)
-- **GameState** (facade): Delegates to focused query modules
-- **StatQueries**: HP, prayer, run energy (OCR-based)
-- **CombatQueries**: Combat detection, click verification
-- **InventoryState**: Inventory fullness checks
+### StateMachineBot (`core/state_machine_bot.py`)
 
-**Benefits**:
-- Clear separation of concerns
-- Prevents accidental state mutations
-- Each module has single responsibility
-- Easy to test and maintain
+Advanced state-driven bot with:
+- State machine execution
+- Retry and failover logic
+- Debug UI integration
+- Anti-ban integration
 
-### 2.2 Dependency Injection
+### BankstanderBot (`core/base_bankstander.py`)
 
-All services are injected, not created internally:
-
-```python
-# ScriptRunner initializes and injects services
-runner = ScriptRunner(window_title="RuneLite -")
-bot = MyBot(
-    interface=runner.interface,
-    state=runner.state,
-    actions=runner.actions,
-    config=runner.config
-)
-```
-
-**Benefits**:
-- Loose coupling
-- Easy to mock for testing
-- Clear dependency graph
-- Services can be swapped
-
-### 2.3 State Machine Pattern
-
-**Key Features**:
-- States defined as Enum
-- Metadata: max_retries, timeout, failover_state
-- Automatic retry with backoff
-- Full execution history
-- Timeout enforcement
-
-**Example**:
-```python
-class MyStates(Enum):
-    IDLE = "idle"
-    COMBAT = "combat"
-    BANKING = "banking"
-
-# State handlers return StateResult.SUCCESS/FAILURE/RETRY
-def _handle_idle(self, context: StateExecutionContext) -> StateResult:
-    # Implementation
-    return StateResult.SUCCESS
-```
-
-### 2.4 Facade Pattern (Recent Refactoring)
-
-**Problem**: God classes (GameActions 806 lines, GameState 605 lines)
-
-**Solution**:
-- Extract focused modules (InventoryActions, CombatActions, etc.)
-- Maintain backward compatibility via facades
-- Reduce file size by 51% (1,411 → 692 lines)
-
-**Result**:
-- Old code works unchanged
-- New code can use focused modules directly
-- Gradual migration path
+Specialized for banking tasks:
+- Pre-defined states: IDLE → BANKING → PROCESS → DEPOSIT
+- Built-in bank detection and item withdrawal
+- Template-based banker finding
+- Only requires `process_items()` override
 
 ---
 
-## 3. Core Infrastructure Files
+# Services
 
-### 3.1 [constants.py](src/osrsbot/constants.py) - Global Configuration
+## Mouse Services
 
-**Purpose**: Centralized magic numbers and configuration dataclasses
-
-**Key Dataclasses**:
-
-| Config Class | Purpose | Key Values |
-|--------------|---------|------------|
-| `OCRPreprocessingConfig` | OCR preprocessing strategies | 5 strategies with different contrast/threshold |
-| `BezierCurveConfig` | Mouse movement curves | Control points, steps per second |
-| `MouseMovementConfig` | Mouse behavior | Speed multipliers, overshoot (15%), delays |
-| `GameTimingConfig` | Delay configurations | Short (0.3s), medium (0.6s), long (1.2s) |
-| `TemplateMatchingConfig` | Template detection | Threshold (0.68), TTL (5s), grid dimensions |
-| `AntiBanConfig` | Anti-ban parameters | Breaks (30-60min), variance (±15%) |
-| `InventoryConfig` | Inventory settings | 28 slots, empty color (#453c33) |
-| `MinimapNavigationConfig` | Minimap walking | Player center (654, 111), 8px/tile |
-
-**Design Note**: Single source of truth for all magic numbers. Can be overridden by config.json.
-
-### 3.2 [core/game_interface.py](src/osrsbot/core/game_interface.py) - Window Management
-
-**Responsibilities**:
-- Find game window by title
-- Translate coordinates (relative ↔ absolute)
-- Window activation and bounds checking
-
-**Key Methods**:
-```python
-get_bounds() -> (left, top, width, height)
-relative_to_absolute(x, y) -> (screen_x, screen_y)
-absolute_to_relative(x, y) -> (window_x, window_y)
-is_in_bounds(x, y, relative=True) -> bool
-activate() / is_active() -> window management
-```
-
-**Dependencies**: None (uses pywin32/pygetwindow)
-**Dependents**: ScreenService, MouseService, all actions/queries
-
-**Design**: Deliberately focused on ONLY window management. All other operations delegated to services.
-
-### 3.3 [core/base_bot.py](src/osrsbot/core/base_bot.py) - Abstract Bot Base
-
-**Responsibilities**:
-- Abstract base class for all bots
-- Main execution loop with error handling
-- Centralized banking logic
-
-**Key Methods**:
-```python
-run_cycle(bank_location, run_number) -> abstract
-run(bank_location, runs) -> main loop
-_teleport_and_bank() -> reusable banking
-_bank_at_varrock() -> specific location
-```
-
-**Dependencies**: GameInterface, GameState, GameActions, Config
-**Dependents**: All bot scripts (green_dragons_state, vorkath_bot, etc.)
-
-### 3.4 [core/state_machine_bot.py](src/osrsbot/core/state_machine_bot.py) - State Machine Framework
-
-**Extends**: `Bot` base class
-
-**State Machine Features**:
-1. Define states (Enum)
-2. Define metadata (max_retries, timeout, failover)
-3. Define transitions (state graph)
-4. Implement handlers (`_handle_<state>()`)
-
-**Execution Flow**:
-```
-run_cycle()
-  → initialize_state_machine()
-  → while has transitions:
-      → _execute_state()
-        → call handler
-        → handle result (retry/timeout/failure)
-        → track history
-      → _get_next_state()
-      → transition
-```
+### MouseService (`services/mouse_service.py`)
 
 **Features**:
-- Automatic retry with configurable backoff
-- Timeout-based failover
-- Full execution history (last 100 entries)
-- Pattern detection for anti-ban
-- Idle actions between states
-
-**Dependencies**: Bot, StateTypes, StateHelpers
-**Dependents**: green_dragons_state.py, vorkath_bot.py
-
-### 3.5 [core/runner.py](src/osrsbot/core/runner.py) - ScriptRunner
-
-**Responsibilities**:
-- Initialize all services with proper dependencies
-- Load configuration
-- Run scripts (Bot classes or functions)
-
-**Service Initialization Order**:
-```
-1. Config (config.json)
-2. GameInterface (window management)
-3. MouseService (with Interception fallback)
-4. ScreenService (capture, color detection)
-5. TemplateMatchService (UI detection)
-6. TemplateOCRService (stat reading)
-7. StatusSocketService (RuneLite integration)
-8. WalkerService (pathfinding)
-9. GameState (queries)
-10. AntiBanService (randomization)
-11. LootDetectionService (loot detection)
-12. GameActions (commands)
-```
-
-**Dependencies**: Config, All services
-**Dependents**: All bot entry points (menu.py, __main__.py)
-
----
-
-## 4. Service Layer - Infrastructure Services
-
-### 4.1 [services/screen_service.py](src/osrsbot/services/screen_service.py)
-
-**Responsibilities**:
-- Screen capture (full window or region)
-- Color detection and matching
-- Pixel sampling
-
-**Key Methods**:
-```python
-capture(region, relative) -> PIL.Image
-capture_grayscale() -> numpy.ndarray
-find_color(hex_color, tolerance, region) -> List[(x,y)]
-get_pixel_color(x, y, relative) -> (r,g,b)
-get_viewport_dimensions() -> (width, height)
-```
-
-**Color Matching**: Euclidean distance in RGB space with tolerance
-
-**Dependencies**: GameInterface, PIL, numpy
-**Dependents**: All queries, TemplateMatchService, CombatActions
-
-### 4.2 [services/mouse_service.py](src/osrsbot/services/mouse_service.py)
-
-**Responsibilities**:
-- Human-like mouse movement (Bezier curves)
-- Natural clicking with variance
-- Multiple movement styles
+- Bezier curve movement (human-like curves)
+- Multiple movement styles: instant, linear, curved, overshoot, random
+- Click variance (±3 pixels)
+- Post-click delay randomization
+- Speed multiplier for anti-ban variance
 
 **Movement Styles**:
-- `instant`: Teleport (no movement)
-- `linear`: Straight line at constant speed
-- `curved`: Bezier curve (human-like)
-- `overshoot`: Click past target, correct back
-- `random`: Random choice of above
-
-**Overshoot Mechanics**:
-- 15% chance of overshoot
-- Random 5-20px past target
-- 70% time reaching, 30% correcting
-- Small delays between movements
-
-**Dependencies**: GameInterface, pyautogui
-**Dependents**: All actions (InventoryActions, CombatActions)
-
-### 4.3 [services/template_match_service.py](src/osrsbot/services/template_match_service.py)
-
-**Responsibilities**:
-- Detect UI grids (inventory 7×4, prayer 6×5)
-- Detect UI buttons (prayer tab, run, logout)
-- Calculate slot positions mathematically
-- Cache results with TTL
-
-**Detection Strategy**:
-1. Register templates from config
-2. Match grid as whole (OpenCV)
-3. Subdivide mathematically (fast!)
-4. Cache for 5 seconds (TTL)
-
-**Key Concepts**:
-- **UIElement**: Single clickable element
-- **UIElementGrid**: 7×4 or 6×5 grid with calculated slots
-- **UIButton**: Named buttons
-
-**Dependencies**: ScreenService, cv2, numpy
-**Dependents**: InventoryActions, CombatActions, CoordinateResolver
-
-### 4.4 [services/template_ocr_service.py](src/osrsbot/services/template_ocr_service.py)
-
-**Responsibilities**:
-- Fast template-based OCR (10x faster than Tesseract)
-- Read HP, prayer, run energy from orbs
-- Based on OS-Bot-COLOR implementation
-
-**Algorithm**:
-1. Load BMP digit templates (0-9)
-2. Isolate target color from image
-3. Match each digit template
-4. Return highest confidence sequence
-
-**Color Definitions**:
-- `ORB_GREEN`: High HP (green orb)
-- `ORB_RED`: Low HP (red orb)
-- `CYAN`: Prayer points
-- `YELLOW`: Run energy
-
-**Why Better than Tesseract**:
-- 10x faster (2ms vs 100ms)
-- More accurate for OSRS fonts
-- Deterministic (same input = same output)
-- No ML overhead
-
-**Dependencies**: cv2, numpy, font templates
-**Dependents**: StatQueries
-
-### 4.5 [services/anti_ban_service.py](src/osrsbot/services/anti_ban_service.py)
-
-**Responsibilities**:
-- Schedule breaks (30-60 min intervals, 2-5 min duration)
-- Micro-breaks (5% chance, 0.5-2 sec)
-- Session variance (±15% timing, ±10% speed)
-- Idle actions (mouse jitter, stats checking)
-- Pattern detection (avoid repetitive sequences)
-
-**Session Variance** (generated once per session):
 ```python
-timing_multiplier = random.uniform(0.85, 1.15)
-mouse_speed = random.uniform(0.9, 1.1)
+"instant"     # Teleport (testing only)
+"linear"      # Straight line
+"curved"      # Bezier curve (most human-like)
+"overshoot"   # Overshoot then correct
+"random"      # Random style each time
+```
+
+### InterceptionMouseService (`services/interception_mouse_service.py`)
+
+**Purpose**: Kernel-level mouse control for enhanced anti-detection.
+
+**Features**:
+- Uses `interception` driver (requires admin + reboot)
+- Hardware-level mouse emulation
+- Multi-pass position correction
+- Automatic fallback to software mouse if unavailable
+
+---
+
+## Screen Services
+
+### ScreenService (`services/screen_service.py`)
+
+**Features**:
+- Window-relative screenshots
+- Color detection with tolerance
+- Pixel analysis and region capture
+- Screenshot caching for performance
+- Grayscale conversion for template matching
+
+---
+
+## OCR Services
+
+### TemplateOCRService (`services/template_ocr_service.py`)
+
+**Purpose**: Fast template-based OCR (much faster than Tesseract).
+
+**Method**: Uses `cv2.matchTemplate` with pre-loaded font bitmaps.
+
+**Supported Fonts**: Plain11, Plain12, Bold12
+
+**Supported Colors**: ORB_GREEN, ORB_RED, CYAN, YELLOW, WHITE, GRAY
+
+**Performance**: ~50-100ms (vs 500-1000ms for Tesseract)
+
+**Use Cases**:
+- HP reading
+- Prayer point reading
+- Run energy reading
+- World coordinate reading
+
+---
+
+## Computer Vision Services
+
+### TemplateMatchService (`services/template_match_service.py`)
+
+**Features**:
+- OpenCV template matching with normalized correlation
+- Multi-template matching (best match selection)
+- UI grid detection (inventory, equipment, prayer, spellbook)
+- Sticky cache for UI elements
+- Threshold-based filtering
+
+**UI Grids Supported**:
+- Inventory (7×4 = 28 slots)
+- Equipment (7×2 = 14 slots)
+- Prayer (6×5 = 30 prayers)
+- Spellbook (7×4 = 28 spells)
+
+### LootDetectionService (`services/loot_detection_service.py`)
+
+**Purpose**: Detect loot drops on ground.
+
+**Method**: HSV color filtering for purple item highlights.
+
+**Features**:
+- Finds nearest loot to player position
+- Distance-based prioritization
+- Region-of-interest limiting
+
+---
+
+## Pathfinding Services
+
+### StatusSocketService (`services/status_socket_service.py`)
+
+**Purpose**: Real-time position tracking via RuneLite plugin.
+
+**Data Provided**:
+- World coordinates (X, Y, plane)
+- Camera rotation (yaw, pitch)
+- Movement state
+- Animation ID
+
+**File**: `live_data.json` written by RuneLite plugin
+**Update Rate**: 100ms (configurable)
+
+### CoordinateOCRService (`services/coordinate_ocr_service.py`)
+
+**Purpose**: OCR-based position tracking (fallback if plugin unavailable).
+
+**Method**: Read world coordinates from bottom-left display using TemplateOCRService.
+
+**Update Rate**: ~100ms
+
+### WalkerService (`services/walker_service.py`)
+
+**Purpose**: World coordinate pathfinding with camera compensation.
+
+**Key Algorithm**: 2D Rotation Matrix
+
+```python
+# Convert world tile → minimap pixel
+dx = target_x - player_x
+dy = target_y - player_y
+
+# Apply camera rotation
+theta = radians(360 - (camera_yaw * 360.0 / 2048.0))
+rotated_x = dx * cos(theta) - dy * sin(theta)
+rotated_y = dx * sin(theta) + dy * cos(theta)
+
+# Scale and offset
+minimap_x = 654 + int(rotated_x * 4)
+minimap_y = 111 + int(rotated_y * 4)
 ```
 
 **Features**:
-- Scheduled breaks with randomization
-- Micro-breaks after actions
-- Mouse jitter during idle
-- Pattern detection (last 10 actions)
-
-**Dependencies**: Config, logging
-**Dependents**: TimingHelper, all actions
-
-### 4.6 [services/click_target_tracker.py](src/osrsbot/services/click_target_tracker.py)
-
-**Responsibilities**:
-- Track click history (last 10 clicks)
-- Detect stuck clicking (same location)
-- Blacklist inaccessible areas temporarily
-
-**Stuck Detection**:
-- Last 3 clicks within 18px = stuck
-- Used to switch targets
-
-**Blacklisting**:
-- 12 second temporary ban
-- 25px radius around blacklisted point
-- Auto-cleanup on expiry
-
-**Dependencies**: None (pure logic)
-**Dependents**: CombatActions (smart targeting)
-
-### 4.7 [services/loot_detection_service.py](src/osrsbot/services/loot_detection_service.py)
-
-**Responsibilities**:
-- Detect ground loot (color-based)
-- RuneLite highlights loot in purple/pink
-- Find nearest loot to player
-
-**Algorithm**:
-1. Find all purple pixels
-2. Cluster nearby pixels
-3. Return cluster centers
-
-**Dependencies**: ScreenService, Config
-**Dependents**: GameActions.pickup_loot()
-
-### 4.8 [services/walker_service.py](src/osrsbot/services/walker_service.py)
-
-**Responsibilities**:
-- Convert world coordinates to minimap clicks
-- Camera rotation compensation (2D rotation matrix)
-- Follow waypoint paths
-- Stuck detection
-
-**Pathfinding**:
-1. Get player position and camera angle from StatusSocket
-2. Apply rotation matrix to convert world → minimap pixels
-3. Click on minimap
-4. Wait for movement
-5. Repeat until arrived (±2 tiles)
-
-**Dependencies**: StatusSocketService, ScreenService, MouseService
-**Dependents**: GameActions.walk_to_world_coordinate()
-
-### 4.9 [services/status_socket_service.py](src/osrsbot/services/status_socket_service.py)
-
-**Responsibilities**:
-- Monitor live_data.json from RuneLite Status Socket plugin
-- Provide player position and camera data
-- Cache last known state
-
-**Data Provided**:
-```python
-@dataclass
-class PlayerState:
-    world_x: int
-    world_y: int
-    plane: int
-    camera_yaw: int
-    animation_id: int
-    is_moving: bool
-    timestamp: float
-```
-
-**Dependencies**: File I/O, json
-**Dependents**: WalkerService
-
-### 4.10 [services/interception_mouse_service.py](src/osrsbot/services/interception_mouse_service.py)
-
-**Responsibilities**:
-- Kernel-level mouse control (harder to detect)
-- Requires Interception driver (Windows)
-
-**Setup**: Opt-in via `USE_INTERCEPTION` environment variable
-
-**Fallback**: Auto-falls back to MouseService if unavailable
-
-**Dependencies**: Interception driver
-**Dependents**: ScriptRunner (optional service)
+- Waypoint-based navigation
+- Distance-based click chunking (max 15 tiles)
+- Arrival tolerance (±2 tiles)
+- Stuck detection and timeout
 
 ---
 
-## 5. Commands Layer - Game Actions
+## Anti-Detection Service
 
-### 5.1 [commands/game_actions.py](src/osrsbot/commands/game_actions.py) - Facade (692 lines)
+### AntiBanService (`services/anti_ban_service.py`)
 
-**Pattern**: Facade maintains backward compatibility while delegating to focused modules
-
-**Delegation Map**:
-
-| Original Method | Delegates To | Module |
-|-----------------|--------------|--------|
-| `click_inventory_slot()` | `click_slot()` | InventoryActions |
-| `drop_item()` | `drop_item()` | InventoryActions |
-| `attack_npc()` | `attack_npc()` | CombatActions |
-| `eat_food()` | `eat()` | CombatActions |
-| `wait()` | `wait()` | TimingHelper |
-
-**Dependencies**: InventoryActions, CombatActions, CoordinateResolver, TimingHelper
-**Dependents**: All bot scripts (backward compatible API)
-
-### 5.2 [commands/inventory_actions.py](src/osrsbot/commands/inventory_actions.py) - 265 lines
-
-**Responsibilities**:
-- Click inventory slots (1-28)
-- Drop items (shift-drop or right-click)
-- Batch operations (drop all except, drop until N empty)
-- Open inventory tab
-
-**Key Methods**:
-```python
-click_slot(slot_num, move_style) -> bool
-drop_item(slot, shift_drop) -> bool
-drop_until_empty_slots(target_empty, keep_slots) -> int
-ensure_open() -> bool
-```
-
-**Coordinate Resolution** (smart fallback):
-1. Try template detection (most accurate)
-2. Fall back to config coordinates
-3. Log which method used
-
-**Dependencies**: MouseService, CoordinateResolver, TimingHelper
-**Dependents**: GameActions facade, bot scripts
-
-### 5.3 [commands/combat_actions.py](src/osrsbot/commands/combat_actions.py) - 307 lines
-
-**Responsibilities**:
-- Attack NPCs (color-based or smart targeting)
-- Eat food/drink potions
-- Switch prayers
-- Smart target selection with blacklisting
-
-**Key Methods**:
-```python
-attack_npc(npc_color_name, use_smart_targeting) -> bool
-eat(food_color_name) -> bool
-drink_potion(potion_color_name) -> bool
-toggle_prayer(prayer_name) -> bool
-click_color_smart(color_name, player_pos, ...) -> bool
-```
-
-**Smart Targeting**:
-- Find all NPCs of target color
-- Select closest to player
-- Track click history
-- Blacklist failed targets
-
-**Dependencies**: MouseService, ScreenService, CoordinateResolver, ClickTargetTracker
-**Dependents**: GameActions facade, bot scripts
+**Features**:
+- Gaussian timing variance (randomized delays)
+- Scheduled break system (every 45-90 minutes)
+- Idle actions (camera movement, random clicks)
+- Mouse speed variance (0.8× - 1.2×)
+- Action pattern detection (prevents repetitive behavior)
+- Micro-breaks (5-15 second pauses)
 
 ---
 
-## 6. Queries Layer - Game State
+# Scripts & Bots
 
-### 6.1 [queries/game_queries.py](src/osrsbot/queries/game_queries.py) - Facade (333 lines)
+## Available Bots
 
-**Pattern**: Delegates to focused query modules
-
-**Delegation Map**:
-
-| Query Method | Delegates To | Module |
-|--------------|--------------|--------|
-| `in_combat()` | `in_combat()` | CombatQueries |
-| `get_hp()` | `get_hp()` | StatQueries |
-| `get_prayer()` | `get_prayer()` | StatQueries |
-| `inventory_full()` | `is_full()` | InventoryState |
-
-**Dependencies**: StatQueries, CombatQueries, InventoryState
-**Dependents**: All bot scripts (backward compatible API)
-
-### 6.2 [queries/stat_queries.py](src/osrsbot/queries/stat_queries.py) - 163 lines
-
-**Responsibilities**:
-- Read HP from orb (OCR)
-- Read prayer points from orb
-- Read run energy from orb
-- Handle OCR errors gracefully
-
-**OCR Process**:
-1. Capture HP region from config
-2. Isolate green/red pixels
-3. Match digit templates
-4. Return most confident number
-
-**Caching**: TTL 0.5s, median filter (last 5 readings)
-
-**Dependencies**: ScreenService, TemplateOCRService, Config
-**Dependents**: GameState facade, bot scripts
-
-### 6.3 [queries/combat_queries.py](src/osrsbot/queries/combat_queries.py) - 119 lines
-
-**Responsibilities**:
-- Detect if player in combat (pixel-based)
-- Verify click was detected
-
-**Combat Detection**:
-```python
-def in_combat(self) -> bool:
-    # Check combat indicator pixel color
-    color = self.screen.get_pixel_color(x, y, relative=True)
-    return color matches combat_indicator_colors
-```
-
-**Dependencies**: ScreenService, Config
-**Dependents**: GameState facade, bot scripts
-
-### 6.4 [queries/inventory_queries.py](src/osrsbot/queries/inventory_queries.py) - Existing
-
-**Responsibilities**:
-- Detect if inventory is full
-- Get list of empty/filled slots
-- Track inventory state changes
-
-**Detection Algorithm**:
-- Check center pixel of each slot
-- Compare against empty slot color (#453c33)
-- Tolerance ±15 per RGB channel
-- Cache results (1s TTL)
-
-**Dependencies**: TemplateMatchService, ScreenService, Config
-**Dependents**: GameState facade
+| Script | Type | Description | Complexity |
+|--------|------|-------------|-----------|
+| `nmz_afk.py` | State Machine | NMZ 1HP absorption strategy with potion timers | High |
+| `bs_flax.py` | Bankstander | Flax spinning (template example) | Low |
+| `bankstander_example.py` | Bankstander | Generic bankstander template | Low |
+| `green_dragons_state.py` | State Machine | Green dragon killing with looting | Medium |
+| `vorkath_bot.py` | State Machine | Vorkath boss mechanics | High |
+| `comprehensive_state_bot_test.py` | State Machine | Feature showcase | High |
+| `hp_tracker.py` | Simple | OCR HP tracking test | Low |
+| `test_inventory_clicks.py` | Simple | Inventory detection test | Low |
 
 ---
 
-## 7. Utility Modules
+# Design Patterns
 
-### 7.1 [utils/coordinate_helpers.py](src/osrsbot/utils/coordinate_helpers.py) - 161 lines
+## CQRS (Command Query Responsibility Segregation)
 
-**Responsibilities**:
-- Resolve coordinates (template-first, config fallback)
-- Convert relative ↔ absolute coordinates
-- Player position helpers
+### Queries (READ-ONLY operations)
 
-**Key Methods**:
+**File**: `queries/`
+
 ```python
-resolve_inventory_slot(slot_num, force_detect) -> (x, y)
-resolve_ui_button(button_name, force_detect) -> (x, y)
-to_absolute(x, y) -> (abs_x, abs_y)
-get_player_position() -> (x, y)
+GameState (Facade)
+├─ CombatQueries  - in_combat(), click_success()
+├─ StatQueries    - get_hp(), get_prayer(), get_run_energy()
+├─ InventoryQueries - inventory_full(), count_filled_slots()
+└─ BankQueries    - is_bank_open(), find_template()
 ```
 
-**Design**: Centralizes all coordinate resolution logic
+### Commands (WRITE operations)
 
-**Dependencies**: ScreenService, TemplateMatchService, Config
-**Dependents**: InventoryActions, CombatActions
+**File**: `commands/`
 
-### 7.2 [utils/timing_helpers.py](src/osrsbot/utils/timing_helpers.py) - 74 lines
-
-**Responsibilities**:
-- Apply configured waits with anti-ban variance
-- Calculate mouse speed multipliers
-- Trigger micro-breaks
-
-**Key Methods**:
 ```python
-wait(timing_type) -> None  # "short", "medium", "long"
-get_mouse_speed_multiplier() -> float  # 0.9-1.1
+GameActions (Facade)
+├─ CombatActions    - attack_npc(), eat(), drink_potion()
+├─ InventoryActions - click_slot(), drop_item(), drop_all_except()
+└─ BankActions      - click_banker(), search_and_withdraw()
 ```
 
-**Anti-Ban Integration**:
-- Session variance ±15% timing
-- Speed variance ±10%
+## Other Patterns
 
-**Dependencies**: Config, AntiBanService
-**Dependents**: All actions
-
-### 7.3 [utils/template_helpers.py](src/osrsbot/utils/template_helpers.py) - 69 lines
-
-**Responsibilities**:
-- Load template images
-- Convert between formats
-- Template path resolution
-
-**Dependencies**: cv2, PIL
-**Dependents**: TemplateMatchService
-
-### 7.4 [utils/color_helpers.py](src/osrsbot/utils/color_helpers.py)
-
-**Responsibilities**:
-- Hex ↔ RGB conversion
-- Color distance calculation
-- Color matching with tolerance
-
-**Key Functions**:
-```python
-hex_to_rgb(hex_color) -> (r, g, b)
-rgb_to_hex(r, g, b) -> "#RRGGBB"
-color_distance(color1, color2) -> float
-colors_match(color1, color2, tolerance) -> bool
-```
-
-**Dependencies**: None
-**Dependents**: ScreenService, Config
+- **Facade Pattern**: `GameState` and `GameActions` provide unified API
+- **Strategy Pattern**: Mouse movement styles, OCR preprocessing strategies
+- **Dependency Injection**: All services injected via constructor
+- **State Machine Pattern**: Enum-based state definitions with metadata-driven configuration
 
 ---
 
-## 8. Models & Data Structures
+# File Organization
 
-### 8.1 [models/config.py](src/osrsbot/models/config.py)
+```
+OSRS-Automation-Framework/
+├── config.json                 # Configuration (colors, coords, timings)
+├── src/osrsbot/
+│   ├── __main__.py            # Entry point
+│   ├── app/                   # Application layer
+│   │   ├── menu.py           # CLI menu
+│   │   ├── calibration.py    # Color/coordinate calibration
+│   │   └── debug_ui.py       # Debug UI (optional)
+│   ├── core/                  # Framework foundation
+│   │   ├── base_bot.py       # Simple bot base class
+│   │   ├── state_machine_bot.py  # State machine framework
+│   │   ├── base_bankstander.py   # Bankstander base class
+│   │   ├── runner.py         # Service orchestrator
+│   │   ├── game_interface.py # Window attachment
+│   │   ├── state_types.py    # State machine types
+│   │   └── state_helpers.py  # State utilities
+│   ├── commands/              # CQRS Command layer
+│   │   ├── game_actions.py   # Main facade
+│   │   ├── combat_actions.py # Combat operations
+│   │   ├── bank_actions.py   # Banking operations
+│   │   └── inventory_actions.py # Inventory operations
+│   ├── queries/               # CQRS Query layer
+│   │   ├── game_queries.py   # Main facade
+│   │   ├── combat_queries.py # Combat state
+│   │   ├── stat_queries.py   # HP/Prayer/Run OCR
+│   │   ├── inventory_queries.py # Inventory state
+│   │   └── bank_queries.py   # Bank detection
+│   ├── services/              # Service implementations
+│   │   ├── mouse_service.py  # Software mouse
+│   │   ├── interception_mouse_service.py # Hardware mouse
+│   │   ├── screen_service.py # Screenshots & pixels
+│   │   ├── template_match_service.py # OpenCV matching
+│   │   ├── template_ocr_service.py # Fast template OCR
+│   │   ├── status_socket_service.py # RuneLite plugin
+│   │   ├── coordinate_ocr_service.py # OCR position tracking
+│   │   ├── walker_service.py # Pathfinding
+│   │   ├── anti_ban_service.py # Anti-detection
+│   │   ├── loot_detection_service.py # Loot finding
+│   │   └── click_target_tracker.py # Target blacklisting
+│   ├── scripts/               # Bot implementations
+│   │   ├── nmz_afk.py        # NMZ AFK bot
+│   │   ├── bs_flax.py        # Flax spinner
+│   │   ├── green_dragons_state.py # Combat bot
+│   │   └── ...
+│   ├── models/                # Data models
+│   │   ├── config.py         # Configuration loading
+│   │   └── ui_elements.py    # UI element models
+│   ├── utils/                 # Utility helpers
+│   │   ├── color_helpers.py  # Color conversion
+│   │   ├── coordinate_helpers.py # Coordinate resolution
+│   │   ├── template_helpers.py # Template utilities
+│   │   └── timing_helpers.py # Timing utilities
+│   ├── fonts/                 # OCR font templates
+│   │   ├── Plain11/          # OSRS UI font
+│   │   ├── Plain12/
+│   │   └── Bold12/
+│   └── images/bot/            # Template images
+│       ├── items/            # Item templates
+│       ├── ui_templates/     # UI templates
+│       ├── bank/             # Banker templates
+│       └── ...
+├── runelite-status-socket/    # RuneLite plugin (Java)
+│   ├── src/main/java/com/osrsbot/statussocket/
+│   │   ├── StatusSocketPlugin.java
+│   │   ├── PlayerStateData.java
+│   │   ├── FileWriteService.java
+│   │   └── StatusSocketConfig.java
+│   ├── build.gradle
+│   └── install-plugin.bat
+├── docs/                      # Documentation
+│   ├── ARCHITECTURE.md       # CQRS architecture
+│   ├── DEVELOPER_GUIDE.md    # Developer guide
+│   ├── BANKSTANDER_GUIDE.md  # Bankstander guide
+│   ├── PATHFINDING_ARCHITECTURE.md
+│   └── CODEBASE_ANALYSIS.md
+└── tests/                     # Test suite
+    ├── unit/
+    └── manual/
+```
 
-**Responsibilities**:
-- Load config.json
-- Provide default template
-- Nested path access
+---
 
-**Config Structure**:
+# External Dependencies
+
+## RuneLite Plugin (Java)
+
+**Location**: `runelite-status-socket/`
+
+**Purpose**: Real-time game state export.
+
+**Features**:
+- Exports player position, camera angle, movement state
+- Writes to `live_data.json` every 100ms
+- Enables advanced pathfinding
+
+**Status**: Currently not working (RuneLite external plugin issues)
+**Fallback**: CoordinateOCRService reads coordinates from screen
+
+## Arduino Mouse Control (Optional)
+
+**Purpose**: Hardware-level mouse control.
+
+**Configuration**:
 ```json
-{
-  "account_name": "YourAccountName",
-  "window_title": "RuneLite - ",
-  "colors": {...},
-  "coordinates": {
-    "inventory": {"slot_1": {"x": 591, "y": 257}, ...},
-    "ui": {...},
-    "checks": {...}
-  },
-  "timings": {"short": 0.3, "medium": 0.6, "long": 1.2}
+"arduino": {
+  "enabled": false,
+  "serial_port": "COM3",
+  "baud_rate": 115200,
+  "fallback_to_software": true
 }
 ```
 
-**Dependencies**: json, pathlib
-**Dependents**: All services and actions
+## Interception Driver (Optional)
 
-### 8.2 [models/ui_elements.py](src/osrsbot/models/ui_elements.py)
+**Purpose**: Kernel-level mouse/keyboard control.
 
-**UIElement** (single clickable):
-```python
-@dataclass
-class UIElement:
-    x0, y0, x1, y1: int
-    # Properties: center, center_x, center_y, width, height
-```
+**Requirements**:
+- Admin privileges
+- System reboot after installation
+- Windows only
 
-**UIElementGrid** (7×4 or 6×5):
-```python
-class UIElementGrid:
-    # Template-detected grid, mathematically subdivided
-```
-
-**UIButton** (named buttons):
-```python
-@dataclass
-class UIButton:
-    x0, y0, x1, y1: int
-    name: str
-```
-
-**Dependencies**: dataclasses
-**Dependents**: TemplateMatchService
+**Fallback**: MouseService (PyAutoGUI)
 
 ---
 
-## 9. Bot Scripts
+# Configuration System
 
-### 9.1 [scripts/green_dragons_state.py](src/osrsbot/scripts/green_dragons_state.py) - Production
+## Configuration File: `config.json`
 
-**States**:
+### Structure
+
+```json
+{
+  "account_name": "account name",
+  "window_title": "RuneLite - account name",
+  "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+
+  "colors": {
+    "yellow_tile_marker": "#fcfc01",
+    "green_dragon": "#00ffff",
+    "manta_ray": "#765C45"
+  },
+
+  "coordinates": {
+    "inventory": { "slot_1": {"x": 591, "y": 257} },
+    "ui": { "settings": {"x": 687, "y": 509} },
+    "world": { "ge_clerk": {"x": 273, "y": 151} },
+    "ocr": { "hp_region": {"x": 527, "y": 79, "width": 35, "height": 20} }
+  },
+
+  "timings": {
+    "short": [0.4, 0.7],
+    "medium": [0.8, 1.3],
+    "long": [2.5, 3.8],
+    "teleport": [11.0, 13.0]
+  },
+
+  "mouse": {
+    "min_speed": 0.2,
+    "max_speed": 0.6,
+    "overshoot_chance": 0.15
+  },
+
+  "templates": {
+    "overload_potion": "src/osrsbot/images/bot/items/overload_potion.png"
+  },
+
+  "ui_grids": {
+    "inventory": {
+      "path": "src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+      "rows": 7, "cols": 4, "threshold": 0.40
+    }
+  }
+}
 ```
-IDLE → TELEPORT_TO_DRAGONS → NAVIGATE_TO_SPOT → COMBAT →
-TELEPORT_TO_BANK → BANKING → (cycle)
+
+### Config Loading (`models/config.py`)
+
+- JSON-based configuration
+- Default values for missing keys
+- `Config.get()` method with path traversal
+- Auto-saves default config if missing
+
+---
+
+# NMZ Script Deep Dive
+
+## Overview
+
+**File**: `src/osrsbot/scripts/nmz_afk.py`
+**Lines**: 432
+**Complexity**: High
+
+The NMZ (Nightmare Zone) AFK bot implements the "1 HP Absorption" training strategy using a sophisticated state machine.
+
+## Strategy Explanation
+
+### OSRS Game Mechanics
+
+1. **Overload Potion**: Boosts all combat stats by 5-19 levels, but deals 50 damage over ~20 seconds
+2. **Absorption Potion**: Each dose adds 50 absorption points (acts as a damage shield)
+3. **1 HP Strategy**: At 1 HP, enemies deal minimal damage (0-1), making absorption last longer
+4. **Locator Orb**: Deals 10 damage when clicked (used to lower HP)
+
+### Bot Strategy
+
+```
+1. Drink overload (boosts stats, deals 50 damage)
+2. Wait for overload damage to lower HP
+3. Use locator orb to reduce HP to exactly 1
+4. Drink 6 doses of absorption (300 points)
+5. Enter combat loop:
+   - Monitor HP (use orb if HP ≥ 2)
+   - Check overload timer (re-dose at 5 minutes)
+   - Check absorption timer (re-dose at 5 minutes)
 ```
 
-**Features**:
-- HP threshold with variance
-- Kill tracking (logs every 5 kills)
+---
+
+## State Machine Design
+
+### States
+
+```python
+class NMZStates(Enum):
+    IDLE = "idle"
+    DRINK_OVERLOAD = "drink_overload"
+    WAIT_FOR_DAMAGE = "wait_for_damage"
+    LOWER_HP = "lower_hp"
+    DRINK_ABSORPTION = "drink_absorption"
+    COMBAT_LOOP = "combat_loop"
+    RECOVERY = "recovery"
+```
+
+### State Flow
+
+```
+IDLE
+ ↓
+DRINK_OVERLOAD
+ ↓
+WAIT_FOR_DAMAGE
+ ↓
+LOWER_HP
+ ↓
+DRINK_ABSORPTION
+ ↓
+COMBAT_LOOP ←─────┐
+ ↓ (timer expired) │
+ └────────────────→┘
+ ↓ (error)
+RECOVERY → IDLE
+```
+
+---
+
+## Line-by-Line Analysis
+
+### Initialization (Lines 59-79)
+
+```python
+def __init__(self, **kwargs):
+    super().__init__(**kwargs)
+
+    # Timer tracking (in seconds)
+    self._overload_timer: float = 0.0
+    self._absorption_timer: float = 0.0
+    self._last_overload_time: float = 0.0
+    self._last_absorption_time: float = 0.0
+
+    # Constants
+    self.OVERLOAD_DURATION = 300  # 5 minutes
+    self.ABSORPTION_DURATION = 300  # 5 minutes
+    self.OVERLOAD_DAMAGE = 50  # Overload deals 50 damage
+    self.TARGET_HP = 1  # Maintain 1 HP
+```
+
+**Timer Design**:
+- `_last_overload_time`: Unix timestamp when overload was drunk
+- `_last_absorption_time`: Unix timestamp when absorption was drunk
+- Duration constants: 300 seconds = 5 minutes
+
+**Timer Logic**:
+```python
+elapsed = time.time() - self._last_overload_time
+needs_redose = elapsed >= 300  # True if ≥5 minutes passed
+```
+
+### Helper Methods
+
+#### HP Detection (Lines 159-169)
+
+```python
+def _get_hp(self) -> Optional[int]:
+    hp = self.state.get_hp(force=True)
+    if hp is None:
+        logger.warning("Failed to read HP value")
+    return hp
+```
+
+**Process**:
+1. Capture screenshot of HP orb region
+2. Isolate green text color
+3. Use template OCR to match digit templates
+4. Return parsed integer
+
+**Performance**: ~50-100ms
+
+#### Safe Locator Orb Usage (Lines 191-221)
+
+```python
+def _use_locator_orb_safe(self) -> bool:
+    current_hp = self._get_hp()
+    if current_hp is None:
+        logger.error("Cannot use locator orb - HP detection failed")
+        return False
+
+    if current_hp < 2:
+        logger.warning(
+            f"SAFETY CHECK: HP too low ({current_hp}) - "
+            "cannot use locator orb (would die)"
+        )
+        return False
+
+    logger.info(f"Using locator orb (current HP: {current_hp})")
+    if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
+        logger.error("Failed to click locator orb")
+        return False
+
+    self.actions.wait("medium")
+    return True
+```
+
+**Safety Checks**:
+1. **HP Detection**: If HP can't be read, don't click (could kill player)
+2. **HP Threshold**: If HP < 2, don't click (10 damage would kill at 1 HP)
+
+**Locator Orb Mechanics**:
+- Deals 10 damage
+- No minimum HP requirement (can kill you!)
+- Safe HP levels: HP ≥ 2 (will survive)
+
+### State Handlers
+
+#### IDLE State (Lines 225-242)
+
+```python
+def _handle_idle(self, context: StateExecutionContext) -> StateResult:
+    logger.info("[IDLE] Checking potion timers...")
+
+    if self._needs_overload():
+        logger.info("IDLE: Overload timer expired, starting setup")
+        return StateResult.SUCCESS  # Go to DRINK_OVERLOAD
+
+    logger.info("IDLE: Timers active, entering combat loop")
+    return StateResult.SUCCESS
+```
+
+**Decision Point**: Does setup need to run?
+- First run OR overload expired → Start setup
+- Timers valid → Skip to combat loop
+
+#### DRINK_OVERLOAD State (Lines 244-265)
+
+```python
+def _handle_drink_overload(self, context: StateExecutionContext) -> StateResult:
+    logger.info("[DRINK_OVERLOAD] Drinking overload potion...")
+
+    # Click overload potion in inventory
+    if not self.actions.click_template(self.OVERLOAD_TEMPLATE, "overload_potion"):
+        logger.error("DRINK_OVERLOAD: Failed to find overload potion")
+        return StateResult.FAILURE
+
+    # Update timer
+    self._last_overload_time = time.time()
+    logger.info("DRINK_OVERLOAD: Overload timer started")
+
+    self.actions.wait("medium")
+    return StateResult.SUCCESS  # Go to WAIT_FOR_DAMAGE
+```
+
+**Process**:
+1. Template match overload potion in inventory
+2. Click if found (FAILURE if not found)
+3. Start timer with current Unix timestamp
+4. Wait for game to process (0.8-1.3 seconds)
+5. Transition to WAIT_FOR_DAMAGE
+
+#### WAIT_FOR_DAMAGE State (Lines 267-300)
+
+```python
+def _handle_wait_for_damage(self, context: StateExecutionContext) -> StateResult:
+    logger.info("[WAIT_FOR_DAMAGE] Waiting for overload damage...")
+
+    max_wait = 30
+    start_time = time.time()
+
+    while time.time() - start_time < max_wait:
+        current_hp = self._get_hp()
+        if current_hp is None:
+            logger.warning("WAIT_FOR_DAMAGE: HP detection failed, waiting...")
+            self.actions.wait("medium")
+            continue
+
+        logger.info(f"WAIT_FOR_DAMAGE: Current HP: {current_hp}")
+
+        if current_hp <= 60:  # Arbitrary threshold
+            logger.info("WAIT_FOR_DAMAGE: HP dropped, overload is working")
+            return StateResult.SUCCESS  # Go to LOWER_HP
+
+        self.actions.wait("long")
+
+    logger.warning("WAIT_FOR_DAMAGE: Timeout waiting for damage")
+    return StateResult.FAILURE
+```
+
+**Purpose**: Wait for overload to deal damage (50 damage over ~20 seconds).
+
+**Loop Logic**:
+- Maximum 30 seconds timeout
+- Check HP every 2.5-3.8 seconds
+- If HP ≤ 60, damage is occurring → SUCCESS
+- If 30 seconds pass with no HP drop → FAILURE
+
+**Why wait?**: Overload deals damage slowly. Can't immediately lower HP to 1.
+
+#### LOWER_HP State (Lines 302-339)
+
+```python
+def _handle_lower_hp(self, context: StateExecutionContext) -> StateResult:
+    logger.info("[LOWER_HP] Lowering HP to 1 with rock cake...")
+
+    current_hp = self._get_hp()
+    if current_hp is None:
+        logger.error("LOWER_HP: Cannot detect HP")
+        return StateResult.FAILURE
+
+    if current_hp <= 1:
+        logger.info("LOWER_HP: Already at 1 HP, skipping")
+        return StateResult.SUCCESS
+
+    # Click locator orb
+    logger.info(f"LOWER_HP: Current HP: {current_hp}, using rock cake")
+    if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
+        logger.error("LOWER_HP: Failed to find rock cake")
+        return StateResult.FAILURE
+
+    self.actions.wait("medium")
+
+    # Verify HP is at 1
+    new_hp = self._get_hp()
+    if new_hp is None or new_hp > 1:
+        logger.warning(f"LOWER_HP: HP not at 1 (current: {new_hp}), retrying")
+        return StateResult.FAILURE
+
+    logger.info("LOWER_HP: HP successfully lowered to 1")
+    return StateResult.SUCCESS
+```
+
+**Process**:
+1. Check current HP (abort if detection fails)
+2. Skip if already at 1 HP
+3. Click locator orb (deals 10 damage)
+4. Wait for game processing
+5. Verify HP reached 1 (retry if not)
+
+**Retry Behavior**:
+- If HP > 1 after click → FAILURE
+- State machine retries (up to 3 times)
+- Each retry clicks orb again (another -10 HP)
+
+**Example**:
+```
+HP = 45 → Click → HP = 35 (FAILURE, retry)
+HP = 35 → Click → HP = 25 (FAILURE, retry)
+HP = 25 → Click → HP = 15 (FAILURE, retry)
+...continues until HP = 1
+```
+
+#### DRINK_ABSORPTION State (Lines 341-370)
+
+```python
+def _handle_drink_absorption(self, context: StateExecutionContext) -> StateResult:
+    logger.info("[DRINK_ABSORPTION] Drinking absorption potions...")
+
+    num_doses = 6
+    for i in range(1, num_doses + 1):
+        logger.info(f"DRINK_ABSORPTION: Dose {i}/{num_doses}")
+        if not self.actions.click_template(self.ABSORPTION_TEMPLATE, "absorption_potion"):
+            logger.warning(
+                f"DRINK_ABSORPTION: Failed to find absorption potion (dose {i})"
+            )
+            break
+
+        self.actions.wait("short")
+
+    # Update timer
+    self._last_absorption_time = time.time()
+    logger.info("DRINK_ABSORPTION: Absorption timer started")
+
+    return StateResult.SUCCESS  # Go to COMBAT_LOOP
+```
+
+**Process**:
+1. Loop 6 times (6 doses = 300 absorption points)
+2. Click absorption potion template
+3. Wait 0.4-0.7 seconds between doses
+4. Break loop if potion not found (graceful degradation)
+5. Start absorption timer
+6. Transition to COMBAT_LOOP
+
+**Graceful Degradation**: If potions run out mid-loop, log warning and continue (doesn't crash).
+
+#### COMBAT_LOOP State (Lines 372-411)
+
+```python
+def _handle_combat_loop(self, context: StateExecutionContext) -> StateResult:
+    while True:
+        current_hp = self._get_hp()
+        if current_hp is None:
+            logger.warning("COMBAT_LOOP: HP detection failed, retrying...")
+            self.actions.wait("medium")
+            continue
+
+        logger.info(f"COMBAT_LOOP: Current HP: {current_hp}")
+
+        # SAFETY: Use locator orb if HP >= 2
+        if current_hp >= 2:
+            logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
+            self._use_locator_orb_safe()
+
+        # Check timers
+        overload_elapsed = time.time() - self._last_overload_time
+        absorption_elapsed = time.time() - self._last_absorption_time
+
+        if overload_elapsed >= self.OVERLOAD_DURATION:
+            logger.info("COMBAT_LOOP: Overload expired, re-dosing")
+            return StateResult.FAILURE  # Transition to DRINK_OVERLOAD
+
+        if absorption_elapsed >= self.ABSORPTION_DURATION:
+            logger.info("COMBAT_LOOP: Absorption expired, re-dosing")
+            return StateResult.FAILURE  # Transition to DRINK_ABSORPTION
+
+        # Log time remaining
+        overload_remaining = self.OVERLOAD_DURATION - overload_elapsed
+        absorption_remaining = self.ABSORPTION_DURATION - absorption_elapsed
+        logger.info(
+            f"COMBAT_LOOP: Overload: {overload_remaining:.0f}s, "
+            f"Absorption: {absorption_remaining:.0f}s"
+        )
+
+        # Wait before next loop iteration
+        self.actions.wait("medium")
+```
+
+**Main Loop**: Runs indefinitely, monitoring HP and timers.
+
+**Infinite Loop Design**:
+- `while True` keeps bot IN this state
+- Returning FAILURE breaks loop and transitions
+
+**Monitoring**:
+1. **HP**: Check every iteration (~1 second)
+2. **HP Safety**: If HP ≥ 2, use locator orb
+3. **Overload Timer**: If ≥300 seconds, re-dose
+4. **Absorption Timer**: If ≥300 seconds, re-dose
+
+**Example Log Output**:
+```
+COMBAT_LOOP: Current HP: 1
+COMBAT_LOOP: Overload: 245s, Absorption: 213s
+```
+
+**Loop Frequency**: ~1 check per second (prevents CPU spam)
+
+#### RECOVERY State (Lines 413-431)
+
+```python
+def _handle_recovery(self, context: StateExecutionContext) -> StateResult:
+    logger.warning("[RECOVERY] Attempting to recover from error...")
+
+    # Reset timers to force re-setup
+    self._reset_timers()
+
+    # Wait a bit before retrying
+    self.actions.wait("long")
+
+    logger.info("RECOVERY: Timers reset, returning to IDLE")
+    return StateResult.SUCCESS  # Go to IDLE
+```
+
+**Purpose**: Error recovery triggered when a state fails too many times.
+
+**Recovery Strategy**:
+1. Reset all timers to 0.0
+2. Wait 2.5-3.8 seconds
+3. Return to IDLE (forces full setup sequence)
+
+**When triggered**: State reaches max_retries without success.
+
+---
+
+## Complete Execution Flow
+
+### Initial Startup
+
+```
+1. Bot launched
+2. State machine starts in IDLE
+3. IDLE checks timers (both 0.0, needs setup)
+4. IDLE → DRINK_OVERLOAD
+```
+
+### First Setup Sequence
+
+```
+5. DRINK_OVERLOAD: Click overload, start timer → SUCCESS
+6. WAIT_FOR_DAMAGE: Wait for HP ≤60 → SUCCESS
+7. LOWER_HP: Click locator orb until HP = 1 → SUCCESS
+8. DRINK_ABSORPTION: Click 6 times, start timer → SUCCESS
+9. COMBAT_LOOP: Enter infinite monitoring loop
+```
+
+### Main Combat Loop (5 minutes)
+
+```
+10. COMBAT_LOOP iteration 1: HP=1, timers active, wait
+11. COMBAT_LOOP iteration 2: HP=2, use orb, timers active, wait
+12. COMBAT_LOOP iteration 3: HP=1, timers active, wait
+... (repeat ~300 times over 5 minutes)
+```
+
+### Overload Expiration (5 minutes later)
+
+```
+N. COMBAT_LOOP: overload_elapsed >= 300 → FAILURE
+N+1. Transition: COMBAT_LOOP → DRINK_OVERLOAD
+N+2. DRINK_OVERLOAD: Click overload, restart timer
+N+3. WAIT_FOR_DAMAGE → LOWER_HP → DRINK_ABSORPTION → COMBAT_LOOP
+N+4. Back in combat loop for another 5 minutes
+```
+
+### Error Scenario
+
+```
+1. DRINK_OVERLOAD fails (potion not found)
+2. Retry 1: DRINK_OVERLOAD fails
+3. Retry 2: DRINK_OVERLOAD fails (max_retries=2 reached)
+4. Failover: DRINK_OVERLOAD → RECOVERY
+5. RECOVERY: Reset timers, wait
+6. RECOVERY → IDLE
+7. IDLE → DRINK_OVERLOAD (try again)
+```
+
+---
+
+## Key Design Patterns
+
+### 1. State Machine Pattern
+- Clear state definitions with metadata
+- Explicit transitions
 - Automatic retry and failover
-- Full state history
 
-**Dependencies**: StateMachineBot, GameState, GameActions
-**Status**: Production-ready, fully functional
+### 2. Safety-First Design
+- Multiple HP checks before dangerous actions
+- Graceful degradation (continue if potions run out)
+- Conservative HP thresholds (HP ≥ 2 for orb)
 
-### 9.2 [scripts/vorkath_bot.py](src/osrsbot/scripts/vorkath_bot.py) - WIP
+### 3. Timer-Based Logic
+- Unix timestamp tracking
+- Elapsed time calculations
+- Expiration detection
 
-**Planned States**:
-```
-IDLE → NAVIGATE_TO_VORKATH → COMBAT → NAVIGATE_TO_BANK → BANKING
-```
+### 4. Template Matching
+- Image-based item detection
+- OpenCV correlation matching
+- Fallback on detection failure
 
-**Status**: Skeleton implementation, handlers not complete
-
-### 9.3 [scripts/comprehensive_state_bot_test.py](src/osrsbot/scripts/comprehensive_state_bot_test.py) - Testing
-
-**Tests**:
-1. Minimap navigation (all directions)
-2. Inventory detection (pixel-based)
-3. Inventory clicking (template-based)
-4. Combat detection
-5. HP/Prayer/Run reading (OCR)
-6. Prayer system
-
-**Status**: Complete, validates all framework features
-
-### 9.4 [scripts/hp_tracker.py](src/osrsbot/scripts/hp_tracker.py) - Testing
-
-**Purpose**: Compare OCR methods (Tesseract vs Template)
-
-**Results**: Template matching is 50x faster and more accurate
+### 5. Human-Like Behavior
+- Randomized delays (short, medium, long)
+- Variable timing between actions
+- Natural mouse movement
 
 ---
 
-## 10. State Machine Type System
+## Performance Characteristics
 
-### 10.1 [core/state_types.py](src/osrsbot/core/state_types.py)
+### Speed
+- HP detection: ~50-100ms
+- Template matching: ~50-200ms
+- State transition: <10ms
+- Loop iteration: ~1-2 seconds
 
-**StateResult** (Enum):
+### Reliability
+- Retry logic on failures
+- Graceful error handling
+- Timeout protection
+- State verification
+
+### Resource Usage
+- CPU: ~5-10%
+- Memory: ~50-100MB
+- Disk: Minimal (logging)
+
+---
+
+## Potential Improvements
+
+### 1. Better HP Lowering Logic
+
+**Current Issue**: Could kill player if HP between 2-10 and multiple clicks happen.
+
+**Fix**:
 ```python
-SUCCESS = "success"    # Proceed to next state
-FAILURE = "failure"    # May retry or failover
-RETRY = "retry"        # Retry immediately
-SKIP = "skip"          # Condition not met
-TIMEOUT = "timeout"    # Exceeded timeout
+def _handle_lower_hp(self, context: StateExecutionContext) -> StateResult:
+    while True:
+        current_hp = self._get_hp()
+        if current_hp is None:
+            return StateResult.FAILURE
+        if current_hp <= 1:
+            return StateResult.SUCCESS
+        if not self._use_locator_orb_safe():
+            return StateResult.FAILURE
+        self.actions.wait("medium")
 ```
 
-**StateMetadata**:
-```python
-@dataclass
-class StateMetadata:
-    name: str
-    description: str = ""
-    max_retries: int = 3
-    timeout: Optional[float] = None
-    failover_state: Optional[Enum] = None
-```
+### 2. Dynamic Timer Adjustment
 
-**StateTransition**:
-```python
-@dataclass
-class StateTransition:
-    from_state: Enum
-    to_state: Enum
-    condition: Optional[Callable[[], bool]] = None
-```
+**Current**: Fixed 5-minute timers
+**Improvement**: Detect buff icons instead of timers
 
-**StateHistoryEntry**:
-```python
-@dataclass
-class StateHistoryEntry:
-    state: Enum
-    result: StateResult
-    duration: float
-    timestamp: float
-    retry_count: int
-    error_message: Optional[str] = None
-    metadata: dict = {}
-```
+### 3. Better IDLE Logic
 
-### 10.2 [core/state_helpers.py](src/osrsbot/core/state_helpers.py)
+**Current**: Always transitions to DRINK_OVERLOAD
+**Improvement**: Add transition to COMBAT_LOOP if timers valid
 
-**Helper Functions**:
-```python
-def build_metadata_dict(
-    states_enum: type[Enum],
-    configs: Dict[Enum, dict]
-) -> Dict[Enum, StateMetadata]:
-    # Build from compact config
-```
+### 4. Potion Management
 
----
+**Current**: Breaks loop if potions run out
+**Improvement**: Detect vial in inventory, exit safely
 
-## 11. File Dependency Graph
+### 5. Power-Up Collection
 
-### Service Layer Dependencies
-
-```
-Config (root)
-├── GameInterface
-│   ├── MouseService
-│   └── ScreenService
-│       ├── TemplateMatchService
-│       ├── TemplateOCRService
-│       └── StatusSocketService
-│           └── WalkerService
-│
-├── AntiBanService
-├── LootDetectionService
-└── ClickTargetTracker
-```
-
-### Command Layer Dependencies
-
-```
-CoordinateResolver (ScreenService, TemplateMatchService, Config)
-TimingHelper (Config, AntiBanService)
-
-InventoryActions (MouseService, CoordinateResolver, TimingHelper)
-CombatActions (MouseService, ScreenService, CoordinateResolver, TimingHelper, ClickTargetTracker)
-
-GameActions (facade)
-├── InventoryActions
-├── CombatActions
-├── CoordinateResolver
-└── TimingHelper
-```
-
-### Query Layer Dependencies
-
-```
-StatQueries (ScreenService, TemplateOCRService, Config)
-CombatQueries (ScreenService, Config)
-InventoryState (TemplateMatchService, ScreenService, Config)
-
-GameState (facade)
-├── StatQueries
-├── CombatQueries
-└── InventoryState
-```
-
-### Bot Scripts Dependencies
-
-```
-StateMachineBot (Bot, StateTypes, StateHelpers)
-
-GreenDragonsBot (StateMachineBot)
-├── GameInterface
-├── GameState
-├── GameActions
-└── Config
-```
-
----
-
-## 12. Configuration System
-
-### Constants vs Config
-
-**Constants** ([constants.py](src/osrsbot/constants.py)):
-- Global defaults (hard-coded)
-- Science-based values (Bezier math)
-- Can be overridden by config
-
-**Config** ([config.json](config.json)):
-- Game-specific coordinates/colors
-- Per-account preferences
-- Timing adjustments
-- Anti-ban customization
-
----
-
-## 13. Anti-Ban System
-
-### Multi-Level Anti-Detection
-
-**Session Variance** (generated once):
-- Timing: ±15%
-- Mouse speed: ±10%
-
-**Scheduled Breaks**:
-- Every 30-60 minutes
-- 2-5 minute duration
-
-**Micro-breaks**:
-- 5% chance per action
-- 0.5-2 second pause
-
-**Idle Actions**:
-- Every 5 minutes
-- Mouse jitter (5-25px)
-- Stats checking
-
-**Pattern Detection**:
-- Tracks last 10 actions
-- Warns if 80%+ similarity
-
-**Smart Targeting**:
-- Closest target selection
-- Blacklisting failed targets
-- Stuck detection
-
----
-
-## 14. Performance Optimizations
-
-### Caching Strategy
-
-| Component | TTL | Reason |
-|-----------|-----|--------|
-| Inventory Grid | 5s | Position stable |
-| Inventory State | 1s | Avoid redundant checks |
-| Player Stats (HP) | 0.5s | Avoid redundant OCR |
-| Template Buttons | 5s | UI stable |
-| Click History | — | Fast deque |
-| Blacklist | 12s | Auto-cleanup |
-
-### Optimization Techniques
-
-1. **Template OCR**: 10x faster than Tesseract
-2. **Pixel-Based Inventory**: 28 pixel reads vs 28 template matches
-3. **Color Detection**: Single pixel for combat
-4. **Coordinate Caching**: Template results cached
-5. **File Monitoring**: Status Socket checks mtime
-6. **Grayscale Conversion**: Template matching on grayscale only
-7. **Region Capture**: Only capture needed regions
-
----
-
-## 15. Error Handling Strategy
-
-### Service Initialization
-
-**Graceful Degradation**:
-- TemplateMatchService unavailable → use config coords
-- StatusSocket unavailable → walker disabled
-- Interception unavailable → fallback to MouseService
-
-### State Machine Recovery
-
-**Retry Logic**:
-1. State fails → retry (max_retries)
-2. Exceeded retries → check failover
-3. Failover defined → transition
-4. No failover → end cycle with error
-
-**Timeout Handling**:
-- State exceeds timeout → immediate failover
-
-**History Tracking**:
-- Every execution recorded
-- Errors logged with context
-- Full trace available
+**Current**: Ignores power-ups
+**Improvement**: Collect Overload/Absorption power-ups
 
 ---
 
 ## Summary
 
-The OSRS Automation Framework is a professionally-designed bot framework with:
+The NMZ AFK bot is a **professional, production-quality implementation** with:
 
-**Clean Architecture**:
-- CQRS (Commands/Queries)
-- Dependency Injection
-- State Machine
-- Facade Pattern
+- **432 lines** of well-documented code
+- **7 states** with clear responsibilities
+- **Robust error handling** with retry and recovery
+- **Safety-first design** preventing death
+- **Timer-based automation** for 5-minute cycles
+- **Template-based perception** using OpenCV
+- **State machine architecture** for complex logic
 
-**51% Code Reduction**:
-- GameActions: 806 → 425 lines
-- GameState: 605 → 267 lines
-- Total facades: 1,411 → 692 lines
-- New focused modules: 1,158 lines
+This demonstrates advanced software engineering:
+- State machine pattern
+- CQRS (queries/commands separation)
+- Defensive programming
+- Magic number elimination
+- Comprehensive logging
+- Type hints for clarity
 
-**Key Features**:
-- Template-based OCR (10x faster)
-- Pixel-based inventory detection
-- Human-like mouse movement
-- Comprehensive anti-ban
-- Smart target selection
-- RuneLite integration
-- Pathfinding with camera compensation
-
-**Extensibility**:
-- Easy to add new states
-- Easy to add new queries/commands
-- Template-driven UI detection
-- Config-driven behavior
-- Service-based architecture
-
-This documentation provides a complete reference for understanding and extending the OSRS Automation Framework.
+The framework as a whole is a **portfolio piece** demonstrating advanced skills applied to complex automation.

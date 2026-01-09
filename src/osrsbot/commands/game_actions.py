@@ -18,24 +18,26 @@ Migration path:
 """
 
 import logging
-import random
-import time
-from typing import Any, List, Optional, Tuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
-import pyautogui
+import cv2 as cv
+import numpy as np
+import pyautogui  # Used for keyboard input (write/press) - no keyboard service yet
 
+from osrsbot.commands.bank_actions import BankActions
 from osrsbot.commands.combat_actions import CombatActions
-
-# Import new focused modules
 from osrsbot.commands.inventory_actions import InventoryActions
-from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION
-from osrsbot.core.game_interface import GameInterface
-from osrsbot.models.config import Config
-from osrsbot.services.mouse_service import MouseService, MovementStyle
-from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.utils.coordinate_helpers import CoordinateResolver
-from osrsbot.utils.timing_helpers import TimingHelper
+from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION, MovementStyle
+from osrsbot.queries.bank_queries import BankQueries
+
+# Type hints only - actual instances injected by runner
+if TYPE_CHECKING:
+    from osrsbot.core.game_interface import GameInterface
+    from osrsbot.models.config import Config
+    from osrsbot.services.mouse_service import MouseService
+    from osrsbot.services.screen_service import ScreenService
+    from osrsbot.services.template_match_service import TemplateMatchService
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +51,20 @@ class GameActions:
 
     def __init__(
         self,
-        mouse: MouseService,
-        screen: ScreenService,
-        interface: GameInterface,
-        config: Config,
-        template_service: Optional[TemplateMatchService] = None,
+        mouse: "MouseService",
+        screen: "ScreenService",
+        interface: "GameInterface",
+        config: "Config",
+        template_service: Optional["TemplateMatchService"] = None,
         anti_ban_service: Optional[Any] = None,
         loot_detection_service: Optional[Any] = None,
+        coord_resolver: Optional[Any] = None,
+        timing_helper: Optional[Any] = None,
         walker: Optional[Any] = None,
+        ui_manager: Optional[Any] = None,
     ):
-        """Initialize actions with services."""
-        # Services (keep for backward compatibility and delegation)
+        """Initialize actions with services (all injected via DI)."""
+        # Services (injected by runner)
         self.mouse = mouse
         self.screen = screen
         self.interface = interface
@@ -68,10 +73,14 @@ class GameActions:
         self.anti_ban = anti_ban_service
         self.loot_detection = loot_detection_service
         self.walker = walker
+        self.ui_manager = ui_manager
 
-        # Initialize shared utilities
-        self.coord_resolver = CoordinateResolver(screen, config, template_service)
-        self.timing = TimingHelper(config, anti_ban_service)
+        # Utility helpers (injected by runner)
+        self.coord_resolver = coord_resolver
+        self.timing = timing_helper
+
+        # Initialize bank queries
+        bank_queries = BankQueries(screen)
 
         # Initialize focused modules
         self.inventory = InventoryActions(
@@ -80,9 +89,15 @@ class GameActions:
         self.combat = CombatActions(
             mouse, screen, self.coord_resolver, self.timing, config, anti_ban_service
         )
+        self.bank = BankActions(mouse, bank_queries, self.coord_resolver, self.timing)
 
     # ==================== Backward Compatibility Methods ====================
     # These delegate to new modules while maintaining exact same API
+
+    def click_banker(self, banker_templates: List[str], threshold: float = 0.7) -> bool:
+        """Find and click banker (delegates to BankActions)."""
+        return self.bank.click_banker(banker_templates, threshold)
+
 
     # --- Timing/Wait (delegates to TimingHelper) ---
     def wait(self, timing_type: str) -> None:
@@ -207,6 +222,15 @@ class GameActions:
         """Reset target tracking."""
         self.combat.reset_targeting()
 
+    def mark_last_attack_failed(self) -> None:
+        """
+        Mark the most recent attack click as failed.
+
+        Call this when an attack click doesn't result in combat starting.
+        Enables automatic blacklisting of inaccessible NPCs.
+        """
+        self.combat.mark_last_attack_failed()
+
     # --- Legacy methods that stay in facade (not refactored yet) ---
 
     def click_ui_button_detected(
@@ -266,10 +290,8 @@ class GameActions:
             speed_multiplier=self._get_mouse_speed_multiplier(),
         )
 
-        pickup_delay = random.uniform(*LOOT_DETECTION.pickup_delay_range)
-        if self.anti_ban:
-            pickup_delay *= self.anti_ban.get_timing_variance()
-        time.sleep(pickup_delay)
+        # Use framework's wait system with pickup delay range
+        self.wait(LOOT_DETECTION.pickup_delay_range)
 
         if self.anti_ban:
             self.anti_ban.record_action("pickup_loot")
@@ -337,16 +359,13 @@ class GameActions:
         )
 
         if success:
-            actual_wait = (
-                wait_time
-                if wait_time is not None
-                else MINIMAP_NAVIGATION.default_wait_time
-            )
-            variance = time.time() % 1.0
-            total_wait = actual_wait + variance
-
-            logger.debug(f"Waiting {total_wait:.2f}s after minimap click")
-            time.sleep(total_wait)
+            # Use framework's wait system
+            if wait_time is not None:
+                self.wait(wait_time)
+            else:
+                # Use default minimap wait with slight variance
+                base_wait = MINIMAP_NAVIGATION.default_wait_time
+                self.wait((base_wait * 0.9, base_wait * 1.1))
 
             if self.anti_ban:
                 self.anti_ban.record_action(f"walk_{direction}_{tiles}")
@@ -377,9 +396,13 @@ class GameActions:
 
     def bank_deposit_all(self) -> bool:
         """Click bank deposit all button."""
-        if not self.click_coordinate(("ui", "bank_deposit_all")):
-            logger.error("Failed to click deposit all")
+    
+        if not self.click_template(
+            "src\\osrsbot\\images\\bot\\ui_templates\\bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
+        ):
+            logger.error("Failed to click bank deposit all")
             return False
+
 
         self.wait("medium")
         return True
@@ -390,8 +413,10 @@ class GameActions:
             logger.error("Item name cannot be empty")
             return False
 
-        if not self.click_coordinate(("ui", "bank_search")):
-            logger.error("Failed to click bank search")
+        if not self.click_template(
+            "templates/ui/bank_search_box.png", "bank search box", threshold=0.7
+        ):
+            logger.error("Failed to focus bank search box")
             return False
 
         self.wait("short")
@@ -446,3 +471,39 @@ class GameActions:
             return False
 
         return self.walker.walk_path(waypoints, move_style=move_style)
+
+    # ==================== Banking Helper Methods ====================
+    # Delegate to BankActions module
+
+    def is_bank_open(self, search_button_template: str) -> bool:
+        """Check if bank is open (delegates to BankActions)."""
+        return self.bank.is_bank_open(search_button_template)
+
+    def click_banker(
+        self, banker_templates: List[str], threshold: float = 0.7
+    ) -> bool:
+        """Find and click banker (delegates to BankActions)."""
+        return self.bank.click_banker(banker_templates, threshold)
+
+    def click_template(
+        self, template_path: str, item_name: str, threshold: float = 0.7
+    ) -> bool:
+        """Find and click template (delegates to BankActions)."""
+        return self.bank.click_template(template_path, item_name, threshold)
+
+    def bank_search_and_withdraw(
+        self,
+        search_button_template: str,
+        item_template: str,
+        item_name: str,
+        search_text: str,
+        item_threshold: float = 0.7,
+    ) -> bool:
+        """Search and withdraw item (delegates to BankActions)."""
+        return self.bank.search_and_withdraw(
+            search_button_template,
+            item_template,
+            item_name,
+            search_text,
+            item_threshold,
+        )
