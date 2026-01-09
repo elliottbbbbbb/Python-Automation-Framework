@@ -66,10 +66,32 @@ class GrimyFlaxBot(BankstanderBot):
 
             actions.wait("short")
 
-            # Click each inventory slot (1-28) to clean herbs
+            # Choose processing pattern for anti-ban variety
+            pattern_choice = random.random()
+
+            if pattern_choice < 0.60:
+                # 60% - Normal sequential (1→2→3...28)
+                slot_order = list(range(1, 29))
+                logger.debug("PROCESS: Using sequential pattern")
+            elif pattern_choice < 0.90:
+                # 30% - Randomized order
+                slot_order = list(range(1, 29))
+                random.shuffle(slot_order)
+                logger.debug("PROCESS: Using randomized pattern")
+            else:
+                # 10% - Columns (process column by column)
+                slot_order = []
+                for col in range(4):  # 4 columns
+                    for row in range(7):  # 7 rows
+                        slot_num = row * 4 + col + 1
+                        if slot_num <= 28:
+                            slot_order.append(slot_num)
+                logger.debug("PROCESS: Using column pattern")
+
+            # Click each inventory slot to clean herbs
             herbs_this_cycle = 0
             # NOTE: Lazily implemented - to be moved to game actions later
-            for slot in range(1, 29):
+            for slot in slot_order:
                 # Check for exit request
                 self._check_exit_requested()
 
@@ -78,11 +100,15 @@ class GrimyFlaxBot(BankstanderBot):
 
                 logger.debug(f"PROCESS: Clicking slot {slot}")
 
+                # Record action for anti-ban pattern detection
+                if hasattr(actions, 'anti_ban') and actions.anti_ban:
+                    actions.anti_ban.record_action("clean_herb")
+
                 # Click the inventory slot
                 if actions.click_inventory_slot(slot, move_style="curved"):
                     herbs_this_cycle += 1
-                    # Random delay for human-like behavior (50-150ms)
-                    time.sleep(random.uniform(0.05, 0.15))
+                    # Use existing wait system (already has anti-ban variance)
+                    actions.wait("micro")
                 else:
                     logger.warning(f"PROCESS: Failed to click slot {slot}")
 

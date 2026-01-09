@@ -69,6 +69,14 @@ class NMZAfkBot(StateMachineBot):
         self._last_overload_time: float = 0.0
         self._last_absorption_time: float = 0.0
 
+        # Track actual click time (for safety windows)
+        self._actual_overload_click_time: float = 0.0
+        self._actual_absorption_click_time: float = 0.0
+
+        # Variance for current dose (set once per dose, not every loop)
+        self._overload_variance: float = 0.0
+        self._absorption_variance: float = 0.0
+
         # Constants
         self.OVERLOAD_DURATION = 300  # 5 minutes
         self.ABSORPTION_DURATION = 390  # 6 minutes 30 seconds
@@ -169,16 +177,6 @@ class NMZAfkBot(StateMachineBot):
             dict with keys: hp, prayer, run, spec
         """
         return self.state.get_all_stats(force=True)
-
-    # NOTE to be moved to utility/anti-ban module later
-    def human_sleep(self, total_time, chunks=3):
-        remaining = total_time
-        for _ in range(chunks):
-            chunk = random.uniform(0, remaining)
-            time.sleep(chunk)
-            remaining -= chunk
-            if remaining > 0:
-                time.sleep(remaining)
 
     def _get_special_attack_percentage(self) -> Optional[int]:
         """
@@ -290,13 +288,19 @@ class NMZAfkBot(StateMachineBot):
         """
         logger.info("[DRINK_OVERLOAD] Drinking overload potion...")
 
+        # Record action for anti-ban pattern detection
+        if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+            self.actions.anti_ban.record_action("drink_overload")
+
         # Click overload potion in inventory
         if not self.actions.click_template(self.OVERLOAD_TEMPLATE, "overload_potion"):
             logger.error("DRINK_OVERLOAD: Failed to find overload potion")
             return StateResult.FAILURE
 
-        # Update timer
-        self._last_overload_time = time.time()
+        # Update timers (both scheduled and actual click time)
+        current_time = time.time()
+        self._last_overload_time = current_time
+        self._actual_overload_click_time = current_time
         logger.info("DRINK_OVERLOAD: Overload timer started")
 
         self.actions.wait("medium")
@@ -330,7 +334,7 @@ class NMZAfkBot(StateMachineBot):
             # If HP dropped significantly, overload is working
             if current_hp <= 50:  # Arbitrary threshold
                 logger.info("WAIT_FOR_DAMAGE: HP dropped, overload is working")
-                time.sleep(5)
+                self.actions.wait("long")
                 return StateResult.SUCCESS  # Go to LOWER_HP
 
             self.actions.wait("long")
@@ -360,6 +364,11 @@ class NMZAfkBot(StateMachineBot):
 
         #Click rock cake to guzzle
         logger.info(f"LOWER_HP: Current HP: {current_hp}, using locator orb")
+
+        # Record action for anti-ban pattern detection
+        if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+            self.actions.anti_ban.record_action("use_locator_orb")
+
         if not self.actions.click_template(self.LOCATOR_ORB_TEMPLATE, "locator_orb"):
             logger.error("LOWER_HP: Failed to find locator orb")
             return StateResult.FAILURE
@@ -391,6 +400,11 @@ class NMZAfkBot(StateMachineBot):
         num_doses = 6
         for i in range(1, num_doses + 1):
             logger.info(f"DRINK_ABSORPTION: Dose {i}/{num_doses}")
+
+            # Record action for anti-ban pattern detection
+            if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+                self.actions.anti_ban.record_action("drink_absorption")
+
             if not self.actions.click_template(self.ABSORPTION_TEMPLATE, "absorption_potion"):
                 logger.warning(
                     f"DRINK_ABSORPTION: Failed to find absorption potion (dose {i})"
@@ -410,17 +424,6 @@ class NMZAfkBot(StateMachineBot):
 
     # Loop for the duration of overload timer
         while True:
-            stats = self._get_all_stats()
-            hp = stats.get("hp")
-            prayer = stats.get("prayer")
-            run = stats.get("run")
-            spec = stats.get("spec")
-            logger.info(f"COMBAT_LOOP: Stats - HP: {hp}, Prayer: {prayer}, Run: {run}, Spec: {spec}")
-            current_spec = self._get_special_attack_percentage()
-            if current_spec is None:
-                logger.warning("COMBAT_LOOP: Special attack detection failed, retrying...")
-                self.actions.wait("medium")
-                continue
             current_hp = self._get_hp()
             if current_hp is None:
                 logger.warning("COMBAT_LOOP: HP detection failed, retrying...")
@@ -433,26 +436,116 @@ class NMZAfkBot(StateMachineBot):
             overload_elapsed = time.time() - self._last_overload_time
             absorption_elapsed = time.time() - self._last_absorption_time
 
-            logger.info(f"COMBAT_LOOP: Special Attack: {current_spec}%")
+            # Generate HP threshold once per session (player personality)
+            if not hasattr(self, '_hp_threshold_preference'):
+                self._hp_threshold_preference = random.randint(2, 6)
+                logger.info(f"Session HP threshold preference: {self._hp_threshold_preference}")
 
-            if current_hp >= 2 and 7 < overload_elapsed < 270:
-                self.human_sleep(2.5, chunks=3)
-                logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb")
-                self._use_locator_orb_safe()
+            # Use preference with occasional variance
+            hp_threshold = self._hp_threshold_preference
+            if random.random() < 0.15:  # 15% chance to vary
+                hp_threshold = random.randint(2, 9)
 
-            if overload_elapsed >= self.OVERLOAD_DURATION:
-                self.human_sleep(2.5, chunks=3)
-                logger.info("COMBAT_LOOP: Overload expired, re-dosing")
+            # Check if overload needs redose (with variance)
+            # Set variance once per dose cycle, not every loop iteration
+            if self._overload_variance == 0.0 and overload_elapsed >= 290:
+                # Generate variance when approaching redose time (humans react slightly late, not early)
+                self._overload_variance = random.uniform(0, 20)
+                logger.debug(f"COMBAT_LOOP: Set overload variance to {self._overload_variance:.0f}s")
+
+            if overload_elapsed >= (self.OVERLOAD_DURATION + self._overload_variance):
+                logger.info(f"COMBAT_LOOP: Overload re-dose (elapsed: {overload_elapsed:.0f}s, variance: {self._overload_variance:.0f}s)")
+
+                # Add pre-click pause (human reaction time)
+                self.actions.wait("micro")
+
+                # Record action for anti-ban pattern detection
+                if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+                    self.actions.anti_ban.record_action("redose_overload")
+
                 self.actions.click_template(self.OVERLOAD_TEMPLATE, "overload_potion")
-                self._last_overload_time = time.time()
 
-            if absorption_elapsed >= self.ABSORPTION_DURATION:
-                self.human_sleep(2.5, chunks=3)
-                logger.info("COMBAT_LOOP: Absorption expired, re-dosing")
-                DOSES = 5
+                # Track actual click time for safety windows AND timer tracking
+                self._actual_overload_click_time = time.time()
+
+                # Reset timer to actual click time (when overload effect actually started)
+                # This prevents desync between scheduled time and actual effect duration
+                self._last_overload_time = self._actual_overload_click_time
+
+                # Reset variance for next dose
+                self._overload_variance = 0.0
+
+                # Post-click pause
+                self.actions.wait("short")
+
+            # Check if HP needs to be lowered
+            # SAFETY: Don't use locator orb near overload redose times
+            # - 10s AFTER drinking overload (damage still ticking)
+            # - 10s BEFORE needing to redose (HP needs to be 50+)
+
+            # Use ACTUAL click time for safety window, not scheduled timer
+            time_since_actual_overload = time.time() - self._actual_overload_click_time if self._actual_overload_click_time > 0 else 999
+            time_until_overload = self.OVERLOAD_DURATION - overload_elapsed
+
+            if current_hp >= hp_threshold:
+                # Too soon after overload? (damage still happening)
+                if time_since_actual_overload < 10:
+                    logger.debug(f"Skipping orb: only {time_since_actual_overload:.0f}s since actual overload click (need 10s)")
+                # Too close to next overload? (need HP to stay high)
+                elif time_until_overload < 10:
+                    logger.debug(f"Skipping orb: only {time_until_overload:.0f}s until overload (need 10s)")
+                else:
+                    # Safe to use orb
+                    logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb (threshold: {hp_threshold})")
+
+                    # Add pre-action pause (human reaction time)
+                    self.actions.wait("micro")
+
+                    # Record action for anti-ban pattern detection
+                    if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+                        self.actions.anti_ban.record_action("use_locator_orb_combat")
+
+                    self._use_locator_orb_safe()
+
+                    # Post-action pause
+                    self.actions.wait("short")
+            
+            # NOTE: not needed for now - absorption should outlast overload
+            # Check if absorption needs redose
+            #time_until_actual_absorption = self.ABSORPTION_DURATION - (time.time() - self._actual_absorption_click_time) if self._actual_absorption_click_time > 0 else 999
+            #time_until_absorption = self.ABSORPTION_DURATION - self.ABSORPTION_DURATION - absorption_elapsed
+
+            # Check if absorption needs redose (with variance)
+            # Set variance once per dose cycle, not every loop iteration
+            if self._absorption_variance == 0.0 and absorption_elapsed >= 370:
+                # Generate variance when approaching redose time (humans react slightly late, not early)
+                self._absorption_variance = random.uniform(0, 30)
+                logger.debug(f"COMBAT_LOOP: Set absorption variance to {self._absorption_variance:.0f}s")
+
+            if absorption_elapsed >= (self.ABSORPTION_DURATION + self._absorption_variance):
+                logger.info(f"COMBAT_LOOP: Absorption re-dose (elapsed: {absorption_elapsed:.0f}s, variance: {self._absorption_variance:.0f}s)")
+
+                # Pre-action pause
+                self.actions.wait("micro")
+
+                # Vary number of doses (4-6 instead of exactly 5)
+                DOSES = random.randint(4, 6)
                 for _ in range(1, DOSES + 1):
+                    # Record action for anti-ban pattern detection
+                    if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+                        self.actions.anti_ban.record_action("redose_absorption")
+
                     self.actions.click_template(self.ABSORPTION_TEMPLATE, "absorption_potion")
-                self._last_absorption_time = time.time()
+                    self._actual_absorption_click_time = time.time()
+                    # Small variance between clicks
+                    self.actions.wait("micro")
+
+                # Reset timer to when it SHOULD have been reset (prevents timer drift)
+                # If we clicked at 410s (390 + 20s variance), set timer to 390s mark
+                self._last_absorption_time = self._actual_absorption_click_time 
+
+                # Reset variance for next dose
+                self._absorption_variance = 0.0
 
 
 
@@ -466,6 +559,26 @@ class NMZAfkBot(StateMachineBot):
 
             logger.info(f"COMBAT LOOP: Overload Elapsed Time: {overload_elapsed:.0f}s,\nAbsorption Elapsed Time: {absorption_elapsed:.0f}s"
                         )
+
+            # Occasionally perform idle action (3% chance per loop iteration)
+            if random.random() < 0.03:
+                idle_action = random.choice(["check_spec", "mini_pause"])
+
+                if idle_action == "check_spec":
+                    # Check special attack percentage (use existing method)
+                    logger.debug("COMBAT_LOOP: Idle action - checking spec")
+                    try:
+                        spec = self._get_special_attack_percentage()
+                        logger.debug(f"COMBAT_LOOP: Spec: {spec}%")
+                        self.actions.wait("short")
+                    except Exception as e:
+                        logger.debug(f"COMBAT_LOOP: Spec check failed - {e}")
+
+                elif idle_action == "mini_pause":
+                    # Brief freeze (checking phone, looking away)
+                    logger.debug("COMBAT_LOOP: Idle action - mini pause")
+                    # Use framework's wait system with custom timing range
+                    self.actions.wait((1.5, 4.0))
 
             # Wait before next loop iteration
             self.actions.wait("medium")
