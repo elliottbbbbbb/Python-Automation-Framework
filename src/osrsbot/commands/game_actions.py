@@ -18,29 +18,26 @@ Migration path:
 """
 
 import logging
-import random
-import time
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 import cv2 as cv
 import numpy as np
-import pyautogui
+import pyautogui  # Used for keyboard input (write/press) - no keyboard service yet
 
 from osrsbot.commands.bank_actions import BankActions
 from osrsbot.commands.combat_actions import CombatActions
-
-# Import new focused modules
 from osrsbot.commands.inventory_actions import InventoryActions
-from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION
-from osrsbot.core.game_interface import GameInterface
-from osrsbot.models.config import Config
+from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION, MovementStyle
 from osrsbot.queries.bank_queries import BankQueries
-from osrsbot.services.mouse_service import MouseService, MovementStyle
-from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.utils.coordinate_helpers import CoordinateResolver
-from osrsbot.utils.timing_helpers import TimingHelper
+
+# Type hints only - actual instances injected by runner
+if TYPE_CHECKING:
+    from osrsbot.core.game_interface import GameInterface
+    from osrsbot.models.config import Config
+    from osrsbot.services.mouse_service import MouseService
+    from osrsbot.services.screen_service import ScreenService
+    from osrsbot.services.template_match_service import TemplateMatchService
 
 logger = logging.getLogger(__name__)
 
@@ -54,18 +51,20 @@ class GameActions:
 
     def __init__(
         self,
-        mouse: MouseService,
-        screen: ScreenService,
-        interface: GameInterface,
-        config: Config,
-        template_service: Optional[TemplateMatchService] = None,
+        mouse: "MouseService",
+        screen: "ScreenService",
+        interface: "GameInterface",
+        config: "Config",
+        template_service: Optional["TemplateMatchService"] = None,
         anti_ban_service: Optional[Any] = None,
         loot_detection_service: Optional[Any] = None,
+        coord_resolver: Optional[Any] = None,
+        timing_helper: Optional[Any] = None,
         walker: Optional[Any] = None,
         ui_manager: Optional[Any] = None,
     ):
-        """Initialize actions with services."""
-        # Services (keep for backward compatibility and delegation)
+        """Initialize actions with services (all injected via DI)."""
+        # Services (injected by runner)
         self.mouse = mouse
         self.screen = screen
         self.interface = interface
@@ -76,9 +75,9 @@ class GameActions:
         self.walker = walker
         self.ui_manager = ui_manager
 
-        # Initialize shared utilities
-        self.coord_resolver = CoordinateResolver(screen, config, template_service)
-        self.timing = TimingHelper(config, anti_ban_service)
+        # Utility helpers (injected by runner)
+        self.coord_resolver = coord_resolver
+        self.timing = timing_helper
 
         # Initialize bank queries
         bank_queries = BankQueries(screen)
@@ -291,10 +290,8 @@ class GameActions:
             speed_multiplier=self._get_mouse_speed_multiplier(),
         )
 
-        pickup_delay = random.uniform(*LOOT_DETECTION.pickup_delay_range)
-        if self.anti_ban:
-            pickup_delay *= self.anti_ban.get_timing_variance()
-        time.sleep(pickup_delay)
+        # Use framework's wait system with pickup delay range
+        self.wait(LOOT_DETECTION.pickup_delay_range)
 
         if self.anti_ban:
             self.anti_ban.record_action("pickup_loot")
@@ -362,16 +359,13 @@ class GameActions:
         )
 
         if success:
-            actual_wait = (
-                wait_time
-                if wait_time is not None
-                else MINIMAP_NAVIGATION.default_wait_time
-            )
-            variance = time.time() % 1.0
-            total_wait = actual_wait + variance
-
-            logger.debug(f"Waiting {total_wait:.2f}s after minimap click")
-            time.sleep(total_wait)
+            # Use framework's wait system
+            if wait_time is not None:
+                self.wait(wait_time)
+            else:
+                # Use default minimap wait with slight variance
+                base_wait = MINIMAP_NAVIGATION.default_wait_time
+                self.wait((base_wait * 0.9, base_wait * 1.1))
 
             if self.anti_ban:
                 self.anti_ban.record_action(f"walk_{direction}_{tiles}")

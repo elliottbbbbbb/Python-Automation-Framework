@@ -21,8 +21,8 @@ from typing import Any, Optional
 import keyboard
 import pyautogui
 
-from osrsbot.constants import INVENTORY, INVENTORY_ACTIONS
-from osrsbot.services.mouse_service import MouseService, MovementStyle
+from osrsbot.constants import INVENTORY, INVENTORY_ACTIONS, MovementStyle
+from osrsbot.services.mouse_service import MouseService
 from osrsbot.utils.coordinate_helpers import CoordinateResolver
 from osrsbot.utils.timing_helpers import TimingHelper
 

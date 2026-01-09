@@ -13,11 +13,9 @@ from typing import Literal, Optional, Tuple
 
 import pyautogui
 
-from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT
+from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT, MovementStyle
 
 logger = logging.getLogger(__name__)
-
-MovementStyle = Literal["instant", "linear", "curved", "overshoot", "random"]
 
 
 @dataclass

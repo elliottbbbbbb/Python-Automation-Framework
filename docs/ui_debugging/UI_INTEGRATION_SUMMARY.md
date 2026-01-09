@@ -6,7 +6,7 @@ Successfully integrated UIManager into the OSRS bot framework and created a comp
 
 ## Files Modified
 
-### 1. [src/osrsbot/core/ui_manager.py](src/osrsbot/core/ui_manager.py)
+### 1. [src/osrsbot/services/ui_manager_service.py](src/osrsbot/services/ui_manager_service.py)
 **Status:** Enhanced with debug visualization capabilities
 
 **New Features:**
@@ -29,7 +29,7 @@ Successfully integrated UIManager into the OSRS bot framework and created a comp
 **Status:** Modified to initialize UIManager
 
 **Changes:**
-- Added `from osrsbot.core.ui_manager import UIManager` import
+- Added `from osrsbot.services.ui_manager_service import UIManager` import
 - Added UIManager initialization after TemplateMatchService (lines 162-169)
 - Syncs grids and buttons from TemplateMatchService automatically
 - Passes `ui_manager` to GameActions (line 285)

@@ -18,6 +18,8 @@ See bankstander_flax.py for a complete example.
 """
 
 import logging
+import random
+import time
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -221,6 +223,11 @@ class BankstanderBot(StateMachineBot):
 
             # Search for and withdraw item
             self._update_ui("BANKING", f"Searching for {self._item_name}...")
+
+            # Record action for anti-ban pattern detection
+            if hasattr(actions, 'anti_ban') and actions.anti_ban:
+                actions.anti_ban.record_action("bank_withdraw")
+
             if not actions.bank_search_and_withdraw(
                 search_button_template=self._bank_search_template,
                 item_template=self._item_template,
@@ -319,6 +326,11 @@ class BankstanderBot(StateMachineBot):
 
             # Deposit all items
             self._update_ui("DEPOSIT", "Depositing all items...")
+
+            # Record action for anti-ban pattern detection
+            if hasattr(actions, 'anti_ban') and actions.anti_ban:
+                actions.anti_ban.record_action("bank_deposit")
+
             if not actions.bank_deposit_all():
                 logger.error("DEPOSIT: Failed to deposit inventory")
                 return StateResult.FAILURE
@@ -332,6 +344,14 @@ class BankstanderBot(StateMachineBot):
             )
             if self._cycles % 10 == 0:
                 logger.info(f"DEPOSIT: Completed {self._cycles} cycles")
+
+            # Occasionally perform idle action before next cycle (5% chance)
+            if random.random() < 0.05:
+                logger.debug("DEPOSIT: Idle action - brief pause")
+                # Use framework's wait system with custom timing range
+                # This simulates a human pausing to check something or get distracted
+                pause_duration = (1.0, 3.0)
+                actions.wait(pause_duration)
 
             logger.info("DEPOSIT: Deposit complete, ready for next cycle")
             return StateResult.SUCCESS

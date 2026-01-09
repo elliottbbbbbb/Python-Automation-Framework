@@ -112,8 +112,9 @@ class StatQueries:
         # Convert PIL to numpy array for OCR
         img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
+        # Use ORB_GREEN, ORB_RED for better color range coverage (prayer orb can vary slightly)
         prayer = self.ocr.extract_number(
-            img_np, font_name="plain11", colors=[CYAN], correlation_threshold=0.95
+            img_np, font_name="plain11", colors=[ORB_GREEN, ORB_RED], correlation_threshold=0.95
         )
 
         if prayer is None:
@@ -149,8 +150,9 @@ class StatQueries:
         # Convert PIL to numpy array for OCR
         img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
+        # Use ORB_GREEN, ORB_RED for better color range coverage (run energy can vary)
         energy = self.ocr.extract_number(
-            img_np, font_name="plain11", colors=[YELLOW], correlation_threshold=0.95
+            img_np, font_name="plain11", colors=[ORB_GREEN, ORB_RED], correlation_threshold=0.95
         )
 
         if energy is None:
@@ -188,8 +190,9 @@ class StatQueries:
         # Convert PIL to numpy array for OCR
         img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
+        # Use ORB_GREEN, ORB_RED for better color range coverage (spec attack can vary)
         percentage = self.ocr.extract_number(
-            img_np, font_name="plain11", colors=[YELLOW], correlation_threshold=0.95
+            img_np, font_name="plain11", colors=[ORB_GREEN, ORB_RED], correlation_threshold=0.95
         )
 
         if percentage is None:
@@ -213,15 +216,15 @@ class StatQueries:
             ),
             "prayer": self._read_stat(
                 region_key="prayer_region",
-                colors=[CYAN],
+                colors=[ORB_GREEN, ORB_RED],
             ),
             "run": self._read_stat(
                 region_key="run_energy_region",
-                colors=[YELLOW],
+                colors=[ORB_GREEN, ORB_RED],
             ),
             "spec": self._read_stat(
                 region_key="special_attack_region",
-                colors=[YELLOW],
+                colors=[ORB_GREEN, ORB_RED],
             ),
         }
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from osrsbot.commands.game_actions import GameActions
 from osrsbot.core.game_interface import GameInterface
-from osrsbot.core.ui_manager import UIManager
+from osrsbot.services.ui_manager_service import UIManager
 from osrsbot.models.config import Config
 from osrsbot.queries.game_queries import GameState
 from osrsbot.services.anti_ban_service import AntiBanService
@@ -272,6 +272,20 @@ class ScriptRunner:
             raise
 
         try:
+            logger.debug("Initializing utility helpers")
+            from osrsbot.utils.coordinate_helpers import CoordinateResolver
+            from osrsbot.utils.timing_helpers import TimingHelper
+
+            self.coord_resolver = CoordinateResolver(
+                self.screen, self.config, self.template_service
+            )
+            self.timing = TimingHelper(self.config, self.anti_ban)
+            logger.info("Utility helpers initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize utility helpers: {e}", exc_info=True)
+            raise
+
+        try:
             logger.debug("Initializing GameActions (Commands)")
             self.actions = GameActions(
                 self.mouse,
@@ -281,6 +295,8 @@ class ScriptRunner:
                 self.template_service,
                 self.anti_ban,
                 self.loot_detection,
+                coord_resolver=self.coord_resolver,
+                timing_helper=self.timing,
                 walker=self.walker,
                 ui_manager=self.ui_manager,
             )

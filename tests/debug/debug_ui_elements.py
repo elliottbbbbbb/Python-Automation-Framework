@@ -44,7 +44,7 @@ from osrsbot.models.config import Config
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_match_service import TemplateMatchService
-from osrsbot.core.ui_manager import UIManager
+from osrsbot.services.ui_manager_service import UIManager
 
 # Setup logging
 logging.basicConfig(

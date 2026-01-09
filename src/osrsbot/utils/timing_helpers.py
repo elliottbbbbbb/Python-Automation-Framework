@@ -40,7 +40,10 @@ class TimingHelper:
         # Handle tuple/list ranges for variance
         if isinstance(delay, (list, tuple)) and len(delay) == 2:
             min_delay, max_delay = delay
-            actual_delay = random.uniform(float(min_delay), float(max_delay))
+            # Use triangular distribution (peaks at middle) instead of uniform (flat)
+            # This creates more human-like clustering around the center value
+            mode = (float(min_delay) + float(max_delay)) / 2
+            actual_delay = random.triangular(float(min_delay), float(max_delay), mode)
             logger.debug(
                 f"Wait '{timing_type}': {
                     actual_delay:.2f}s (range: {min_delay}-{max_delay}s)"

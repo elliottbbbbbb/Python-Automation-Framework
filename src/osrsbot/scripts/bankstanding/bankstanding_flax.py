@@ -20,7 +20,7 @@ from osrsbot.core.base_bankstander import BankstanderBot
 logger = logging.getLogger(__name__)
 
 
-class grimy_flax(BankstanderBot):
+class GrimyFlaxBot(BankstanderBot):
     """
     Bankstander that cleans grimy toadflax by clicking each inventory slot.
 

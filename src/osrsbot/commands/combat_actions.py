@@ -18,10 +18,10 @@ Responsibilities:
 import logging
 from typing import Any, Optional, Tuple
 
-from osrsbot.constants import COLOR_DETECTION, TARGET_SELECTION
+from osrsbot.constants import COLOR_DETECTION, MovementStyle, TARGET_SELECTION
 from osrsbot.models.config import Config
 from osrsbot.services.click_target_tracker import ClickTargetTracker
-from osrsbot.services.mouse_service import MouseService, MovementStyle
+from osrsbot.services.mouse_service import MouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.utils.coordinate_helpers import CoordinateResolver
 from osrsbot.utils.timing_helpers import TimingHelper
