@@ -156,7 +156,7 @@ class MouseService:
                 delay = random.uniform(*self.config.post_click_delay)
                 time.sleep(delay)
 
-            logger.debug(f"Clicked at ({x}, {y}) with {button} button")
+            logger.info(f"[PyAutoGUI] Clicked at ({x}, {y}) with {button} button")
             return True
 
         except Exception as e:

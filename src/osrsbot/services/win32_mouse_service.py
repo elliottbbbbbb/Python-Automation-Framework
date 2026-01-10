@@ -116,6 +116,7 @@ class Win32MouseService:
 
     def move_to(self, x: int, y: int, style: MovementStyle = "curved", duration: Optional[float] = None, speed_multiplier: float = 1.0) -> bool:
         try:
+            logger.debug(f"[Win32] Moving to ({x}, {y}) using style={style}")
             # get current pos
             pt = ctypes.wintypes.POINT()
             ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
@@ -224,6 +225,7 @@ class Win32MouseService:
 
     def click(self, x: Optional[int] = None, y: Optional[int] = None, button: Literal["left", "right", "middle"] = "left", variance: bool = True, delay_after: bool = True) -> bool:
         try:
+            logger.info(f"[Win32] click() at ({x}, {y}) button={button}")
             if x is not None and y is not None:
                 if variance:
                     offset_x = random.randint(-self.config.click_variance, self.config.click_variance)
