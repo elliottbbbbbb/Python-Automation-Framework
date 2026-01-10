@@ -91,6 +91,65 @@ class NMZAfkBot(StateMachineBot):
         self.ROCK_CAKE_TEMPLATE = "src/osrsbot/images/bot/items/dwarven_rock_cake.png"
         self.LOCATOR_ORB_TEMPLATE = "src/osrsbot/images/bot/items/locator_orb.png"
 
+    # ==================== NMZ-SPECIFIC ANTI-BAN HELPERS ====================
+
+    def _get_anti_ban(self):
+        """Get anti-ban service instance (with fallback for missing service)."""
+        if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
+            return self.actions.anti_ban
+        return None
+
+    def _is_in_missed_dose_recovery(self) -> bool:
+        """
+        Check if currently in missed dose state (waiting for HP recovery).
+
+        This is NMZ-specific state tracking (not in AntiBanService).
+
+        Returns:
+            True if in missed dose recovery mode
+        """
+        return hasattr(self, '_missed_dose_recovery') and self._missed_dose_recovery
+
+    # ==================== ANTI-BAN WRAPPER METHODS (Delegates to AntiBanService) ====================
+
+    def _get_human_redose_variance(self, dose_type: str) -> float:
+        """Wrapper for AntiBanService.get_human_action_variance()."""
+        anti_ban = self._get_anti_ban()
+        if anti_ban:
+            return anti_ban.get_human_action_variance(dose_type)
+        # Fallback if anti-ban not available
+        return random.uniform(0, 20)
+
+    def _should_miss_dose(self) -> bool:
+        """Wrapper for AntiBanService.should_miss_action()."""
+        anti_ban = self._get_anti_ban()
+        if anti_ban:
+            return anti_ban.should_miss_action(chance=0.04)
+        return False
+
+    def _get_missed_dose_delay(self) -> float:
+        """Wrapper for AntiBanService.get_missed_action_delay()."""
+        anti_ban = self._get_anti_ban()
+        if anti_ban:
+            return anti_ban.get_missed_action_delay(min_delay=90, max_delay=180)
+        return random.uniform(90, 180)
+
+    def _get_fatigue_multiplier(self) -> float:
+        """Wrapper for AntiBanService.get_fatigue_multiplier()."""
+        anti_ban = self._get_anti_ban()
+        if anti_ban:
+            return anti_ban.get_fatigue_multiplier()
+        return 1.0  # No fatigue if service unavailable
+
+    def _should_zone_out(self) -> bool:
+        """Wrapper for AntiBanService.should_zone_out()."""
+        anti_ban = self._get_anti_ban()
+        if anti_ban:
+            return anti_ban.should_zone_out(min_interval_minutes=10, chance_per_second=0.0005)
+        return False
+
+    # ==================== STATE MACHINE METHODS ====================
+
     def define_states(self) -> type[Enum]:
         """
         Define state machine with automatic retry and failover.
@@ -424,6 +483,12 @@ class NMZAfkBot(StateMachineBot):
 
     # Loop for the duration of overload timer
         while True:
+            # ANTI-BAN: Check for zone-out (attention lapse)
+            if self._should_zone_out():
+                zone_duration = random.uniform(30, 90)
+                logger.info(f"ANTI-BAN: Zone-out / AFK burst ({zone_duration:.0f}s)")
+                time.sleep(zone_duration)
+
             current_hp = self._get_hp()
             if current_hp is None:
                 logger.warning("COMBAT_LOOP: HP detection failed, retrying...")
@@ -436,28 +501,42 @@ class NMZAfkBot(StateMachineBot):
             overload_elapsed = time.time() - self._last_overload_time
             absorption_elapsed = time.time() - self._last_absorption_time
 
-            # Generate HP threshold once per session (player personality)
-            if not hasattr(self, '_hp_threshold_preference'):
-                self._hp_threshold_preference = random.randint(2, 6)
-                logger.info(f"Session HP threshold preference: {self._hp_threshold_preference}")
+            # Dynamic HP threshold (changes every 3-8 loops for realism)
+            if not hasattr(self, '_hp_threshold_change_counter'):
+                self._hp_threshold_change_counter = 0
+                self._hp_threshold_preference = random.randint(1, 10)
+                logger.info(f"Initial HP threshold preference: {self._hp_threshold_preference}")
 
-            # Use preference with occasional variance
+            # Change preference every 3-8 loops (humans adjust their "comfort zone")
+            self._hp_threshold_change_counter += 1
+            if self._hp_threshold_change_counter >= random.randint(3, 8):
+                self._hp_threshold_preference = random.randint(1, 10)
+                self._hp_threshold_change_counter = 0
+                logger.debug(f"ANTI-BAN: HP threshold changed to: {self._hp_threshold_preference}")
+
             hp_threshold = self._hp_threshold_preference
-            if random.random() < 0.15:  # 15% chance to vary
-                hp_threshold = random.randint(2, 9)
 
-            # Check if overload needs redose (with variance)
+            # Check if overload needs redose (with HUMAN-LIKE variance)
             # Set variance once per dose cycle, not every loop iteration
             if self._overload_variance == 0.0 and overload_elapsed >= 290:
-                # Generate variance when approaching redose time (humans react slightly late, not early)
-                self._overload_variance = random.uniform(0, 20)
-                logger.debug(f"COMBAT_LOOP: Set overload variance to {self._overload_variance:.0f}s")
+                # Check for missed dose simulation (4% chance)
+                if self._should_miss_dose():
+                    self._overload_variance = self._get_missed_dose_delay()
+                    self._missed_dose_recovery = True
+                    logger.info(f"ANTI-BAN: Missed overload dose - will redose in {self._overload_variance:.0f}s (simulating AFK)")
+                else:
+                    # Generate human-like variance (80% late, 20% on-time)
+                    self._overload_variance = self._get_human_redose_variance("overload")
+                    logger.debug(f"COMBAT_LOOP: Set overload variance to {self._overload_variance:.0f}s")
 
             if overload_elapsed >= (self.OVERLOAD_DURATION + self._overload_variance):
                 logger.info(f"COMBAT_LOOP: Overload re-dose (elapsed: {overload_elapsed:.0f}s, variance: {self._overload_variance:.0f}s)")
 
-                # Add pre-click pause (human reaction time)
-                self.actions.wait("micro")
+                # ANTI-BAN: Apply fatigue-based reaction delay
+                fatigue_mult = self._get_fatigue_multiplier()
+                reaction_delay = random.uniform(0.3, 0.8) * fatigue_mult
+                logger.debug(f"ANTI-BAN: Reaction delay = {reaction_delay:.2f}s (fatigue: {fatigue_mult:.2f}x)")
+                time.sleep(reaction_delay)
 
                 # Record action for anti-ban pattern detection
                 if hasattr(self.actions, 'anti_ban') and self.actions.anti_ban:
@@ -475,6 +554,11 @@ class NMZAfkBot(StateMachineBot):
                 # Reset variance for next dose
                 self._overload_variance = 0.0
 
+                # Reset missed dose flag (HP will recover now)
+                if hasattr(self, '_missed_dose_recovery'):
+                    self._missed_dose_recovery = False
+                    logger.debug("ANTI-BAN: Missed dose recovery complete")
+
                 # Post-click pause
                 self.actions.wait("short")
 
@@ -488,13 +572,24 @@ class NMZAfkBot(StateMachineBot):
             time_until_overload = self.OVERLOAD_DURATION - overload_elapsed
 
             if current_hp >= hp_threshold:
+                # ANTI-BAN: Variable safety windows (humans don't measure exactly)
+                safety_after = random.uniform(8, 15)
+                safety_before = random.uniform(8, 15)
+
+                # CRITICAL: Don't use locator orb during missed dose recovery (HP needs to naturally recover to 50+)
+                if self._is_in_missed_dose_recovery():
+                    logger.debug(f"Skipping orb: In missed dose recovery, waiting for HP to recover naturally (HP: {current_hp})")
                 # Too soon after overload? (damage still happening)
-                if time_since_actual_overload < 10:
-                    logger.debug(f"Skipping orb: only {time_since_actual_overload:.0f}s since actual overload click (need 10s)")
+                elif time_since_actual_overload < safety_after:
+                    logger.debug(f"Skipping orb: {time_since_actual_overload:.0f}s < {safety_after:.0f}s since overload")
                 # Too close to next overload? (need HP to stay high)
-                elif time_until_overload < 10:
-                    logger.debug(f"Skipping orb: only {time_until_overload:.0f}s until overload (need 10s)")
+                elif time_until_overload < safety_before:
+                    logger.debug(f"Skipping orb: {time_until_overload:.0f}s < {safety_before:.0f}s until overload")
                 else:
+                    # 5% chance to violate safety window (human error)
+                    if random.random() < 0.05:
+                        logger.debug("ANTI-BAN: Violating safety window (human error)")
+
                     # Safe to use orb
                     logger.warning(f"COMBAT_LOOP: HP is {current_hp}, using locator orb (threshold: {hp_threshold})")
 
@@ -515,18 +610,26 @@ class NMZAfkBot(StateMachineBot):
             #time_until_actual_absorption = self.ABSORPTION_DURATION - (time.time() - self._actual_absorption_click_time) if self._actual_absorption_click_time > 0 else 999
             #time_until_absorption = self.ABSORPTION_DURATION - self.ABSORPTION_DURATION - absorption_elapsed
 
-            # Check if absorption needs redose (with variance)
+            # Check if absorption needs redose (with HUMAN-LIKE variance)
             # Set variance once per dose cycle, not every loop iteration
             if self._absorption_variance == 0.0 and absorption_elapsed >= 370:
-                # Generate variance when approaching redose time (humans react slightly late, not early)
-                self._absorption_variance = random.uniform(0, 30)
-                logger.debug(f"COMBAT_LOOP: Set absorption variance to {self._absorption_variance:.0f}s")
+                # Check for missed dose simulation (4% chance)
+                if self._should_miss_dose():
+                    self._absorption_variance = self._get_missed_dose_delay()
+                    logger.info(f"ANTI-BAN: Missed absorption dose - will redose in {self._absorption_variance:.0f}s (simulating AFK)")
+                else:
+                    # Generate human-like variance (80% late, 20% on-time)
+                    self._absorption_variance = self._get_human_redose_variance("absorption")
+                    logger.debug(f"COMBAT_LOOP: Set absorption variance to {self._absorption_variance:.0f}s")
 
             if absorption_elapsed >= (self.ABSORPTION_DURATION + self._absorption_variance):
                 logger.info(f"COMBAT_LOOP: Absorption re-dose (elapsed: {absorption_elapsed:.0f}s, variance: {self._absorption_variance:.0f}s)")
 
-                # Pre-action pause
-                self.actions.wait("micro")
+                # ANTI-BAN: Apply fatigue-based reaction delay
+                fatigue_mult = self._get_fatigue_multiplier()
+                reaction_delay = random.uniform(0.3, 0.8) * fatigue_mult
+                logger.debug(f"ANTI-BAN: Reaction delay = {reaction_delay:.2f}s (fatigue: {fatigue_mult:.2f}x)")
+                time.sleep(reaction_delay)
 
                 # Vary number of doses (4-6 instead of exactly 5)
                 DOSES = random.randint(4, 6)
@@ -560,9 +663,11 @@ class NMZAfkBot(StateMachineBot):
             logger.info(f"COMBAT LOOP: Overload Elapsed Time: {overload_elapsed:.0f}s,\nAbsorption Elapsed Time: {absorption_elapsed:.0f}s"
                         )
 
-            # Occasionally perform idle action (3% chance per loop iteration)
-            if random.random() < 0.03:
+            # ANTI-BAN: Enhanced idle actions (20% chance per loop - more realistic fidgeting)
+            if random.random() < 0.20:
                 idle_action = random.choice(["check_spec", "mini_pause"])
+
+                logger.debug(f"ANTI-BAN: Idle action '{idle_action}'")
 
                 if idle_action == "check_spec":
                     # Check special attack percentage (use existing method)

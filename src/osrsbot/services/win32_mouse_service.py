@@ -296,3 +296,36 @@ class Win32MouseService:
         ox = random.randint(-radius, radius)
         oy = random.randint(-radius, radius)
         self.move_to(cx + ox, cy + oy, style="curved")
+
+    def hover_at(
+        self,
+        x: int,
+        y: int,
+        duration: float = 0.5,
+        style: MovementStyle = "curved"
+    ) -> bool:
+        """
+        Move mouse to position and hover without clicking (Win32 implementation).
+
+        Args:
+            x: Target X coordinate (absolute)
+            y: Target Y coordinate (absolute)
+            duration: How long to hover in seconds
+            style: Movement style (curved, linear, overshoot)
+
+        Returns:
+            True if hover successful, False otherwise
+        """
+        try:
+            # Move to target position
+            if not self.move_to(x, y, style=style):
+                return False
+
+            # Hover for specified duration
+            time.sleep(duration)
+            logger.debug(f"[Win32] Hovered at ({x}, {y}) for {duration:.2f}s")
+            return True
+
+        except Exception as e:
+            logger.exception("Win32MouseService.hover_at failed: %s", e)
+            return False

@@ -1,6 +1,7 @@
 {
   "account_name": "mweow rawr",
   "window_title": "RuneLite - mweow rawr",
+  "log_level": "DEBUG",
   "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
   "colors": {
     "yellow_tile_marker": "#fcfc01",

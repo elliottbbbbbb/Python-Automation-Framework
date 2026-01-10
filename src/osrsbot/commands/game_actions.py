@@ -18,6 +18,8 @@ Migration path:
 """
 
 import logging
+import random
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
@@ -507,3 +509,145 @@ class GameActions:
             search_text,
             item_threshold,
         )
+
+    # ==================== ANTI-BAN: Pre-Action Behaviors ====================
+
+    def hover_template(
+        self, template_path: str, template_name: str = "item"
+    ) -> bool:
+        """
+        Hover mouse over template match without clicking.
+
+        Args:
+            template_path: Path to template image
+            template_name: Name for logging
+
+        Returns:
+            True if hover successful, False if template not found
+        """
+        if not self.template_service:
+            logger.warning("Template service not available for hover_template")
+            return False
+
+        try:
+            match = self.template_service.find_template(template_path)
+            if not match:
+                logger.debug(f"Template '{template_name}' not found for hover")
+                return False
+
+            center_x, center_y = match['center']
+            abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
+
+            hover_duration = random.uniform(0.3, 1.0)
+            success = self.mouse.hover_at(abs_x, abs_y, duration=hover_duration)
+
+            if success:
+                logger.debug(f"Hovered over {template_name} for {hover_duration:.2f}s")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to hover over template '{template_name}': {e}")
+            return False
+
+    def open_skills_tab(self) -> bool:
+        """
+        Open the skills tab.
+
+        Returns:
+            True if opened successfully, False otherwise
+        """
+        logger.debug("Opening skills tab")
+
+        try:
+            button_pos = self.coord_resolver.resolve_ui_button("skills_tab", force_detect=True)
+            if not button_pos:
+                logger.error("Failed to detect skills tab button")
+                return False
+
+            rel_x, rel_y = button_pos
+            abs_x, abs_y = self.coord_resolver.to_absolute(rel_x, rel_y)
+
+            success = self.mouse.click_at(
+                abs_x,
+                abs_y,
+                speed_multiplier=self.timing.get_mouse_speed_multiplier()
+            )
+
+            if success:
+                self.timing.wait("short")
+                logger.debug("Skills tab opened")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to open skills tab: {e}")
+            return False
+
+    def right_click_template(
+        self, template_path: str, template_name: str = "item"
+    ) -> bool:
+        """
+        Right-click on template match (for examine/cancel actions).
+
+        Args:
+            template_path: Path to template image
+            template_name: Name for logging
+
+        Returns:
+            True if right-click successful, False if template not found
+        """
+        if not self.template_service:
+            logger.warning("Template service not available for right_click_template")
+            return False
+
+        try:
+            match = self.template_service.find_template(template_path)
+            if not match:
+                logger.debug(f"Template '{template_name}' not found for right-click")
+                return False
+
+            center_x, center_y = match['center']
+            abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
+
+            success = self.mouse.click(abs_x, abs_y, button="right", variance=True)
+
+            if success:
+                logger.debug(f"Right-clicked on {template_name}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to right-click template '{template_name}': {e}")
+            return False
+
+    def random_camera_movement(self) -> None:
+        """
+        Simulate looking around by moving mouse (simulates camera movement).
+
+        Note: This is a simplified version. For actual camera control,
+        you would use arrow keys or middle mouse drag.
+        """
+        logger.debug("ANTI-BAN: Random camera movement")
+
+        try:
+            current_x, current_y = pyautogui.position()
+
+            # Move to random location near minimap area
+            minimap_x = random.randint(600, 750)
+            minimap_y = random.randint(50, 200)
+
+            self.mouse.move_to(minimap_x, minimap_y, style="curved")
+            time.sleep(random.uniform(0.3, 0.8))
+
+            # Return near original position (with variance)
+            variance_x = random.randint(-30, 30)
+            variance_y = random.randint(-30, 30)
+            self.mouse.move_to(
+                current_x + variance_x,
+                current_y + variance_y,
+                style="curved"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed random camera movement: {e}")
