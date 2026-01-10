@@ -387,6 +387,132 @@ class AntiBanService:
         # Could be implemented with UI button clicks if needed
         time.sleep(random.uniform(0.5, 1.5))
 
+    # ==================== ADVANCED ANTI-BAN METHODS (REUSABLE) ====================
+
+    def get_human_action_variance(self, action_name: str = "action") -> float:
+        """
+        Generate realistic human timing variance for any timer-based action.
+
+        IMPORTANT: Cannot perform actions early in OSRS - variance must be >= 0
+
+        Args:
+            action_name: Name of action (for logging)
+
+        Returns:
+            Variance in seconds to add to base duration (always >= 0)
+        """
+        roll = random.random()
+
+        if roll < 0.20:  # 20% on-time (wider variance than bot)
+            variance = random.uniform(0, 15)
+            logger.debug(f"ANTI-BAN: {action_name} variance = {variance:.0f}s (on-time)")
+        else:  # 80% late (distracted/forgot)
+            variance = random.uniform(5, 60)
+            logger.debug(f"ANTI-BAN: {action_name} variance = {variance:.0f}s (late)")
+
+        return variance
+
+    def should_miss_action(self, chance: float = 0.04) -> bool:
+        """
+        Random chance to completely miss an action (simulate stepping away).
+
+        Args:
+            chance: Probability of missing (default 4%)
+
+        Returns:
+            True if action should be missed
+        """
+        return random.random() < chance
+
+    def get_missed_action_delay(self, min_delay: float = 90, max_delay: float = 180) -> float:
+        """
+        Delay for missed action (simulates AFK period).
+
+        Args:
+            min_delay: Minimum delay in seconds (default 90s)
+            max_delay: Maximum delay in seconds (default 180s)
+
+        Returns:
+            Delay in seconds
+        """
+        return random.uniform(min_delay, max_delay)
+
+    def initialize_attention_fatigue(self):
+        """
+        Initialize attention fatigue tracking.
+
+        Should be called once when bot starts. Tracks session duration
+        and zone-out periods for realistic attention degradation.
+        """
+        if not hasattr(self.session, 'attention_fatigue_start'):
+            self.session.attention_fatigue_start = time.time()
+            self.session.last_zone_out = time.time()
+            logger.debug("ANTI-BAN: Attention fatigue initialized")
+
+    def get_fatigue_multiplier(self) -> float:
+        """
+        Get reaction time multiplier based on session duration.
+
+        Simulates human attention degradation:
+        - Fresh (0-20min): 0.8-1.0 (faster reactions)
+        - Medium (20-45min): 1.0-1.3 (normal to slower)
+        - Tired (45min+): 1.2-1.8 (noticeably slower)
+
+        Returns:
+            Multiplier for reaction times (>1.0 = slower, <1.0 = faster)
+        """
+        self.initialize_attention_fatigue()
+        session_minutes = (time.time() - self.session.attention_fatigue_start) / 60
+
+        if session_minutes < 20:
+            mult = random.uniform(0.8, 1.0)
+        elif session_minutes < 45:
+            mult = random.uniform(1.0, 1.3)
+        else:
+            mult = random.uniform(1.2, 1.8)
+
+        logger.debug(f"ANTI-BAN: Fatigue multiplier = {mult:.2f}x (session: {session_minutes:.0f}m)")
+        return mult
+
+    def should_zone_out(self, min_interval_minutes: float = 10, chance_per_second: float = 0.0005) -> bool:
+        """
+        Check if should have attention lapse (30-90s AFK burst).
+
+        Args:
+            min_interval_minutes: Minimum time between zone-outs (default 10 min)
+            chance_per_second: Probability per second (~3% per minute default)
+
+        Returns:
+            True if should zone out
+        """
+        self.initialize_attention_fatigue()
+        time_since_last = (time.time() - self.session.last_zone_out) / 60
+
+        if time_since_last < min_interval_minutes:
+            return False
+
+        # ~3% chance per minute (0.05% per second)
+        if random.random() < chance_per_second:
+            self.session.last_zone_out = time.time()
+            logger.debug("ANTI-BAN: Zone-out triggered")
+            return True
+        return False
+
+    def get_zone_out_duration(self, min_duration: float = 30, max_duration: float = 90) -> float:
+        """
+        Get random duration for zone-out / AFK burst.
+
+        Args:
+            min_duration: Minimum duration in seconds (default 30s)
+            max_duration: Maximum duration in seconds (default 90s)
+
+        Returns:
+            Duration in seconds
+        """
+        return random.uniform(min_duration, max_duration)
+
+    # ==================== SESSION STATISTICS ====================
+
     def get_session_stats(self) -> Dict:
         """
         Get current session statistics.
