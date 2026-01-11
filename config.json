@@ -349,6 +349,13 @@
       }
     }
   },
+  "license": {
+    "api_url": "https://osrs-automation-framework-production.up.railway.app",
+    "purchase_url": "https://yoursite.com/buy",
+    "timeout": 10,
+    "cache_file": ".license_cache",
+    "offline_grace_period_hours": 24
+  },
   "zulrah": {
     "tile_colors": {
       "middle": "#FF0000",
