@@ -49,7 +49,7 @@ async def create_license(
 
     logger.info(f"License created: {license_key}, duration: {duration_hours}h")
 
-    return LicenseInfo.from_orm(license)
+    return LicenseInfo.model_validate(license)
 
 
 @router.get("/admin/licenses", response_model=List[LicenseInfo])
@@ -72,7 +72,7 @@ async def list_licenses(
         List of licenses
     """
     licenses = db.query(License).offset(skip).limit(limit).all()
-    return [LicenseInfo.from_orm(lic) for lic in licenses]
+    return [LicenseInfo.model_validate(lic) for lic in licenses]
 
 
 @router.get("/admin/licenses/{license_key}", response_model=LicenseInfo)
@@ -100,7 +100,7 @@ async def get_license(
     if not license:
         raise HTTPException(status_code=404, detail="License not found")
 
-    return LicenseInfo.from_orm(license)
+    return LicenseInfo.model_validate(license)
 
 
 @router.delete("/admin/licenses/{license_key}")
