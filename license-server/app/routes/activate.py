@@ -67,10 +67,10 @@ async def activate_license(request: ActivateRequest, db: Session = Depends(get_d
     license.last_validated_at = datetime.utcnow()
 
     # Store client version in custom_metadata if not exists
-    if not license.custom_metadata:
-        license.custom_metadata = {}
-    license.custom_metadata["client_version"] = request.client_version
-    license.custom_metadata["activated_at"] = datetime.utcnow().isoformat()
+    metadata = license.custom_metadata if license.custom_metadata else {}
+    metadata["client_version"] = request.client_version
+    metadata["activated_at"] = datetime.utcnow().isoformat()
+    license.custom_metadata = metadata
 
     db.commit()
     db.refresh(license)
