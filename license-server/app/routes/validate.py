@@ -1,7 +1,7 @@
 """License validation endpoint."""
 
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import License
@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.post("/validate", response_model=ValidateResponse)
 @limiter.limit("30/minute")
-async def validate_license(request: ValidateRequest, db: Session = Depends(get_db)):
+async def validate_license(validate_request: ValidateRequest, request: Request, db: Session = Depends(get_db)):
     """
     Validate a license key for a specific machine.
 
@@ -30,10 +30,10 @@ async def validate_license(request: ValidateRequest, db: Session = Depends(get_d
         HTTPException: If validation request is malformed
     """
     # Find license by key
-    license = db.query(License).filter(License.license_key == request.license_key).first()
+    license = db.query(License).filter(License.license_key == validate_request.license_key).first()
 
     if not license:
-        logger.warning(f"License not found: {request.license_key}")
+        logger.warning(f"License not found: {validate_request.license_key}")
         return ValidateResponse(
             valid=False,
             error="LICENSE_NOT_FOUND",
@@ -41,8 +41,8 @@ async def validate_license(request: ValidateRequest, db: Session = Depends(get_d
         )
 
     # Check if machine fingerprint matches
-    if license.machine_fingerprint != request.machine_fingerprint:
-        logger.warning(f"Machine mismatch for license: {request.license_key}")
+    if license.machine_fingerprint != validate_request.machine_fingerprint:
+        logger.warning(f"Machine mismatch for license: {validate_request.license_key}")
         return ValidateResponse(
             valid=False,
             error="MACHINE_MISMATCH",
@@ -51,7 +51,7 @@ async def validate_license(request: ValidateRequest, db: Session = Depends(get_d
 
     # Check if license is active
     if not license.is_active:
-        logger.warning(f"License revoked: {request.license_key}")
+        logger.warning(f"License revoked: {validate_request.license_key}")
         return ValidateResponse(
             valid=False,
             error="LICENSE_REVOKED",
@@ -60,7 +60,7 @@ async def validate_license(request: ValidateRequest, db: Session = Depends(get_d
 
     # Check if license has expired
     if license.is_expired():
-        logger.warning(f"License expired: {request.license_key}")
+        logger.warning(f"License expired: {validate_request.license_key}")
         return ValidateResponse(
             valid=False,
             error="LICENSE_EXPIRED",
@@ -74,7 +74,7 @@ async def validate_license(request: ValidateRequest, db: Session = Depends(get_d
 
     hours_remaining = license.get_hours_remaining()
 
-    logger.info(f"License valid: {request.license_key}, {hours_remaining:.2f}h remaining")
+    logger.info(f"License valid: {validate_request.license_key}, {hours_remaining:.2f}h remaining")
 
     return ValidateResponse(
         valid=True,
