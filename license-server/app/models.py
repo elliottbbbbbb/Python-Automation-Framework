@@ -20,7 +20,7 @@ class License(Base):
     activation_count = Column(Integer, default=0)
     last_validated_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
-    metadata = Column(JSON, nullable=True)  # Store additional info (email, purchase_id, etc.)
+    custom_metadata = Column(JSON, nullable=True)  # Store additional info (email, purchase_id, etc.)
 
     def __repr__(self):
         return f"<License {self.license_key}>"
