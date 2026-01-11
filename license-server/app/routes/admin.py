@@ -40,7 +40,7 @@ async def create_license(
     license = License(
         license_key=license_key,
         duration_hours=duration_hours,
-        metadata={"notes": notes} if notes else None
+        custom_metadata={"notes": notes} if notes else None
     )
 
     db.add(license)
