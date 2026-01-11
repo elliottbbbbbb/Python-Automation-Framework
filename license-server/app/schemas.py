@@ -45,11 +45,14 @@ class LicenseInfo(BaseModel):
     id: int
     license_key: str
     duration_hours: int
-    created_at: str
-    expires_at: Optional[str]
+    created_at: datetime
+    expires_at: Optional[datetime]
     activation_count: int
     is_active: bool
-    last_validated_at: Optional[str]
+    last_validated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
