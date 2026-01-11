@@ -1,0 +1,493 @@
+# OSRS Items List - Format: item_id,item_name
+# This file contains common OSRS items with correct wiki names
+
+# === FOOD (Cooked) ===
+385,Shark
+373,Swordfish
+379,Lobster
+361,Tuna
+329,Salmon
+333,Trout
+317,Shrimps
+7946,Monkfish
+3144,Cooked karambwan
+389,Manta ray
+7223,Dark crab
+13441,Anglerfish
+
+# === FOOD (Raw) ===
+383,Raw shark
+371,Raw swordfish
+377,Raw lobster
+359,Raw tuna
+331,Raw salmon
+335,Raw trout
+317,Raw shrimps
+7944,Raw monkfish
+3142,Raw karambwan
+387,Raw manta ray
+13439,Raw anglerfish
+
+# === POTIONS (Attack) ===
+2428,Attack potion(4)
+121,Attack potion(3)
+123,Attack potion(2)
+125,Attack potion(1)
+
+# === POTIONS (Strength) ===
+113,Strength potion(4)
+115,Strength potion(3)
+117,Strength potion(2)
+119,Strength potion(1)
+
+# === POTIONS (Defence) ===
+2432,Defence potion(4)
+133,Defence potion(3)
+135,Defence potion(2)
+137,Defence potion(1)
+
+# === POTIONS (Super Attack) ===
+2436,Super attack(4)
+145,Super attack(3)
+147,Super attack(2)
+149,Super attack(1)
+
+# === POTIONS (Super Strength) ===
+2440,Super strength(4)
+157,Super strength(3)
+159,Super strength(2)
+161,Super strength(1)
+
+# === POTIONS (Super Defence) ===
+2442,Super defence(4)
+163,Super defence(3)
+165,Super defence(2)
+167,Super defence(1)
+
+# === POTIONS (Super Combat) ===
+12695,Super combat potion(4)
+12697,Super combat potion(3)
+12699,Super combat potion(2)
+12701,Super combat potion(1)
+
+# === POTIONS (Ranging) ===
+2444,Ranging potion(4)
+169,Ranging potion(3)
+171,Ranging potion(2)
+173,Ranging potion(1)
+
+# === POTIONS (Super Ranging) ===
+11722,Super ranging(4)
+11724,Super ranging(3)
+11726,Super ranging(2)
+11728,Super ranging(1)
+
+# === POTIONS (Magic) ===
+3040,Magic potion(4)
+3042,Magic potion(3)
+3044,Magic potion(2)
+3046,Magic potion(1)
+
+# === POTIONS (Prayer) ===
+2434,Prayer potion(4)
+139,Prayer potion(3)
+141,Prayer potion(2)
+143,Prayer potion(1)
+
+# === POTIONS (Super Restore) ===
+3024,Super restore(4)
+3026,Super restore(3)
+3028,Super restore(2)
+3030,Super restore(1)
+
+# === POTIONS (Antifire) ===
+2452,Antifire potion(4)
+2454,Antifire potion(3)
+2456,Antifire potion(2)
+2458,Antifire potion(1)
+
+# === POTIONS (Extended Antifire) ===
+11951,Extended antifire(4)
+11953,Extended antifire(3)
+11955,Extended antifire(2)
+11957,Extended antifire(1)
+
+# === POTIONS (Super Antifire) ===
+21978,Super antifire potion(4)
+21981,Super antifire potion(3)
+21984,Super antifire potion(2)
+21987,Super antifire potion(1)
+
+# === POTIONS (Extended Super Antifire) ===
+22209,Extended super antifire(4)
+22212,Extended super antifire(3)
+22215,Extended super antifire(2)
+22218,Extended super antifire(1)
+
+# === POTIONS (Antipoison) ===
+2446,Antipoison(4)
+175,Antipoison(3)
+177,Antipoison(2)
+179,Antipoison(1)
+
+# === POTIONS (Super Antipoison) ===
+2448,Super antipoison(4)
+181,Super antipoison(3)
+183,Super antipoison(2)
+185,Super antipoison(1)
+
+# === POTIONS (Antidote+) ===
+5943,Antidote+(4)
+5945,Antidote+(3)
+5947,Antidote+(2)
+5949,Antidote+(1)
+
+# === POTIONS (Antidote++) ===
+5952,Antidote++(4)
+5954,Antidote++(3)
+5956,Antidote++(2)
+5958,Antidote++(1)
+
+# === POTIONS (Energy) ===
+3008,Energy potion(4)
+3010,Energy potion(3)
+3012,Energy potion(2)
+3014,Energy potion(1)
+
+# === POTIONS (Super Energy) ===
+3016,Super energy(4)
+3018,Super energy(3)
+3020,Super energy(2)
+3022,Super energy(1)
+
+# === POTIONS (Stamina) ===
+12625,Stamina potion(4)
+12627,Stamina potion(3)
+12629,Stamina potion(2)
+12631,Stamina potion(1)
+
+# === POTIONS (Saradomin Brew) ===
+6685,Saradomin brew(4)
+6687,Saradomin brew(3)
+6689,Saradomin brew(2)
+6691,Saradomin brew(1)
+
+# === WEAPONS (Melee - Dragon) ===
+4587,Dragon scimitar
+1249,Dragon dagger
+1305,Dragon longsword
+3204,Dragon halberd
+21009,Dragon hunter lance
+22978,Dragon claws
+
+# === WEAPONS (Melee - Abyssal) ===
+4151,Abyssal whip
+13265,Abyssal tentacle
+13271,Abyssal dagger
+
+# === WEAPONS (Melee - Godswords) ===
+11802,Armadyl godsword
+11804,Bandos godsword
+11806,Saradomin godsword
+11808,Zamorak godsword
+
+# === WEAPONS (Ranged) ===
+861,Magic shortbow
+859,Magic longbow
+11235,Dark bow
+12926,Toxic blowpipe
+19481,Heavy ballista
+21012,Dragon hunter crossbow
+12765,Armadyl crossbow
+11785,Dragon crossbow
+
+# === WEAPONS (Magic) ===
+1383,Staff of fire
+1381,Staff of water
+1385,Staff of air
+1387,Staff of earth
+6914,Master wand
+21006,Kodai wand
+12904,Toxic staff of the dead
+11791,Staff of the dead
+22323,Tumeken's shadow
+25739,Sanguinesti staff
+
+# === ARMOUR (Helmets) ===
+1163,Rune full helm
+1147,Adamant full helm
+1121,Mithril full helm
+1101,Steel full helm
+1075,Iron full helm
+1155,Bronze full helm
+10828,Helm of neitiznot
+11128,Berserker helm
+12605,Serpentine helm
+19553,Ancestral hat
+
+# === ARMOUR (Platebodies) ===
+1127,Rune platebody
+1111,Adamant platebody
+1093,Mithril platebody
+1069,Steel platebody
+1115,Iron platebody
+1117,Bronze platebody
+10551,Fighter torso
+12873,Bandos chestplate
+13072,Armadyl chestplate
+19548,Ancestral robe top
+
+# === ARMOUR (Platelegs) ===
+1079,Rune platelegs
+1073,Adamant platelegs
+1071,Mithril platelegs
+1067,Steel platelegs
+1067,Iron platelegs
+1075,Bronze platelegs
+12875,Bandos tassets
+13073,Armadyl chainskirt
+19551,Ancestral robe bottom
+
+# === ARMOUR (Shields) ===
+1201,Rune kiteshield
+1185,Adamant kiteshield
+1181,Mithril kiteshield
+1177,Steel kiteshield
+1175,Iron kiteshield
+1189,Bronze kiteshield
+12817,Elysian spirit shield
+12825,Spectral spirit shield
+12821,Arcane spirit shield
+11283,Dragonfire shield
+22003,Twisted buckler
+
+# === ARMOUR (Boots) ===
+11732,Dragon boots
+13239,Primordial boots
+13235,Pegasian boots
+13237,Eternal boots
+6920,Infinity boots
+3105,Climbing boots
+
+# === ARMOUR (Gloves) ===
+7462,Barrows gloves
+7461,Dragon gloves
+7460,Rune gloves
+22981,Ferocious gloves
+21024,Zaryte vambraces
+
+# === ARMOUR (Capes) ===
+6570,Fire cape
+21295,Infernal cape
+21791,Mythical cape
+13331,Ava's assembler
+10499,Ava's accumulator
+9672,Skill cape
+13342,Max cape
+
+# === ARMOUR (Amulets) ===
+1731,Amulet of power
+1725,Amulet of glory
+6585,Amulet of fury
+19547,Amulet of torture
+19553,Necklace of anguish
+12002,Occult necklace
+
+# === ARMOUR (Rings) ===
+2550,Ring of dueling(8)
+2552,Ring of forging
+2568,Ring of life
+6731,Ring of suffering
+19550,Ring of the gods
+
+# === RUNES (Elemental) ===
+554,Fire rune
+555,Water rune
+556,Air rune
+557,Earth rune
+558,Mind rune
+559,Body rune
+560,Cosmic rune
+561,Chaos rune
+562,Death rune
+563,Blood rune
+564,Nature rune
+565,Law rune
+566,Soul rune
+9075,Astral rune
+21880,Wrath rune
+
+# === RUNES (Combination) ===
+4694,Mist rune
+4695,Dust rune
+4696,Mud rune
+4697,Smoke rune
+4698,Steam rune
+4699,Lava rune
+
+# === ARROWS ===
+882,Bronze arrow
+884,Iron arrow
+886,Steel arrow
+888,Mithril arrow
+890,Adamant arrow
+892,Rune arrow
+11212,Dragon arrow
+21326,Amethyst arrow
+
+# === BOLTS ===
+877,Bronze bolts
+9139,Iron bolts
+9140,Steel bolts
+9141,Mithril bolts
+9142,Adamant bolts
+9143,Rune bolts
+21316,Dragon bolts
+9244,Dragon bolts(e)
+
+# === TOOLS (Mining) ===
+1265,Bronze pickaxe
+1267,Iron pickaxe
+1269,Steel pickaxe
+1273,Mithril pickaxe
+1271,Adamant pickaxe
+1275,Rune pickaxe
+11920,Dragon pickaxe
+13243,Crystal pickaxe
+
+# === TOOLS (Woodcutting) ===
+1351,Bronze axe
+1349,Iron axe
+1353,Steel axe
+1355,Mithril axe
+1357,Adamant axe
+1359,Rune axe
+6739,Dragon axe
+13241,Crystal axe
+
+# === TOOLS (Fishing) ===
+307,Fishing rod
+309,Fly fishing rod
+311,Harpoon
+301,Lobster pot
+303,Small fishing net
+305,Big fishing net
+21028,Dragon harpoon
+13258,Crystal harpoon
+
+# === TOOLS (Other) ===
+590,Tinderbox
+946,Knife
+1755,Chisel
+1592,Amulet mould
+1595,Necklace mould
+1785,Glassblowing pipe
+5523,Watering can
+
+# === HERBS (Grimy) ===
+199,Grimy guam leaf
+201,Grimy marrentill
+203,Grimy tarromin
+205,Grimy harralander
+207,Grimy ranarr weed
+209,Grimy irit leaf
+211,Grimy avantoe
+213,Grimy kwuarm
+215,Grimy cadantine
+2485,Grimy lantadyme
+217,Grimy dwarf weed
+219,Grimy torstol
+
+# === HERBS (Clean) ===
+249,Guam leaf
+251,Marrentill
+253,Tarromin
+255,Harralander
+257,Ranarr weed
+259,Irit leaf
+261,Avantoe
+263,Kwuarm
+265,Cadantine
+2481,Lantadyme
+267,Dwarf weed
+269,Torstol
+
+# === SEEDS (Herb) ===
+5291,Guam seed
+5292,Marrentill seed
+5293,Tarromin seed
+5294,Harralander seed
+5295,Ranarr seed
+5296,Toadflax seed
+5297,Irit seed
+5298,Avantoe seed
+5299,Kwuarm seed
+5300,Snapdragon seed
+5301,Cadantine seed
+5302,Lantadyme seed
+5303,Dwarf weed seed
+5304,Torstol seed
+
+# === SEEDS (Tree) ===
+5312,Oak seed
+5313,Willow seed
+5314,Maple seed
+5315,Yew seed
+5316,Magic seed
+
+# === SEEDS (Fruit Tree) ===
+5283,Apple tree seed
+5284,Banana tree seed
+5285,Orange tree seed
+5286,Curry tree seed
+5287,Pineapple seed
+5288,Papaya tree seed
+5289,Palm tree seed
+22869,Dragonfruit tree seed
+
+# === LOGS ===
+1511,Logs
+1521,Oak logs
+1519,Willow logs
+1517,Maple logs
+1515,Yew logs
+1513,Magic logs
+19669,Redwood logs
+
+# === ORES ===
+438,Copper ore
+436,Tin ore
+440,Iron ore
+442,Silver ore
+453,Coal
+444,Gold ore
+447,Mithril ore
+449,Adamantite ore
+451,Runite ore
+21347,Amethyst
+
+# === BARS ===
+2349,Bronze bar
+2351,Iron bar
+2353,Steel bar
+2355,Mithril bar
+2357,Adamantite bar
+2359,Runite bar
+
+# === GEMS ===
+1623,Uncut sapphire
+1621,Uncut emerald
+1619,Uncut ruby
+1617,Uncut diamond
+1631,Uncut dragonstone
+6571,Uncut onyx
+19496,Uncut zenyte
+
+# === COINS & MISC ===
+995,Coins
+6529,Tokkul
+13307,Ancient shard
+13311,Dark totem base
+12934,Zulrah's scales
+12936,Tanzanite fang
+12929,Serpentine visage

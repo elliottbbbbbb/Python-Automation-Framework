@@ -188,10 +188,13 @@ class ItemDetectionService:
 
         # Check if best match meets threshold
         if best_match_confidence >= self.threshold:
-            logger.debug(f"Identified item: {best_match_name} (confidence: {best_match_confidence:.2f})")
+            logger.info(f"✓ Identified item: '{best_match_name}' (confidence: {best_match_confidence:.3f})")
             return best_match_name
         else:
-            logger.debug(f"No item identified (best: {best_match_name} @ {best_match_confidence:.2f}, threshold: {self.threshold:.2f})")
+            if best_match_name and best_match_confidence > 0.5:
+                logger.info(f"✗ No match (best: '{best_match_name}' @ {best_match_confidence:.3f}, threshold: {self.threshold:.3f})")
+            else:
+                logger.debug(f"No item identified (best: {best_match_name} @ {best_match_confidence:.2f})")
             return None
 
     def find_item(
