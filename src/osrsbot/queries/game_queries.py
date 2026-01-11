@@ -49,6 +49,7 @@ class GameState:
         ocr_service: TemplateOCRService,
         screen_service: Optional["ScreenService"] = None,
         template_service: Optional[Any] = None,
+        item_detection_service: Optional[Any] = None,
     ) -> None:
         """Initialize game state queries."""
         self._interface = interface  # Keep for backward compatibility
@@ -56,6 +57,7 @@ class GameState:
         self.ocr_service = ocr_service
         self.screen = screen_service
         self.template_service = template_service
+        self.item_detection_service = item_detection_service  # NEW: Optional item detection
 
         # Initialize focused query modules
         if screen_service:
@@ -72,11 +74,13 @@ class GameState:
                 "ScreenService not available - combat, stat, and bank queries unavailable"
             )
 
-        # Initialize inventory detection (already exists)
+        # Initialize inventory detection (with optional item detection)
         if template_service and screen_service:
             from osrsbot.queries.inventory_queries import InventoryState
 
-            self.inventory = InventoryState(template_service, screen_service, config)
+            self.inventory = InventoryState(
+                template_service, screen_service, config, item_detection_service
+            )
             logger.debug("InventoryState initialized successfully")
         else:
             self.inventory = None

@@ -172,6 +172,26 @@ class ScriptRunner:
             self.ocr = TemplateOCRService()
             logger.info("TemplateOCRService initialized successfully")
 
+            # Initialize ItemDetectionService if enabled
+            logger.debug("Checking item detection configuration")
+            item_detection_config = self.config.get("item_detection", default={})
+            if item_detection_config.get("enabled", False):
+                try:
+                    from osrsbot.services.item_detection_service import ItemDetectionService
+
+                    logger.debug("Initializing ItemDetectionService")
+                    items_dir = item_detection_config.get("items_dir", "src/osrsbot/images/items")
+                    threshold = item_detection_config.get("threshold", 0.75)
+
+                    self.item_detection = ItemDetectionService(items_dir, threshold)
+                    logger.info(f"ItemDetectionService initialized with {len(self.item_detection.templates)} item templates loaded")
+                except Exception as e:
+                    logger.warning(f"ItemDetectionService initialization failed: {e}. Item detection disabled.")
+                    self.item_detection = None
+            else:
+                logger.debug("Item detection disabled in config")
+                self.item_detection = None
+
             # Initialize Position Tracking Service
             # Try Status Socket plugin first, fall back to OCR-based tracking
             logger.debug("Initializing position tracking service")
@@ -247,6 +267,7 @@ class ScriptRunner:
                 self.ocr,
                 self.screen,
                 self.template_service,
+                self.item_detection,  # NEW: Pass ItemDetectionService
             )
             logger.info("GameState initialized successfully")
         except Exception as e:

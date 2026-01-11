@@ -436,5 +436,11 @@
     "form_detection_delay": 0.5,
     "movement_delay": "medium",
     "attack_delay": "short"
+  },
+  "item_detection": {
+    "enabled": false,
+    "items_dir": "src/osrsbot/images/items",
+    "threshold": 0.75,
+    "load_at_startup": true
   }
 }

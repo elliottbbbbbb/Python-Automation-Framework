@@ -279,10 +279,13 @@ class UIElementGrid:
         # Adjust for border offset (template image may include border pixels)
         # The actual grid area is smaller than the template
         # Use separate X and Y offsets if provided
+        edge_row_nudge = 15
+
         grid_x = x + self.border_offset_x
-        grid_y = y + self.border_offset_y
+        #grid_y = y  + self.border_offset_y
+        grid_y = y
         grid_w = w - (2 * self.border_offset_x)
-        grid_h = h - (2 * self.border_offset_y)
+        grid_h = h - (0 * self.border_offset_y)
 
         cell_w = grid_w / self.num_cols
         cell_h = grid_h / self.num_rows
@@ -293,10 +296,15 @@ class UIElementGrid:
                 # Calculate cell center first (more accurate)
                 center_x_float = grid_x + (col + 0.5) * cell_w
                 center_y_float = grid_y + (row + 0.5) * cell_h
-
+                
                 # Round center to int - this is the EXACT center we'll use
                 center_x_int = int(round(center_x_float))
                 center_y_int = int(round(center_y_float))
+                
+                #if row == 0:
+                #    center_y_int -= edge_row_nudge
+                #if row == self.num_rows - 1:
+                #    center_y_int += edge_row_nudge
 
                 # Calculate bounds from center with padding
                 half_w = (cell_w / 2) - self.padding
