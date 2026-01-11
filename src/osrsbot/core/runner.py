@@ -53,6 +53,8 @@ class ScriptRunner:
             raise
 
         # Validate license before proceeding
+        logger.info("Checking license...")
+        print("Validating license...")
         self._validate_license()
 
         if window_title:
