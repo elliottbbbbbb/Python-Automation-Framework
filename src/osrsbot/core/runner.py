@@ -52,6 +52,9 @@ class ScriptRunner:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             raise
 
+        # Validate license before proceeding
+        self._validate_license()
+
         if window_title:
             self.config.data["window_title"] = window_title
             logger.debug(f"Updated window title in config to: '{window_title}'")
@@ -327,6 +330,110 @@ class ScriptRunner:
             raise
 
         logger.info("ScriptRunner initialization complete")
+
+    def _validate_license(self) -> None:
+        """
+        Validate license before allowing bot execution.
+
+        This method checks if a valid license exists and is not expired.
+        If no license is found, it displays a GUI dialog for activation.
+        If license validation fails, the program exits immediately.
+
+        Raises:
+            SystemExit: If license validation fails or user cancels activation
+        """
+        from osrsbot.services.license_service import LicenseService
+        from osrsbot.ui.license_dialog import LicenseDialog
+        from osrsbot.exceptions.license_exceptions import (
+            LicenseExpiredException,
+            LicenseInvalidException,
+        )
+
+        # Get license configuration from config
+        license_config = self.config.get("license", default={})
+        api_url = os.getenv(
+            "LICENSE_API_URL",
+            license_config.get("api_url", "http://localhost:8000")
+        )
+        purchase_url = license_config.get("purchase_url", "https://yoursite.com/buy")
+        cache_file = license_config.get("cache_file", ".license_cache")
+
+        # Initialize license service
+        license_service = LicenseService(api_url=api_url, cache_file=cache_file)
+
+        try:
+            # Try to validate existing license
+            license_service.validate()
+
+            # Get license status for user feedback
+            status = license_service.get_license_status()
+            if status["status"] == "active":
+                hours = status.get("hours_remaining", 0)
+                logger.info(f"✓ License validated successfully ({hours:.1f} hours remaining)")
+            else:
+                logger.info("✓ License validated successfully")
+
+        except LicenseInvalidException as e:
+            # No license found - show activation dialog
+            logger.info("No active license found. Please activate a license key.")
+            print("\n" + "="*60)
+            print("  OSRS Bot - License Activation Required")
+            print("="*60)
+            print(f"  Error: {e}")
+            print(f"  Purchase a license at: {purchase_url}")
+            print("="*60 + "\n")
+
+            def activate_callback(key: str) -> bool:
+                """Callback for license activation from GUI dialog."""
+                try:
+                    result = license_service.activate(key)
+                    logger.info(f"License activated: {result.get('message')}")
+                    return True
+                except Exception as activation_error:
+                    logger.error(f"Activation failed: {activation_error}")
+                    raise
+
+            # Show GUI dialog for license activation
+            dialog = LicenseDialog(
+                on_activate=activate_callback,
+                purchase_url=purchase_url
+            )
+
+            if not dialog.show():
+                logger.error("License activation cancelled by user")
+                print("\n❌ License activation required to use this bot.")
+                print(f"   Visit: {purchase_url}")
+                raise SystemExit(1)
+
+            # After successful activation, validate once more
+            try:
+                license_service.validate()
+                logger.info("✓ License activated and validated successfully")
+            except Exception as final_validation_error:
+                logger.error(f"Post-activation validation failed: {final_validation_error}")
+                print("\n❌ License validation failed after activation.")
+                print("   Please contact support if this persists.")
+                raise SystemExit(1)
+
+        except LicenseExpiredException as e:
+            logger.error(f"License expired: {e}")
+            print("\n" + "="*60)
+            print("  OSRS Bot - License Expired")
+            print("="*60)
+            print(f"  {e}")
+            print(f"  Purchase a new license at: {purchase_url}")
+            print("="*60 + "\n")
+            raise SystemExit(1)
+
+        except Exception as e:
+            logger.error(f"License validation failed: {e}")
+            print("\n" + "="*60)
+            print("  OSRS Bot - License Error")
+            print("="*60)
+            print(f"  Error: {e}")
+            print(f"  Please check your internet connection or contact support.")
+            print("="*60 + "\n")
+            raise SystemExit(1)
 
     def _execute_with_error_handling(
         self, script_name: str, executable: Callable[[], None]
