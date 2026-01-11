@@ -43,6 +43,74 @@ def main() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    # Validate license before showing menu
+    from osrsbot.services.license_service import LicenseService
+    from osrsbot.ui.license_dialog import LicenseDialog
+    from osrsbot.exceptions.license_exceptions import (
+        LicenseExpiredException,
+        LicenseInvalidException,
+    )
+
+    try:
+        config = Config()
+        license_config = config.get("license", default={})
+        api_url = license_config.get("api_url", "http://localhost:8000")
+        purchase_url = license_config.get("purchase_url", "https://yoursite.com/buy")
+        cache_file = license_config.get("cache_file", ".license_cache")
+
+        license_service = LicenseService(api_url=api_url, cache_file=cache_file)
+
+        print("Validating license...")
+        license_service.validate()
+
+        status = license_service.get_license_status()
+        if status["status"] == "active":
+            hours = status.get("hours_remaining", 0)
+            print(f"✓ License valid ({hours:.1f} hours remaining)\n")
+
+    except LicenseInvalidException:
+        print("\n" + "="*60)
+        print("  OSRS Bot - License Activation Required")
+        print("="*60)
+        print("  No valid license found.")
+        print(f"  Purchase a license at: {purchase_url}")
+        print("="*60 + "\n")
+
+        def activate_callback(key: str) -> bool:
+            try:
+                license_service.activate(key)
+                return True
+            except Exception as e:
+                raise e
+
+        dialog = LicenseDialog(
+            on_activate=activate_callback,
+            purchase_url=purchase_url
+        )
+
+        if not dialog.show():
+            print("\n❌ License activation required to use this bot.")
+            print(f"   Visit: {purchase_url}")
+            sys.exit(1)
+
+        # Validate again after activation
+        license_service.validate()
+        print("✓ License activated successfully!\n")
+
+    except LicenseExpiredException as e:
+        print("\n" + "="*60)
+        print("  OSRS Bot - License Expired")
+        print("="*60)
+        print(f"  {e}")
+        print(f"  Purchase a new license at: {purchase_url}")
+        print("="*60 + "\n")
+        sys.exit(1)
+
+    except Exception as e:
+        print(f"\n❌ License validation error: {e}")
+        print("   Please check your internet connection or contact support.")
+        sys.exit(1)
+
     try:
         print("\n" + "=" * 60)
         print("OSRS BOT - TASK SCRIPT RUNNER")
