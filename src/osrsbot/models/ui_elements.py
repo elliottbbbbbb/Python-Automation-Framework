@@ -282,9 +282,10 @@ class UIElementGrid:
         edge_row_nudge = 15
 
         grid_x = x + self.border_offset_x
-        grid_y = y  + self.border_offset_y
+        #grid_y = y  + self.border_offset_y
+        grid_y = y
         grid_w = w - (2 * self.border_offset_x)
-        grid_h = h - (2 * self.border_offset_y)
+        grid_h = h - (0 * self.border_offset_y)
 
         cell_w = grid_w / self.num_cols
         cell_h = grid_h / self.num_rows
