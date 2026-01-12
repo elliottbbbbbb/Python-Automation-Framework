@@ -102,6 +102,7 @@ class BasicNPCKiller(StateMachineBot):
         self._kills = 0
         self._loots_picked = 0
         self._last_attack_time = 0.0
+        self._run_count = 0
 
         logger.info(
             f"BasicNPCKiller initialized: method={self.npc_detection_method}, "
@@ -223,7 +224,7 @@ class BasicNPCKiller(StateMachineBot):
         """
         try:
             # Find all NPCs with target color
-            npc_match = self.screen.find_color(
+            npc_match = self.actions.screen.find_color(
                 self.npc_color,
                 tolerance=15,  # Allow some color variance
                 find_all=False,  # Just find first one
@@ -252,7 +253,7 @@ class BasicNPCKiller(StateMachineBot):
         """
         try:
             # Use template matching service
-            result = self.template.find_template(
+            result = self.actions.template_service.find_template(
                 template_path=self.npc_template,
                 threshold=0.7,  # 70% confidence
             )
@@ -295,8 +296,9 @@ class BasicNPCKiller(StateMachineBot):
         self._check_exit_requested()
         self._update_ui("IDLE", "Starting NPC killer...")
 
+        self._run_count += 1
         logger.info(
-            f"Bot started (run {context.run_number}): "
+            f"Bot started (run {self._run_count}): "
             f"Kills: {self._kills}, Loots: {self._loots_picked}"
         )
 
@@ -350,7 +352,7 @@ class BasicNPCKiller(StateMachineBot):
 
         # Click NPC
         logger.info(f"Clicking NPC at ({npc_x}, {npc_y})")
-        success = self.mouse.click_at(npc_x, npc_y, move_style="curved")
+        success = self.actions.mouse.click_at(npc_x, npc_y, move_style="curved")
 
         if not success:
             logger.warning("Failed to click NPC")
