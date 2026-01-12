@@ -348,6 +348,9 @@ class ZulrahBot(StateMachineBot):
 
     def _handle_attack_zulrah(self, context: StateExecutionContext) -> StateResult:
         """Attack Zulrah until phase complete."""
+        # Check if user pressed 'q' to exit
+        self._check_exit_requested()
+
         # Check if Zulrah submerged (phase transition)
         if not self.detector.is_zulrah_visible():
             logger.info("Zulrah submerged - phase complete")

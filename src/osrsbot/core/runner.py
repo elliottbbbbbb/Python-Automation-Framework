@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from typing import TYPE_CHECKING, Any, Callable, Union
 from pathlib import Path
 
@@ -20,6 +21,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# EXE CONFIG HELPER
+
+def resolve_config_path(config_file: str) -> Path:
+    # If user provided an absolute path, respect it
+    path = Path(config_file)
+    if path.is_absolute():
+        return path
+
+    # Running as PyInstaller exe
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / config_file
 
 class ScriptRunner:
     """Main script runner that sets up everything"""
@@ -35,19 +47,49 @@ class ScriptRunner:
             FileNotFoundError: If config file doesn't exist
             Exception: If game window not found or initialization fails
         """
+
         if not window_title or not window_title.strip():
             logger.error("Window title cannot be empty")
             raise ValueError("Window title is required and cannot be empty")
 
         logger.info(f"Initializing ScriptRunner for window: '{window_title}'")
 
+
+
         try:
-            logger.debug(f"Loading config from: {config_file}")
-            self.config = Config(config_file)
-            logger.info("Config loaded successfully")
-        except FileNotFoundError as e:
-            logger.error(f"Config file not found: {config_file}")
-            raise FileNotFoundError(f"Config file '{config_file}' not found") from e
+            # First: try config next to the exe (or cwd when not frozen)
+            primary_config = Path(config_file)
+
+            if not primary_config.is_absolute():
+                if getattr(sys, "frozen", False):
+                    primary_config = Path(sys.executable).parent / config_file
+                else:
+                    primary_config = Path.cwd() / config_file
+
+            logger.debug(f"Trying config from: {primary_config}")
+            self.config = Config(primary_config)
+            logger.info("Config loaded successfully from primary location")
+
+        except FileNotFoundError:
+            # Fallback: use bundled config inside .exe (or default behavior)
+            logger.warning(
+                f"Primary config not found ({primary_config}), falling back to bundled config"
+            )
+            try:
+                if getattr(sys, "frozen", False):
+                    # Try bundled config in .exe
+                    bundled_config = Path(sys._MEIPASS) / "osrsbot" / "config.json"
+                    logger.debug(f"Trying bundled config: {bundled_config}")
+                    self.config = Config(str(bundled_config))
+                else:
+                    # In dev mode, use default Config behavior
+                    logger.debug("Using default config location")
+                    self.config = Config()
+                logger.info("Config loaded successfully from fallback location")
+            except Exception as e:
+                logger.error(f"Failed to load config from both locations: {e}", exc_info=True)
+                raise
+
         except Exception as e:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             raise

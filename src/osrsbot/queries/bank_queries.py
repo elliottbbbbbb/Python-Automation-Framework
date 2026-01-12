@@ -14,6 +14,7 @@ Query layer responsibilities:
 """
 
 import logging
+import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -23,6 +24,38 @@ import numpy as np
 from osrsbot.services.screen_service import ScreenService
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_template_path(template_path: str) -> Path:
+    """
+    Resolve template path for .exe environment.
+
+    When running as .exe, converts relative paths like 'src/osrsbot/images/...'
+    to absolute paths inside the bundled _MEIPASS directory.
+
+    Args:
+        template_path: Original template path (relative or absolute)
+
+    Returns:
+        Resolved Path object
+    """
+    resolved_path = Path(template_path)
+
+    # When running as .exe, resolve relative paths from the bundled location
+    if not resolved_path.is_absolute() and getattr(sys, "frozen", False):
+        # Normalize path to use forward slashes for comparison (Windows uses backslashes)
+        normalized_path = template_path.replace("\\", "/")
+
+        # Check if path starts with src/osrsbot (from config or hardcoded)
+        if normalized_path.startswith("src/osrsbot/"):
+            # Strip src/osrsbot/ prefix and resolve from _MEIPASS
+            relative_path = normalized_path.replace("src/osrsbot/", "", 1)
+            resolved_path = Path(sys._MEIPASS) / "osrsbot" / relative_path
+            logger.info(f"Resolved bundled template: {template_path} -> {resolved_path}")
+        else:
+            logger.warning(f"Path doesn't start with 'src/osrsbot/': {normalized_path}")
+
+    return resolved_path
 
 
 class BankQueries:
@@ -50,7 +83,8 @@ class BankQueries:
         """
         try:
             # Load search button template
-            template = cv.imread(search_button_template, cv.IMREAD_COLOR)
+            resolved_path = _resolve_template_path(search_button_template)
+            template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
             if template is None:
                 logger.warning(
                     f"Failed to load bank search template: {search_button_template}"
@@ -96,8 +130,11 @@ class BankQueries:
             Tuple of (center_x, center_y, confidence) if found, None otherwise
         """
         try:
+            # Resolve template path for .exe
+            resolved_path = _resolve_template_path(template_path)
+
             # Load template
-            template = cv.imread(template_path, cv.IMREAD_COLOR)
+            template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
             if template is None:
                 logger.error(f"Failed to load template: {template_path}")
                 return None
@@ -158,8 +195,9 @@ class BankQueries:
         # Try all templates
         for template_path in template_paths:
             try:
-                # Load template
-                template = cv.imread(template_path, cv.IMREAD_COLOR)
+                # Resolve and load template
+                resolved_path = _resolve_template_path(template_path)
+                template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
                 if template is None:
                     logger.warning(f"Failed to load template: {template_path}")
                     continue

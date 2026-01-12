@@ -1,6 +1,7 @@
 import json
 import logging
 import platform
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,12 +12,23 @@ class Config:
     """Centralized configuration for all scripts"""
 
     def __init__(self, config_file: str = None) -> None:
-        # If no config file specified, use the one in src/osrsbot/
+        # If no config file specified, determine the best location
         if config_file is None:
-            # Get the directory where this file (config.py) is located
-            # Then go up one level to osrsbot/, then look for config.json
-            config_dir = Path(__file__).parent.parent
-            self.config_file = config_dir / "config.json"
+            # When running as .exe, prioritize config.json next to the executable
+            if getattr(sys, "frozen", False):
+                external_config = Path(sys.executable).parent / "config.json"
+                if external_config.exists():
+                    logger.info(f"Using external config next to .exe: {external_config}")
+                    self.config_file = external_config
+                else:
+                    # Fall back to bundled config inside .exe
+                    logger.info("No external config found, using bundled config")
+                    config_dir = Path(__file__).parent.parent
+                    self.config_file = config_dir / "config.json"
+            else:
+                # When running in dev mode, use the one in src/osrsbot/
+                config_dir = Path(__file__).parent.parent
+                self.config_file = config_dir / "config.json"
         else:
             self.config_file = Path(config_file)
         self.data = self._load_config()

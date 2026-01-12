@@ -10,6 +10,7 @@ Key Classes:
 """
 
 import logging
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -167,6 +168,18 @@ class UIElementGrid:
             FileNotFoundError: If template file doesn't exist
         """
         template_path = Path(self.template_path)
+
+        # When running as .exe, resolve relative paths from the bundled location
+        if not template_path.is_absolute() and getattr(sys, "frozen", False):
+            # Normalize to forward slashes for comparison (Windows uses backslashes)
+            normalized_path = self.template_path.replace("\\", "/")
+
+            # Check if path starts with src/osrsbot (from config)
+            if normalized_path.startswith("src/osrsbot/"):
+                # Strip src/osrsbot/ prefix and resolve from _MEIPASS
+                relative_path = normalized_path.replace("src/osrsbot/", "", 1)
+                template_path = Path(sys._MEIPASS) / "osrsbot" / relative_path
+                logger.debug(f"Resolved bundled template path: {template_path}")
 
         # Try loading the template
         template = cv.imread(str(template_path), cv.IMREAD_GRAYSCALE)
@@ -401,6 +414,18 @@ class UIButton:
     def _load_template(self) -> np.ndarray:
         """Load template image as grayscale NumPy array."""
         template_path = Path(self.template_path)
+
+        # When running as .exe, resolve relative paths from the bundled location
+        if not template_path.is_absolute() and getattr(sys, "frozen", False):
+            # Normalize to forward slashes for comparison (Windows uses backslashes)
+            normalized_path = self.template_path.replace("\\", "/")
+
+            # Check if path starts with src/osrsbot (from config)
+            if normalized_path.startswith("src/osrsbot/"):
+                # Strip src/osrsbot/ prefix and resolve from _MEIPASS
+                relative_path = normalized_path.replace("src/osrsbot/", "", 1)
+                template_path = Path(sys._MEIPASS) / "osrsbot" / relative_path
+                logger.debug(f"Resolved bundled template path: {template_path}")
 
         template = cv.imread(str(template_path), cv.IMREAD_GRAYSCALE)
 

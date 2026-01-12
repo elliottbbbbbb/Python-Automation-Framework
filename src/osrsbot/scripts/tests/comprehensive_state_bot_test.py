@@ -999,6 +999,9 @@ class ComprehensiveTestBot(StateMachineBot):
             StateResult.RETRY to continue testing
             StateResult.FAILURE if test fails
         """
+        # Check if user pressed 'q' to exit
+        self._check_exit_requested()
+
         logger.info(
             f"\n[TEST 10/10] COMBAT DETECTION (Kill {self._combat_click_count + 1}/{self._combat_target_clicks})"
         )

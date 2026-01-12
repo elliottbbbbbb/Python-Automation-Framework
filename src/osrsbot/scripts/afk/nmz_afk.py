@@ -492,6 +492,9 @@ class NMZAfkBot(StateMachineBot):
 
     # Loop for the duration of overload timer
         while True:
+            # Check if user pressed 'q' to exit
+            self._check_exit_requested()
+
             # ANTI-BAN: Check for zone-out (attention lapse)
             if self._anti_ban_call('should_zone_out', False, min_interval_minutes=10, chance_per_second=0.0005):
                 zone_duration = random.uniform(30, 90)

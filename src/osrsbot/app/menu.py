@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -38,10 +39,26 @@ def get_valid_int(prompt: str, default: int) -> int:
 
 
 def main() -> None:
+    # Determine log file location (next to .exe when frozen, or in cwd when dev)
+    if getattr(sys, "frozen", False):
+        log_dir = Path(sys.executable).parent
+    else:
+        log_dir = Path.cwd()
+
+    log_file = log_dir / "osrs_bot_debug.log"
+
+    # Configure logging with both console and file output
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stdout),  # Console output
+            logging.FileHandler(log_file, mode='w', encoding='utf-8')  # File output
+        ]
     )
+
+    logger.info(f"Debug log file: {log_file}")
+    logger.info(f"Running as .exe: {getattr(sys, 'frozen', False)}")
 
     # Validate license before showing menu
     from osrsbot.services.license_service import LicenseService
@@ -356,4 +373,20 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # Log the exception before the terminal closes
+        logger.critical("FATAL ERROR - Bot crashed", exc_info=True)
+
+        # Also print to console (in case file logging fails)
+        print("\n" + "="*60)
+        print("FATAL ERROR - Bot crashed!")
+        print("="*60)
+        print(f"Error: {e}")
+        print("\nCheck osrs_bot_debug.log for full details")
+        print("="*60)
+
+        # Keep the terminal open so user can see the error
+        input("\nPress Enter to exit...")
+        sys.exit(1)
