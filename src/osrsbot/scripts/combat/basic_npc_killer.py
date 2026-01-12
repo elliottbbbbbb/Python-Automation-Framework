@@ -350,9 +350,9 @@ class BasicNPCKiller(StateMachineBot):
         if self.actions.anti_ban:
             self.actions.anti_ban.record_action("attack_npc")
 
-        # Click NPC
+        # Click NPC using click_relative_coordinate (converts relative to absolute)
         logger.info(f"Clicking NPC at ({npc_x}, {npc_y})")
-        success = self.actions.mouse.click_at(npc_x, npc_y, move_style="curved")
+        success = self.actions.click_relative_coordinate((npc_x, npc_y), move_style="curved")
 
         if not success:
             logger.warning("Failed to click NPC")
