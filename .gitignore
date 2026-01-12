@@ -140,6 +140,17 @@ segmentation_debug/
 *.jpg
 *.jpeg
 
+# License system
+.license_cache
+**/\.license_cache
+license-server/app/routes/.license_cache
+licenses_export_*.json
+license_*.json
+
+# Debug logs (created by bot at runtime)
+osrs_bot_debug.log
+bot_debug.log
+
 # Debug and test scripts (temporary development files)
 analyze_coord_color.py
 debug_coordinate_region.py
