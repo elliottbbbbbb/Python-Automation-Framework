@@ -217,6 +217,7 @@ class CombatActions:
         enable_stuck_detection: bool = True,
         enable_blacklist: bool = True,
         region: Optional[Tuple[int, int, int, int]] = None,
+        restrict_to_viewport: bool = True,
     ) -> bool:
         """
         Click color with distance-based selection, stuck detection, and blacklisting.
@@ -231,7 +232,8 @@ class CombatActions:
             tolerance: Color tolerance
             enable_stuck_detection: Enable stuck detection
             enable_blacklist: Enable location blacklisting
-            region: Search region
+            region: Search region (if None and restrict_to_viewport=True, uses game viewport)
+            restrict_to_viewport: If True, restricts search to game viewport (excludes UI)
 
         Returns:
             True if clicked successfully
@@ -250,6 +252,12 @@ class CombatActions:
 
         if player_position is None:
             player_position = self.coords.get_player_position()
+
+        # Use game viewport region if no specific region provided and restrict_to_viewport is True
+        if region is None and restrict_to_viewport:
+            region = self.screen.get_game_viewport_region()
+            if region:
+                logger.debug(f"Restricting search to game viewport: {region}")
 
         blacklist_checker = None
         if enable_blacklist:
@@ -298,13 +306,18 @@ class CombatActions:
                 enable_stuck_detection=enable_stuck_detection,
                 enable_blacklist=True,
                 region=region,
+                restrict_to_viewport=restrict_to_viewport,
             )
+
+        # Use instant movement for combat clicks to minimize delay
+        # NPCs can move between detection and click, so speed matters
+        combat_move_style = "instant" if move_style == "curved" else move_style
 
         abs_x, abs_y = self.coords.to_absolute(best_match.x, best_match.y)
         success = self.mouse.click_at(
             abs_x,
             abs_y,
-            move_style=move_style,
+            move_style=combat_move_style,
             speed_multiplier=self.timing.get_mouse_speed_multiplier(),
         )
 

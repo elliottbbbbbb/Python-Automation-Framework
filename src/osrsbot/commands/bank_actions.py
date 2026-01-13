@@ -14,7 +14,7 @@ Command layer responsibilities:
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import pyautogui
 
@@ -106,31 +106,65 @@ class BankActions:
             return False
 
     def click_template(
-        self, template_path: str, item_name: str, threshold: float = 0.7
+        self, template_path: Union[str, List[str]], item_name: str, threshold: float = 0.7
     ) -> bool:
         """
         Find and click an item using template matching.
 
+        Supports both single template and multiple templates for better accuracy
+        across different zoom levels, camera angles, etc.
+
         Args:
-            template_path: Path to template image
+            template_path: Path to template image (str) OR list of paths (List[str])
+                          Single: "images/bot/items/overload.png"
+                          Multiple: ["custom:overload_zoom1.png", "custom:overload_zoom2.png"]
             item_name: Name of item for logging
             threshold: Match confidence threshold (0.0-1.0)
 
         Returns:
             True if item found and clicked, False otherwise
+
+        Examples:
+            # Single template (fast, simple)
+            click_template("images/bot/items/potion.png", "potion")
+
+            # Multiple templates (better accuracy, slightly slower)
+            click_template([
+                "custom:potion_zoom1.png",
+                "custom:potion_zoom2.png",
+                "custom:potion_zoom3.png"
+            ], "potion")
         """
-        # Query layer: find item
-        result = self.bank_queries.find_template(template_path, threshold)
+        # Handle both single path (str) and multiple paths (list)
+        if isinstance(template_path, str):
+            # Single template - use find_template
+            result = self.bank_queries.find_template(template_path, threshold)
 
-        if result is None:
-            logger.warning(f"{item_name} not found (threshold: {threshold})")
+            if result is None:
+                logger.warning(f"{item_name} not found (threshold: {threshold})")
+                return False
+
+            center_x, center_y, confidence = result
+            template_name = template_path
+
+        elif isinstance(template_path, list):
+            # Multiple templates - use find_multi_template
+            result = self.bank_queries.find_multi_template(template_path, threshold)
+
+            if result is None:
+                logger.warning(f"{item_name} not found with any template (threshold: {threshold})")
+                return False
+
+            center_x, center_y, confidence, template_name = result
+
+        else:
+            logger.error(f"Invalid template_path type: {type(template_path)}")
             return False
-
-        center_x, center_y, confidence = result
 
         logger.info(
             f"Found {item_name} at ({center_x}, {center_y}) "
             f"with confidence {confidence:.3f}"
+            + (f" (template: {template_name})" if isinstance(template_path, list) else "")
         )
 
         # Command layer: click item

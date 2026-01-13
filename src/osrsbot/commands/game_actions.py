@@ -208,6 +208,7 @@ class GameActions:
         enable_stuck_detection: bool = True,
         enable_blacklist: bool = True,
         region: Optional[Tuple[int, int, int, int]] = None,
+        restrict_to_viewport: bool = True,
     ) -> bool:
         """Click color with smart targeting."""
         return self.combat.click_color_smart(
@@ -218,6 +219,7 @@ class GameActions:
             enable_stuck_detection,
             enable_blacklist,
             region,
+            restrict_to_viewport,
         )
 
     def reset_click_tracking(self) -> None:
@@ -488,9 +490,16 @@ class GameActions:
         return self.bank.click_banker(banker_templates, threshold)
 
     def click_template(
-        self, template_path: str, item_name: str, threshold: float = 0.7
+        self, template_path, item_name: str, threshold: float = 0.7
     ) -> bool:
-        """Find and click template (delegates to BankActions)."""
+        """
+        Find and click template (delegates to BankActions).
+
+        Args:
+            template_path: Single path (str) or multiple paths (List[str])
+            item_name: Name for logging
+            threshold: Match confidence (0.0-1.0)
+        """
         return self.bank.click_template(template_path, item_name, threshold)
 
     def bank_search_and_withdraw(

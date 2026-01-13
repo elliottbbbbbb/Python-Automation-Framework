@@ -196,6 +196,9 @@ src/osrsbot/models/*.pt
 src/osrsbot/models/*.h5
 !src/osrsbot/models/.gitkeep
 
+# User custom images (created next to .exe for end users)
+user_images/
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -81,6 +81,152 @@ class ScreenService:
             return (width, height)
         return None
 
+    def get_game_viewport_region(self) -> Optional[Tuple[int, int, int, int]]:
+        """
+        Get the game viewport region (3D game area only, excluding UI elements).
+
+        Returns a region tuple (x, y, width, height) that covers only the
+        viewable 3D game area, excluding the right-side UI (minimap, inventory, etc.).
+
+        This is useful for restricting NPC/loot detection to avoid clicking
+        on UI elements like the minimap.
+
+        Returns:
+            (x, y, width, height) tuple or None if window unavailable
+
+        Example:
+            >>> region = screen_service.get_game_viewport_region()
+            >>> if region:
+            >>>     # Search only in game viewport
+            >>>     match = screen_service.find_color("#00FFFF", region=region)
+        """
+        from osrsbot.constants import GAME_VIEWPORT
+
+        bounds = self._get_bounds()
+        if not bounds:
+            return None
+
+        _, _, window_width, window_height = bounds
+
+        # Calculate viewport dimensions (3D game area only)
+        viewport_width = int(window_width * GAME_VIEWPORT.viewport_width_fraction)
+        viewport_height = int(window_height * GAME_VIEWPORT.viewport_height_fraction)
+
+        # Viewport starts at (0, 0) relative to window
+        return (0, 0, viewport_width, viewport_height)
+
+    def debug_show_viewport(self, duration: int = 5) -> None:
+        """
+        Display the viewport region visually with a colored overlay.
+
+        Shows the game viewport region by capturing a screenshot and drawing
+        a semi-transparent overlay on the excluded UI area (right side).
+
+        Args:
+            duration: How long to display the debug image (seconds)
+
+        Example:
+            >>> screen_service.debug_show_viewport(duration=10)
+        """
+        try:
+            import cv2 as cv
+            import numpy as np
+
+            region = self.get_game_viewport_region()
+            if not region:
+                logger.error("Cannot show viewport: window bounds not available")
+                return
+
+            bounds = self._get_bounds()
+            if not bounds:
+                return
+
+            left, top, window_width, window_height = bounds
+            viewport_x, viewport_y, viewport_width, viewport_height = region
+
+            # Capture full window screenshot
+            screenshot = self.capture(region=None)
+            img = np.array(screenshot)
+            img_bgr = cv.cvtColor(img, cv.COLOR_RGB2BGR)
+
+            # Draw viewport boundary (green line)
+            cv.line(
+                img_bgr,
+                (viewport_width, 0),
+                (viewport_width, window_height),
+                (0, 255, 0),  # Green
+                3,  # Thickness
+            )
+
+            # Create semi-transparent red overlay for excluded UI area
+            overlay = img_bgr.copy()
+            cv.rectangle(
+                overlay,
+                (viewport_width, 0),
+                (window_width, window_height),
+                (0, 0, 255),  # Red (BGR)
+                -1,  # Fill
+            )
+
+            # Blend overlay with original
+            alpha = 0.3  # Transparency
+            cv.addWeighted(overlay, alpha, img_bgr, 1 - alpha, 0, img_bgr)
+
+            # Add text labels
+            font = cv.FONT_HERSHEY_SIMPLEX
+            cv.putText(
+                img_bgr,
+                "GAME VIEWPORT",
+                (10, 30),
+                font,
+                0.8,
+                (0, 255, 0),  # Green
+                2,
+            )
+            cv.putText(
+                img_bgr,
+                f"(Search Area: {viewport_width}x{viewport_height})",
+                (10, 60),
+                font,
+                0.6,
+                (0, 255, 0),
+                1,
+            )
+            cv.putText(
+                img_bgr,
+                "UI EXCLUDED",
+                (viewport_width + 10, 30),
+                font,
+                0.8,
+                (0, 0, 255),  # Red
+                2,
+            )
+            cv.putText(
+                img_bgr,
+                "(No NPC Search)",
+                (viewport_width + 10, 60),
+                font,
+                0.6,
+                (0, 0, 255),
+                1,
+            )
+
+            # Show the image
+            window_name = "Viewport Debug - Press any key to close"
+            cv.imshow(window_name, img_bgr)
+            cv.waitKey(duration * 1000)  # Wait for specified duration in ms
+            cv.destroyWindow(window_name)
+
+            logger.info(
+                f"Viewport region displayed: {viewport_width}x{viewport_height} "
+                f"(excluded UI: {window_width - viewport_width}px wide)"
+            )
+
+        except ImportError:
+            logger.error("OpenCV (cv2) not available for viewport visualization")
+        except Exception as e:
+            logger.error(f"Failed to show viewport debug: {e}", exc_info=True)
+
     def relative_to_absolute(self, x: int, y: int) -> Tuple[int, int]:
         """
         Convert coordinates relative to window to absolute screen coordinates.
@@ -227,9 +373,12 @@ class ScreenService:
         tolerance: int = COLOR_DETECTION.default_tolerance,
         region: Optional[Tuple[int, int, int, int]] = None,
         blacklist_checker: Optional[Any] = None,
+        max_samples: Optional[int] = None,
     ) -> List[Tuple[ColorMatch, float]]:
         """
-        Find all color matches sorted by distance from reference point.
+        Find color matches sorted by distance from reference point.
+
+        Uses stride-based sampling for speed - checks every Nth pixel instead of all.
 
         Args:
             hex_color: Target color as hex string
@@ -237,40 +386,93 @@ class ScreenService:
             tolerance: Color matching tolerance
             region: Optional search region (x, y, width, height)
             blacklist_checker: Optional callable(x, y) -> bool to filter blacklisted
+            max_samples: Max pixels to sample (ignored, uses stride-based sampling)
 
         Returns:
             List of (ColorMatch, distance) tuples, sorted by distance (closest first)
         """
-        # Find all color matches
-        matches = self.find_color(
-            hex_color=hex_color, tolerance=tolerance, region=region, find_all=True
-        )
+        target = hex_to_rgb(hex_color)
 
-        if not matches or not isinstance(matches, list):
+        try:
+            screenshot = self.capture(region=region)
+            img_array = np.array(screenshot)
+
+            # Calculate region offset for coordinate correction
+            region_offset_x = region[0] if region else 0
+            region_offset_y = region[1] if region else 0
+
+            height, width = img_array.shape[:2]
+
+            # Stride-based sampling: check every 5th pixel (still finds objects reliably)
+            stride = 5
+
+            # Vectorized color matching with stride
+            r_match = np.abs(img_array[::stride, ::stride, 0].astype(int) - target[0]) <= tolerance
+            g_match = np.abs(img_array[::stride, ::stride, 1].astype(int) - target[1]) <= tolerance
+            b_match = np.abs(img_array[::stride, ::stride, 2].astype(int) - target[2]) <= tolerance
+
+            # Combine RGB matches
+            color_mask = r_match & g_match & b_match
+
+            # Get coordinates of matching pixels (scaled by stride)
+            y_coords, x_coords = np.where(color_mask)
+
+            # Scale back to original coordinates
+            x_coords = x_coords * stride
+            y_coords = y_coords * stride
+
+            if len(x_coords) == 0:
+                return []
+
+            # Randomly sample if too many matches
+            if len(x_coords) > 200:
+                import random
+                indices = random.sample(range(len(x_coords)), 200)
+                x_coords = x_coords[indices]
+                y_coords = y_coords[indices]
+
+            logger.debug(f"Stride sampled {len(x_coords)} matching pixels")
+
+            # Calculate distance and filter blacklisted
+            matches_with_distance: List[Tuple[ColorMatch, float]] = []
+            ref_x, ref_y = reference_point
+
+            for x_coord, y_coord in zip(x_coords, y_coords):
+                x, y = int(x_coord), int(y_coord)
+
+                # Apply offset
+                x_abs = x + region_offset_x
+                y_abs = y + region_offset_y
+
+                # Filter out blacklisted locations if checker provided
+                if blacklist_checker and blacklist_checker(x_abs, y_abs):
+                    continue
+
+                # Calculate Euclidean distance from reference point
+                distance = ((x_abs - ref_x) ** 2 + (y_abs - ref_y) ** 2) ** 0.5
+
+                pixel_rgb = tuple(img_array[y, x, :3].tolist())
+                match = ColorMatch(
+                    x=x_abs,
+                    y=y_abs,
+                    confidence=self._color_similarity(pixel_rgb, target),
+                    color=pixel_rgb,  # type: ignore
+                )
+                matches_with_distance.append((match, distance))
+
+            # Sort by distance (ascending - closest first)
+            matches_with_distance.sort(key=lambda item: item[1])
+
+            logger.debug(
+                f"Found {len(matches_with_distance)} valid targets "
+                f"sorted by distance from ({ref_x}, {ref_y})"
+            )
+
+            return matches_with_distance
+
+        except Exception:
+            logger.exception("find_color_with_distance failed")
             return []
-
-        # Calculate distance from reference point for each match
-        matches_with_distance: List[Tuple[ColorMatch, float]] = []
-        ref_x, ref_y = reference_point
-
-        for match in matches:
-            # Filter out blacklisted locations if checker provided
-            if blacklist_checker and blacklist_checker(match.x, match.y):
-                continue
-
-            # Calculate Euclidean distance from reference point
-            distance = ((match.x - ref_x) ** 2 + (match.y - ref_y) ** 2) ** 0.5
-            matches_with_distance.append((match, distance))
-
-        # Sort by distance (ascending - closest first)
-        matches_with_distance.sort(key=lambda item: item[1])
-
-        logger.debug(
-            f"Found {len(matches_with_distance)} color matches "
-            f"sorted by distance from ({ref_x}, {ref_y})"
-        )
-
-        return matches_with_distance
 
     def get_pixel_color(
         self, x: int, y: int, relative: bool = True

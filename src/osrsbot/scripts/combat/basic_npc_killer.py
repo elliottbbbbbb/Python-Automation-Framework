@@ -22,6 +22,7 @@ import logging
 import random
 from enum import Enum
 from typing import Dict, List
+from time import sleep, time
 
 from osrsbot.core.state_helpers import build_metadata_dict
 from osrsbot.core.state_machine_bot import StateMachineBot
@@ -39,7 +40,6 @@ class NPCKillerStates(Enum):
     """States for basic NPC killer bot."""
 
     IDLE = "idle"
-    FIND_TARGET = "find_target"
     ATTACK = "attack"
     COMBAT = "combat"
     LOOT = "loot"
@@ -85,6 +85,7 @@ class BasicNPCKiller(StateMachineBot):
         # NPC detection configuration
         self.npc_detection_method = npc_detection_method
         self.npc_template = npc_template
+        self._npc_clicked = False
 
         # Get NPC color from parameter or config
         self.npc_color = npc_color or self.config.get(
@@ -120,13 +121,11 @@ class BasicNPCKiller(StateMachineBot):
         """Define state transitions."""
         return [
             # Normal flow
-            StateTransition(NPCKillerStates.IDLE, NPCKillerStates.FIND_TARGET),
-            StateTransition(NPCKillerStates.FIND_TARGET, NPCKillerStates.ATTACK),
+            StateTransition(NPCKillerStates.IDLE, NPCKillerStates.ATTACK),
             StateTransition(NPCKillerStates.ATTACK, NPCKillerStates.COMBAT),
             StateTransition(NPCKillerStates.COMBAT, NPCKillerStates.LOOT),
-            StateTransition(NPCKillerStates.LOOT, NPCKillerStates.FIND_TARGET),
+            StateTransition(NPCKillerStates.LOOT, NPCKillerStates.ATTACK),
             # Completion
-            StateTransition(NPCKillerStates.FIND_TARGET, NPCKillerStates.COMPLETE),
             StateTransition(NPCKillerStates.LOOT, NPCKillerStates.COMPLETE),
         ]
 
@@ -139,30 +138,28 @@ class BasicNPCKiller(StateMachineBot):
                     "name": "Idle",
                     "description": "Initial checks",
                     "max_retries": 1,
-                },
-                NPCKillerStates.FIND_TARGET: {
-                    "name": "Find Target",
-                    "description": "Search for NPC to attack",
-                    "max_retries": 5,
-                    "timeout": 30.0,
+                    "failover": NPCKillerStates.ATTACK,  # If idle fails, try attacking anyway
                 },
                 NPCKillerStates.ATTACK: {
                     "name": "Attack",
                     "description": "Click NPC to attack",
-                    "max_retries": 3,
-                    "timeout": 10.0,
+                    "max_retries": 25,  # Increased retries for finding NPCs
+                    "timeout": 105.0,
+                    "failover": NPCKillerStates.ATTACK,  # Keep retrying attacks if NPCs not found
                 },
                 NPCKillerStates.COMBAT: {
                     "name": "Combat",
                     "description": "Wait for combat to finish",
                     "max_retries": 1,
                     "timeout": 60.0,
+                    "failover": NPCKillerStates.ATTACK,  # If combat fails/times out, try new attack
                 },
                 NPCKillerStates.LOOT: {
                     "name": "Loot",
                     "description": "Pick up loot",
                     "max_retries": 2,
                     "timeout": 15.0,
+                    "failover": NPCKillerStates.ATTACK,  # If looting fails, go back to attacking
                 },
                 NPCKillerStates.COMPLETE: {
                     "name": "Complete",
@@ -197,285 +194,72 @@ class BasicNPCKiller(StateMachineBot):
             # Conservative: assume full if check fails
             return True
 
-    def _find_npc(self) -> tuple:
-        """
-        Find nearest NPC using configured detection method.
-
-        Uses either color detection or template matching based on
-        npc_detection_method setting.
-
-        Returns:
-            (x, y) coordinates of NPC, or None if not found
-        """
-        if self.npc_detection_method == "color":
-            return self._find_npc_by_color()
-        elif self.npc_detection_method == "template":
-            return self._find_npc_by_template()
-        else:
-            logger.error(f"Unknown detection method: {self.npc_detection_method}")
-            return None
-
-    def _find_npc_by_color(self) -> tuple:
-        """
-        Find NPC using color detection (RuneLite highlighting).
-
-        Returns:
-            (x, y) coordinates of NPC, or None if not found
-        """
-        try:
-            # Find all NPCs with target color
-            npc_match = self.actions.screen.find_color(
-                self.npc_color,
-                tolerance=15,  # Allow some color variance
-                find_all=False,  # Just find first one
-            )
-
-            if npc_match:
-                logger.debug(
-                    f"[COLOR] Found NPC at ({npc_match.x}, {npc_match.y}), "
-                    f"confidence={npc_match.confidence:.2f}"
-                )
-                return (npc_match.x, npc_match.y)
-
-            logger.debug("[COLOR] No NPC found on screen")
-            return None
-
-        except Exception as e:
-            logger.error(f"[COLOR] Failed to find NPC: {e}", exc_info=True)
-            return None
-
-    def _find_npc_by_template(self) -> tuple:
-        """
-        Find NPC using template matching.
-
-        Returns:
-            (x, y) coordinates of NPC center, or None if not found
-        """
-        try:
-            # Use template matching service
-            result = self.actions.template_service.find_template(
-                template_path=self.npc_template,
-                threshold=0.7,  # 70% confidence
-            )
-
-            if result:
-                # Calculate center of template match
-                center_x = result.x + result.width // 2
-                center_y = result.y + result.height // 2
-
-                logger.debug(
-                    f"[TEMPLATE] Found NPC at ({center_x}, {center_y}), "
-                    f"confidence={result.confidence:.2f}"
-                )
-                return (center_x, center_y)
-
-            logger.debug("[TEMPLATE] No NPC found on screen")
-            return None
-
-        except Exception as e:
-            logger.error(f"[TEMPLATE] Failed to find NPC: {e}", exc_info=True)
-            return None
-
-    def _is_in_combat(self) -> bool:
-        """
-        Check if player is in combat.
-
-        Returns:
-            True if in combat
-        """
-        try:
-            return self.state.in_combat()
-        except Exception as e:
-            logger.debug(f"Combat check failed: {e}")
-            return False
-
-    # ==================== State Handlers ====================
-
     def _handle_idle(self, context: StateExecutionContext) -> StateResult:
-        """IDLE state - initial checks."""
-        self._check_exit_requested()
-        self._update_ui("IDLE", "Starting NPC killer...")
+        """
+        Initial state for setup and checks.
 
-        self._run_count += 1
-        logger.info(
-            f"Bot started (run {self._run_count}): "
-            f"Kills: {self._kills}, Loots: {self._loots_picked}"
-        )
-
-        # Check if inventory already full
-        if self._check_inventory_full():
-            logger.info("Inventory already full, completing")
-            return StateResult.SUCCESS  # Will transition to COMPLETE via manual override
+        Can be used to show debug viewport on first run.
+        """
+        # Uncomment to see viewport debug visualization:
+        # self.screen.debug_show_viewport(duration=5)
 
         return StateResult.SUCCESS
 
-    def _handle_find_target(self, context: StateExecutionContext) -> StateResult:
-        """FIND_TARGET state - search for NPC."""
-        self._check_exit_requested()
-        self._update_ui("FIND_TARGET", f"Looking for NPC (kills: {self._kills})...")
-
-        # Check inventory first
-        if self._check_inventory_full():
-            logger.info("Inventory full, stopping bot")
-            # Manually transition to COMPLETE
-            self._current_state = NPCKillerStates.COMPLETE
-            return StateResult.SUCCESS
-
-        # Find NPC
-        npc_pos = self._find_npc()
-
-        if not npc_pos:
-            logger.debug("No NPC found, retrying...")
-            self.actions.wait("short")
-            return StateResult.RETRY
-
-        # Store NPC position for attack state
-        self._target_pos = npc_pos
-        logger.info(f"Found NPC at {npc_pos}")
-        return StateResult.SUCCESS
-
+    
     def _handle_attack(self, context: StateExecutionContext) -> StateResult:
-        """ATTACK state - click NPC to attack."""
-        self._check_exit_requested()
-        self._update_ui("ATTACK", f"Attacking NPC (kills: {self._kills})...")
+        """
+        Attack NPC and verify combat engagement.
 
-        # Get stored target position
-        if not hasattr(self, "_target_pos") or not self._target_pos:
-            logger.error("No target position stored")
+        Clicks NPC once, polls for combat start with early exit.
+        If combat doesn't start within timeout, returns FAILURE to retry.
+        """
+        # First attempt - click the NPC
+        if not self.actions.click_color_smart(color_name="blue_outline"):
+            logger.warning("No NPC found to attack")
             return StateResult.FAILURE
 
-        npc_x, npc_y = self._target_pos
+        logger.info("Clicked NPC, checking for combat engagement...")
 
-        # Record action for anti-ban
-        if self.actions.anti_ban:
-            self.actions.anti_ban.record_action("attack_npc")
+        # Poll for combat start with early exit (max 2 seconds, check every 0.3s)
+        max_wait = 4
+        check_interval = 0.3
+        elapsed = 0.0
 
-        # Convert relative coordinates to absolute screen coordinates
-        abs_x, abs_y = self.actions._to_absolute(npc_x, npc_y)
-        logger.info(f"Clicking NPC at relative ({npc_x}, {npc_y}) -> absolute ({abs_x}, {abs_y})")
-        success = self.actions.mouse.click_at(abs_x, abs_y, move_style="curved")
-
-        if not success:
-            logger.warning("Failed to click NPC")
-            return StateResult.RETRY
-
-        # Wait for attack to register
-        self.actions.wait("medium")
-
-        # Verify we're in combat
-        if not self._is_in_combat():
-            logger.warning("Not in combat after clicking NPC, retrying")
-            return StateResult.RETRY
-
-        logger.info("Attack successful, entering combat")
-        return StateResult.SUCCESS
-
-    def _handle_combat(self, context: StateExecutionContext) -> StateResult:
-        """COMBAT state - wait for combat to finish."""
-        self._check_exit_requested()
-        self._update_ui("COMBAT", f"Fighting NPC (kills: {self._kills})...")
-
-        # Wait while in combat
-        import time
-
-        max_combat_time = 60  # Max 60 seconds per kill
-        start_time = time.time()
-
-        while self._is_in_combat():
-            # Check exit request
-            self._check_exit_requested()
-
-            # Check timeout
-            if time.time() - start_time > max_combat_time:
-                logger.warning("Combat timeout, moving to loot phase")
-                break
-
-            # Update UI periodically
-            elapsed = int(time.time() - start_time)
-            self._update_ui("COMBAT", f"Fighting... ({elapsed}s, kills: {self._kills})")
-
-            # Wait a bit
-            self.actions.wait("medium")
-
-            # Occasionally check HP (if available)
-            if random.random() < 0.1:  # 10% chance
-                try:
-                    hp = self.state.get_hp()
-                    if hp and hp < 20:
-                        logger.warning(f"Low HP detected: {hp}")
-                        # Could add eating logic here
-                except:
-                    pass
-
-        # Combat finished
-        self._kills += 1
-        logger.info(f"Combat finished! Total kills: {self._kills}")
-
-        # Wait for loot to appear
-        self.actions.wait("long")
-
-        return StateResult.SUCCESS
-
-    def _handle_loot(self, context: StateExecutionContext) -> StateResult:
-        """LOOT state - pick up loot."""
-        self._check_exit_requested()
-        self._update_ui(
-            "LOOT", f"Looting... (kills: {self._kills}, loots: {self._loots_picked})"
-        )
-
-        # Try to pick up loot multiple times
-        max_loot_attempts = 5
-        loots_this_kill = 0
-
-        for attempt in range(max_loot_attempts):
-            # Check if inventory full
-            if self._check_inventory_full():
-                logger.info("Inventory full during looting, stopping")
-                self._current_state = NPCKillerStates.COMPLETE
+        while elapsed < max_wait:
+            if self.state.in_combat():
+                logger.info(f"Combat started after {elapsed:.1f}s")
+                self.actions.wait("small")
                 return StateResult.SUCCESS
 
-            # Record action for anti-ban
-            if self.actions.anti_ban:
-                self.actions.anti_ban.record_action("pickup_loot")
+            sleep(check_interval)
+            elapsed += check_interval
 
-            # Try to pick up loot
-            loot_found = self.actions.pickup_loot(tolerance=30)
+        # Combat didn't start within timeout
+        logger.warning(f"Combat didn't start after {max_wait}s - NPC may be inaccessible")
+        return StateResult.FAILURE
+        
+    def _handle_combat(self, context: StateExecutionContext) -> StateResult:
+        """
+        Wait for combat to finish.
 
-            if not loot_found:
-                # No more loot
-                logger.debug(f"No loot found (attempt {attempt + 1}/{max_loot_attempts})")
-                break
+        Polls combat state efficiently with sleep intervals to avoid CPU waste.
+        """
+        logger.debug("Waiting for combat to finish...")
 
-            # Picked up loot
-            loots_this_kill += 1
-            self._loots_picked += 1
-            logger.info(f"Picked up loot! Total loots: {self._loots_picked}")
+        while self.state.in_combat():
+            sleep(0.6)  # Check every game tick (0.6s)
 
-            # Wait between loot pickups
-            self.actions.wait("short")
+        logger.info("Combat finished")
 
-        if loots_this_kill > 0:
-            logger.info(f"Looted {loots_this_kill} items this kill")
-        else:
-            logger.info("No loot found this kill")
-
-        # Check inventory one more time before next kill
-        if self._check_inventory_full():
-            logger.info("Inventory full after looting, completing")
-            self._current_state = NPCKillerStates.COMPLETE
-            return StateResult.SUCCESS
+        # Small delay to let loot appear before transitioning to loot state
+        sleep(0.1)
 
         return StateResult.SUCCESS
 
+        
+    def _handle_loot(self, context: StateExecutionContext) -> StateResult:
+        return StateResult.SUCCESS
+        
     def _handle_complete(self, context: StateExecutionContext) -> StateResult:
-        """COMPLETE state - bot finished."""
-        self._update_ui(
-            "COMPLETE",
-            f"Finished! Kills: {self._kills}, Loots: {self._loots_picked}",
-        )
-
-        logger.info(
-            f"Bot completed! Total kills: {self._kills}, Total loots: {self._loots_picked}"
-        )
-
+        logger.info("Bot run complete")
         return StateResult.SUCCESS

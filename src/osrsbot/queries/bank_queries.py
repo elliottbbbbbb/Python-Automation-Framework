@@ -28,32 +28,72 @@ logger = logging.getLogger(__name__)
 
 def _resolve_template_path(template_path: str) -> Path:
     """
-    Resolve template path for .exe environment.
+    Resolve template path for both development and .exe environments.
 
-    When running as .exe, converts relative paths like 'src/osrsbot/images/...'
-    to absolute paths inside the bundled _MEIPASS directory.
+    Supports three path formats:
+    1. Custom user images: 'custom:my_item.png' -> looks in user_images/ folder next to exe
+    2. Short bundled paths: 'images/bot/items/my_item.png' -> auto-prefixed with 'src/osrsbot/'
+    3. Full bundled paths: 'src/osrsbot/images/bot/items/my_item.png' -> used as-is
+
+    When running as .exe:
+    - 'custom:' paths resolve to './user_images/' folder (created if missing)
+    - Bundled paths resolve to _MEIPASS directory
 
     Args:
         template_path: Original template path (relative or absolute)
+                      Examples:
+                      - 'custom:my_custom_item.png' (user images folder)
+                      - 'images/bot/items/my_item.png' (auto-prefixed)
+                      - 'src/osrsbot/images/bot/items/my_item.png' (full path)
 
     Returns:
         Resolved Path object
     """
     resolved_path = Path(template_path)
 
-    # When running as .exe, resolve relative paths from the bundled location
-    if not resolved_path.is_absolute() and getattr(sys, "frozen", False):
-        # Normalize path to use forward slashes for comparison (Windows uses backslashes)
-        normalized_path = template_path.replace("\\", "/")
+    # Skip resolution if already an absolute path
+    if resolved_path.is_absolute():
+        return resolved_path
 
-        # Check if path starts with src/osrsbot (from config or hardcoded)
-        if normalized_path.startswith("src/osrsbot/"):
-            # Strip src/osrsbot/ prefix and resolve from _MEIPASS
-            relative_path = normalized_path.replace("src/osrsbot/", "", 1)
-            resolved_path = Path(sys._MEIPASS) / "osrsbot" / relative_path
-            logger.info(f"Resolved bundled template: {template_path} -> {resolved_path}")
+    # Normalize path to use forward slashes for comparison (Windows uses backslashes)
+    normalized_path = template_path.replace("\\", "/")
+
+    # Handle 'custom:' prefix for user images
+    if normalized_path.startswith("custom:"):
+        # Strip 'custom:' prefix
+        custom_filename = normalized_path.replace("custom:", "", 1)
+
+        # Determine user_images folder location
+        if getattr(sys, "frozen", False):
+            # .exe mode: user_images folder next to the .exe
+            exe_dir = Path(sys.executable).parent
+            user_images_dir = exe_dir / "user_images"
         else:
-            logger.warning(f"Path doesn't start with 'src/osrsbot/': {normalized_path}")
+            # Development mode: user_images folder in project root
+            project_root = Path(__file__).parent.parent.parent.parent
+            user_images_dir = project_root / "user_images"
+
+        # Create user_images folder if it doesn't exist
+        user_images_dir.mkdir(exist_ok=True)
+
+        resolved_path = user_images_dir / custom_filename
+        logger.info(f"Resolved custom template: {template_path} -> {resolved_path}")
+        return resolved_path
+
+    # Auto-add 'src/osrsbot/' prefix if missing
+    if not normalized_path.startswith("src/osrsbot/"):
+        normalized_path = f"src/osrsbot/{normalized_path}"
+        logger.debug(f"Auto-prefixed template path: {template_path} -> {normalized_path}")
+
+    # When running as .exe, resolve from bundled location
+    if getattr(sys, "frozen", False):
+        # Strip src/osrsbot/ prefix and resolve from _MEIPASS
+        relative_path = normalized_path.replace("src/osrsbot/", "", 1)
+        resolved_path = Path(sys._MEIPASS) / "osrsbot" / relative_path
+        logger.info(f"Resolved bundled template: {template_path} -> {resolved_path}")
+    else:
+        # Development mode: use the normalized path as-is
+        resolved_path = Path(normalized_path)
 
     return resolved_path
 
