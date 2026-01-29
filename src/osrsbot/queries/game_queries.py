@@ -19,7 +19,7 @@ Migration path:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 from osrsbot.models.config import Config
 
@@ -177,6 +177,72 @@ class GameState:
             "InventoryState not available - assuming inventory is full (conservative)"
         )
         return True
+
+    # --- Template Matching Queries (delegate to BankQueries) ---
+    def find_template(
+        self,
+        template_path: str,
+        threshold: float = 0.7,
+        region: Optional[Tuple[int, int, int, int]] = None,
+    ) -> Optional[Tuple[int, int, float]]:
+        """Find a template on screen.
+
+        Args:
+            template_path: Path to template image
+            threshold: Match confidence threshold (0.0-1.0)
+            region: Optional (x, y, width, height) to restrict search area
+
+        Returns:
+            Tuple of (center_x, center_y, confidence) if found, None otherwise
+        """
+        if self.bank_queries:
+            return self.bank_queries.find_template(template_path, threshold, region)
+        logger.warning("BankQueries not available for find_template")
+        return None
+
+    def find_multi_template(
+        self,
+        template_paths: List[str],
+        threshold: float = 0.7,
+        region: Optional[Tuple[int, int, int, int]] = None,
+    ) -> Optional[Tuple[int, int, float, str]]:
+        """Find best matching template from multiple options.
+
+        Args:
+            template_paths: List of paths to template images
+            threshold: Match confidence threshold (0.0-1.0)
+            region: Optional (x, y, width, height) to restrict search area
+
+        Returns:
+            Tuple of (center_x, center_y, confidence, template_name) if found, None otherwise
+        """
+        if self.bank_queries:
+            return self.bank_queries.find_multi_template(template_paths, threshold, region)
+        logger.warning("BankQueries not available for find_multi_template")
+        return None
+
+    # --- Screen Region Queries (delegate to ScreenService) ---
+    def get_game_viewport_region(self) -> Optional[Tuple[int, int, int, int]]:
+        """Get the game viewport region excluding UI elements.
+
+        Returns:
+            Tuple of (x, y, width, height) or None if unavailable
+        """
+        if self.screen:
+            return self.screen.get_game_viewport_region()
+        logger.warning("ScreenService not available for get_game_viewport_region")
+        return None
+
+    def get_inventory_region(self) -> Optional[Tuple[int, int, int, int]]:
+        """Get the inventory panel region.
+
+        Returns:
+            Tuple of (x, y, width, height) or None if unavailable
+        """
+        if self.screen:
+            return self.screen.get_inventory_region()
+        logger.warning("ScreenService not available for get_inventory_region")
+        return None
 
     # --- Debug methods (keep unchanged) ---
     def debug_hp_ocr(self, num_samples: int = 20) -> None:

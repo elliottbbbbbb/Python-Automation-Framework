@@ -31,7 +31,13 @@
     "mithril_rock": "#4682B4",
     "adamantite_rock": "#50C878",
     "runite_rock": "#00CED1",
-    "granite_rock": "#A9A9A9"
+    "granite_rock": "#A9A9A9",
+    "phials_npc_highlight": "#FFD700",
+    "dialogue_background": "#000000",
+    "red_cross_icon": "#FF0000",
+    "construction_skill_icon": "#8B4513",
+    "built_chair_color": "#654321",
+    "transparent_hotspot": "#808080"
   },
   "coordinates": {
     "inventory": {

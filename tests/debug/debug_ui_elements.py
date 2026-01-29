@@ -1,11 +1,11 @@
 """
 Debug UI Element Detection
 
-This script visualizes all detected UI elements with colored boxes overlaid on the game window.
+This script visualizes detected UI elements with colored boxes overlaid on the game window.
 It helps you see exactly what the bot is detecting and where clickable regions are.
 
 Features:
-- Colored boxes around all detected grids (green=inventory, red=spellbook, blue=prayer, etc.)
+- Colored boxes around all detected grids (green=inventory, red=spellbook, blue=prayer, purple=equipment)
 - Thin boxes around each individual grid slot
 - Colored dots showing center points for clicking
 - Labels showing element names and confidence scores
@@ -21,12 +21,11 @@ Controls:
     - Press 's' to toggle slot boxes
     - Press 'g' to toggle grid boxes
     - Press 'l' to toggle labels
+    - Press 'b' to toggle button boxes
     - Press '1' to toggle inventory grid
     - Press '2' to toggle spellbook grid
     - Press '3' to toggle prayer grid
     - Press '4' to toggle equipment grid
-    - Press '5' to toggle chat grid
-    - Press '6' to toggle minimap grid
     - Press 'a' to show all grids
     - Press 'n' to hide all grids
 """
@@ -88,9 +87,58 @@ def main():
         logger.info("Initializing template matching service...")
         template_service = TemplateMatchService()
 
-        # Register templates from config
-        logger.info("Registering templates from config...")
-        template_service.register_from_config(config)
+        # Register all UI grids manually (using inventory_empty.PNG for all)
+        logger.info("Registering UI grids...")
+
+        # Inventory grid (7x4 = 28 slots)
+        template_service.register_grid(
+            name="inventory",
+            template_path="src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+            num_rows=7,
+            num_cols=4,
+            threshold=0.30,
+            sticky=True,
+            padding=0,
+            border_offset=20
+        )
+
+        # Equipment grid (7x2 = 14 slots)
+        template_service.register_grid(
+            name="equipment",
+            template_path="src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+            num_rows=7,
+            num_cols=2,
+            threshold=0.30,
+            sticky=True,
+            padding=0,
+            border_offset=13
+        )
+
+        # Prayer grid (6x5 = 30 prayers)
+        template_service.register_grid(
+            name="prayer",
+            template_path="src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+            num_rows=6,
+            num_cols=5,
+            threshold=0.30,
+            sticky=True,
+            padding=0,
+            border_offset=13
+        )
+
+        # Spellbook grid (10x7 = 70 spells)
+        template_service.register_grid(
+            name="spellbook",
+            template_path="src/osrsbot/images/bot/ui_templates/inventory_empty.PNG",
+            num_rows=10,
+            num_cols=7,
+            threshold=0.30,
+            sticky=True,
+            padding=2,
+            border_offset=15,
+            border_offset_x=22,
+            border_offset_y=12
+        )
 
         # Initialize UI manager
         logger.info("Initializing UI manager...")
@@ -119,9 +167,7 @@ def main():
             "inventory": True,
             "spellbook": True,
             "prayer": True,
-            "equipment": True,
-            "chat": True,
-            "minimap": True
+            "equipment": True
         }
 
         # Main loop
@@ -213,7 +259,7 @@ def main():
 
                 print("\nPress 'q' to refresh, ESC to exit")
                 print("Toggles: 's'=slots, 'g'=grids, 'b'=buttons, 'l'=labels")
-                print("Grids: '1'=inventory, '2'=spellbook, '3'=prayer, '4'=equipment, '5'=chat, '6'=minimap")
+                print("Grids: '1'=inventory, '2'=spellbook, '3'=prayer, '4'=equipment")
                 print("All grids: 'a'=show all, 'n'=hide all")
 
                 # Helper function to redraw and display
@@ -258,14 +304,6 @@ def main():
                     elif key == ord('4'):  # Toggle equipment
                         visible_grids["equipment"] = not visible_grids.get("equipment", True)
                         print(f"\nEquipment: {'ON' if visible_grids['equipment'] else 'OFF'}")
-                        redraw_display()
-                    elif key == ord('5'):  # Toggle chat
-                        visible_grids["chat"] = not visible_grids.get("chat", True)
-                        print(f"\nChat: {'ON' if visible_grids['chat'] else 'OFF'}")
-                        redraw_display()
-                    elif key == ord('6'):  # Toggle minimap
-                        visible_grids["minimap"] = not visible_grids.get("minimap", True)
-                        print(f"\nMinimap: {'ON' if visible_grids['minimap'] else 'OFF'}")
                         redraw_display()
                     elif key == ord('a'):  # Show all grids
                         for grid_name in visible_grids.keys():

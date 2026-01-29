@@ -770,6 +770,46 @@ GAME_VIEWPORT = GameViewportConfig()
 
 
 # ============================================================================
+# INVENTORY REGION CONSTANTS
+# ============================================================================
+
+
+@dataclass
+class InventoryRegionConfig:
+    """
+    Configuration for inventory panel region.
+
+    Defines the inventory area for restricting item template searches.
+    Based on RuneLite fixed mode layout where inventory is on the right side.
+
+    IMPORTANT: These fractions are based on FULL WINDOW dimensions,
+    which include the title bar (~30px) and borders (~4px).
+
+    Window dimensions: ~773 x 540 (includes decorations)
+    Game client area: 765 x 503
+
+    Inventory in game: x=548, y=206
+    Inventory in window: x=552, y=236 (adjusted for title bar/borders)
+    """
+
+    # Start X: (border + game_x) / window_width = (4 + 548) / 773 ≈ 0.714
+    x_start_fraction: float = 0.71
+
+    # Start Y: (title_bar + game_y) / window_height = (30 + 206) / 540 ≈ 0.437
+    y_start_fraction: float = 0.44
+
+    # Width: ~216 / 773 ≈ 0.28
+    width_fraction: float = 0.28
+
+    # Height: ~230 / 540 ≈ 0.43 (extra padding for safety)
+    height_fraction: float = 0.45
+
+
+# Global inventory region configuration
+INVENTORY_REGION = InventoryRegionConfig()
+
+
+# ============================================================================
 # MINIMAP NAVIGATION CONSTANTS
 # ============================================================================
 

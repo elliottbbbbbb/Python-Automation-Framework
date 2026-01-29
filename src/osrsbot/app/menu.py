@@ -14,6 +14,7 @@ from osrsbot.scripts.bankstanding.bankstanding_flax import GrimyFlaxBot
 from osrsbot.scripts.afk.nmz_afk import NMZAfkBot
 from osrsbot.scripts.bosses.zulrah import ZulrahBot
 from osrsbot.scripts.combat.basic_npc_killer import BasicNPCKiller
+from osrsbot.scripts.skills.construction_training import ConstructionTrainingBot
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,7 @@ def main() -> None:
         print("6. NMZ AFK Bot (1 HP Absorption Strategy)")
         print("7. Zulrah Boss Bot (Color-Coded Tile Marker Strategy)")
         print("8. Basic NPC Killer (Combat + Looting)")
+        print("9. Construction Skilling 1-40")
 
         choice = input("\nSelect: ").strip()
 
@@ -354,6 +356,45 @@ def main() -> None:
                 runner.run_script(BasicNPCKiller, runs=runs, bank_location="")
             except Exception as e:
                 logger.error(f"Basic NPC Killer failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "9":
+            logger.info("Starting Construction Training Bot")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                runs = get_valid_int("Number of cycles [default: 999]: ", default=999)
+
+                print("\n🏗️  Construction Training Bot (Chair Building)")
+                print("This bot will:")
+                print("  1. Teleport to house using scroll")
+                print("  2. Exit house to Rimmington")
+                print("  3. Exchange noted planks with Phials NPC (press 3)")
+                print("  4. Re-enter house")
+                print("  5. Build highest level chair available (rocking > wooden > crude)")
+                print("  6. Remove chair and repeat")
+                print("\nMake sure:")
+                print("  • House set to Rimmington")
+                print("  • Chair hotspot built in parlour")
+                print("  • RuneLite NPC Indicators: Phials highlighted (#FFD700)")
+                print("  • All template images created (see TEMPLATE_REQUIREMENTS.md)")
+                print("\nInventory Required:")
+                print("  • Teleport to house scrolls (10-50)")
+                print("  • Noted planks (100-1000)")
+                print("  • Iron nails (100-1000)")
+                print("  • Coins (10-100k for exchange fees)")
+                print("  • Hammer and Saw")
+                print("\n📝 Logs will be saved to: bot_debug.log")
+                print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
+                print("\n⚠️  IMPORTANT: Create template images before running!")
+                print("   See: src/osrsbot/images/bot/construction/TEMPLATE_REQUIREMENTS.md")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(ConstructionTrainingBot, runs=runs, bank_location="")
+            except Exception as e:
+                logger.error(f"Construction Training Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
                 sys.exit(1)
 

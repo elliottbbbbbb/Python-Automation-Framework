@@ -115,6 +115,41 @@ class ScreenService:
         # Viewport starts at (0, 0) relative to window
         return (0, 0, viewport_width, viewport_height)
 
+    def get_inventory_region(self) -> Optional[Tuple[int, int, int, int]]:
+        """
+        Get the inventory panel region.
+
+        Returns a region tuple (x, y, width, height) that covers the
+        inventory panel on the right side of the screen.
+
+        This is useful for restricting item template searches to avoid
+        false positives from game world objects.
+
+        Returns:
+            (x, y, width, height) tuple or None if window unavailable
+
+        Example:
+            >>> region = screen_service.get_inventory_region()
+            >>> if region:
+            >>>     # Search only in inventory region
+            >>>     match = find_template("item.png", region=region)
+        """
+        from osrsbot.constants import INVENTORY_REGION
+
+        bounds = self._get_bounds()
+        if not bounds:
+            return None
+
+        _, _, window_width, window_height = bounds
+
+        # Calculate inventory region based on fractions
+        inv_x = int(window_width * INVENTORY_REGION.x_start_fraction)
+        inv_y = int(window_height * INVENTORY_REGION.y_start_fraction)
+        inv_w = int(window_width * INVENTORY_REGION.width_fraction)
+        inv_h = int(window_height * INVENTORY_REGION.height_fraction)
+
+        return (inv_x, inv_y, inv_w, inv_h)
+
     def debug_show_viewport(self, duration: int = 5) -> None:
         """
         Display the viewport region visually with a colored overlay.

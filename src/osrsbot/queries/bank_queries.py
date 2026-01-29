@@ -157,7 +157,10 @@ class BankQueries:
             return False
 
     def find_template(
-        self, template_path: str, threshold: float = 0.7
+        self,
+        template_path: str,
+        threshold: float = 0.7,
+        region: Optional[Tuple[int, int, int, int]] = None
     ) -> Optional[Tuple[int, int, float]]:
         """
         Find a template on screen.
@@ -165,6 +168,7 @@ class BankQueries:
         Args:
             template_path: Path to template image
             threshold: Match confidence threshold (0.0-1.0)
+            region: Optional (x, y, width, height) to restrict search area
 
         Returns:
             Tuple of (center_x, center_y, confidence) if found, None otherwise
@@ -188,16 +192,38 @@ class BankQueries:
             # Convert PIL to numpy array (BGR for OpenCV)
             img_np = cv.cvtColor(np.array(screenshot), cv.COLOR_RGB2BGR)
 
+            # Apply region if specified (extract ROI before template matching)
+            offset_x, offset_y = 0, 0
+            if region:
+                rx, ry, rw, rh = region
+                # Ensure region is within image bounds
+                img_h, img_w = img_np.shape[:2]
+                rx = max(0, min(rx, img_w))
+                ry = max(0, min(ry, img_h))
+                rw = min(rw, img_w - rx)
+                rh = min(rh, img_h - ry)
+                img_np = img_np[ry:ry+rh, rx:rx+rw]
+                offset_x, offset_y = rx, ry
+
             # Perform template matching
             result = cv.matchTemplate(img_np, template, cv.TM_CCOEFF_NORMED)
             _, max_val, _, max_loc = cv.minMaxLoc(result)
+
+            # Always log the best confidence found for debugging
+            template_name = Path(template_path).name
+            logger.info(
+                f"Template match '{template_name}': "
+                f"best_confidence={max_val:.3f}, threshold={threshold}, "
+                f"region={region}"
+            )
 
             if max_val >= threshold:
                 # Calculate center of matched region
                 x, y = max_loc
                 h, w = template.shape[:2]
-                center_x = x + w // 2
-                center_y = y + h // 2
+                # Add offset back to get screen coordinates
+                center_x = offset_x + x + w // 2
+                center_y = offset_y + y + h // 2
 
                 logger.debug(
                     f"Found template at ({center_x}, {center_y}) "
@@ -213,7 +239,10 @@ class BankQueries:
             return None
 
     def find_multi_template(
-        self, template_paths: List[str], threshold: float = 0.7
+        self,
+        template_paths: List[str],
+        threshold: float = 0.7,
+        region: Optional[Tuple[int, int, int, int]] = None
     ) -> Optional[Tuple[int, int, float, str]]:
         """
         Find best matching template from multiple options.
@@ -223,6 +252,7 @@ class BankQueries:
         Args:
             template_paths: List of paths to template images
             threshold: Match confidence threshold (0.0-1.0)
+            region: Optional (x, y, width, height) to restrict search area
 
         Returns:
             Tuple of (center_x, center_y, confidence, template_name) if found, None otherwise
@@ -250,6 +280,19 @@ class BankQueries:
                 # Convert PIL to numpy array (BGR for OpenCV)
                 img_np = cv.cvtColor(np.array(screenshot), cv.COLOR_RGB2BGR)
 
+                # Apply region if specified (extract ROI before template matching)
+                offset_x, offset_y = 0, 0
+                if region:
+                    rx, ry, rw, rh = region
+                    # Ensure region is within image bounds
+                    img_h, img_w = img_np.shape[:2]
+                    rx = max(0, min(rx, img_w))
+                    ry = max(0, min(ry, img_h))
+                    rw = min(rw, img_w - rx)
+                    rh = min(rh, img_h - ry)
+                    img_np = img_np[ry:ry+rh, rx:rx+rw]
+                    offset_x, offset_y = rx, ry
+
                 # Perform template matching
                 result = cv.matchTemplate(img_np, template, cv.TM_CCOEFF_NORMED)
                 _, max_val, _, max_loc = cv.minMaxLoc(result)
@@ -260,11 +303,11 @@ class BankQueries:
                     best_match = max_loc
                     best_template_name = Path(template_path).name
 
-                    # Calculate center
+                    # Calculate center (add offset to get screen coordinates)
                     x, y = max_loc
                     h, w = template.shape[:2]
-                    center_x = x + w // 2
-                    center_y = y + h // 2
+                    center_x = offset_x + x + w // 2
+                    center_y = offset_y + y + h // 2
                     best_center = (center_x, center_y)
 
             except Exception as e:
