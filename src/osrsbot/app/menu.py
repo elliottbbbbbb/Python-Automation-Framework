@@ -144,6 +144,7 @@ def main() -> None:
         print("8. Basic NPC Killer (Combat + Looting)")
         print("9. Construction Skilling 1-40")
         print("10. Sand Crabs Combat (AFK Beach Training)")
+        print("11. Anti-AFK Relogin Test (Login Screen Detection)")
 
         choice = input("\nSelect: ").strip()
 
@@ -430,6 +431,54 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Sand Crabs Combat Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "11":
+            logger.info("Starting Anti-AFK Relogin Test")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+
+                print("\n🔄 Anti-AFK Relogin Test")
+                print("This test checks login screen detection and auto-relogin.")
+                print("\nModes:")
+                print("  1. Detection only (just reports current login state)")
+                print("  2. Full relogin (detects + clicks through login screens)")
+                print("\nMake sure:")
+                print("  • RuneLite is open (logged in or on a login screen)")
+                print("  • Template images exist in: src/osrsbot/images/bot/login/")
+                print("    - ok_button.png")
+                print("    - play_now_button.png")
+                print("    - click_to_play_button.png")
+
+                mode = input("\nSelect mode (1=detect, 2=relogin) [default: 1]: ").strip()
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+
+                from osrsbot.core.anti_afk import AntiAFK
+                anti_afk = AntiAFK(actions=runner.actions, screen=runner.screen)
+
+                # Always show current state
+                state = anti_afk.login_queries.get_login_state()
+                print(f"\nCurrent login state: {state}")
+                print(f"  Disconnected screen: {anti_afk.login_queries.is_disconnected()}")
+                print(f"  Login screen:        {anti_afk.login_queries.is_on_login_screen()}")
+                print(f"  Lobby screen:        {anti_afk.login_queries.is_on_lobby_screen()}")
+
+                if mode == "2":
+                    print("\nAttempting full relogin sequence...")
+                    result = anti_afk.check_and_relogin()
+                    if result:
+                        print("✅ Relogin successful!")
+                    else:
+                        print("ℹ️  No relogin needed (already logged in) or relogin failed.")
+                else:
+                    print("\nDetection-only mode complete.")
+
+            except Exception as e:
+                logger.error(f"Anti-AFK Relogin Test failed: {e}", exc_info=True)
+                print(f"❌ Test error: {e}")
                 sys.exit(1)
 
         else:

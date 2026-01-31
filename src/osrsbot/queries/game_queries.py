@@ -26,6 +26,7 @@ from osrsbot.models.config import Config
 # Import new focused modules
 from osrsbot.queries.bank_queries import BankQueries
 from osrsbot.queries.combat_queries import CombatQueries
+from osrsbot.queries.login_queries import LoginQueries
 from osrsbot.queries.stat_queries import StatQueries
 from osrsbot.services.template_ocr_service import TemplateOCRService
 
@@ -66,10 +67,12 @@ class GameState:
             )
             self.stat_queries = StatQueries(screen_service, ocr_service, config)
             self.bank_queries = BankQueries(screen_service)
+            self.login_queries = LoginQueries(screen_service)
         else:
             self.combat_queries = None
             self.stat_queries = None
             self.bank_queries = None
+            self.login_queries = None
             logger.warning(
                 "ScreenService not available - combat, stat, and bank queries unavailable"
             )
@@ -105,6 +108,13 @@ class GameState:
             return self.combat_queries.click_success(tries)
 
         logger.warning("CombatQueries not available")
+        return False
+
+    # --- Login Queries (delegate to LoginQueries) ---
+    def is_logged_out(self) -> bool:
+        """Check if player is logged out (any login screen visible)."""
+        if self.login_queries:
+            return self.login_queries.is_logged_out()
         return False
 
     # --- Stat Queries (delegate to StatQueries) ---
