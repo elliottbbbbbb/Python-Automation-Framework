@@ -202,6 +202,13 @@ class StateMachineBot(Bot):
                         mouse=self.actions.mouse, actions=self.actions
                     )
 
+            # Check for disconnect/logout before executing any state
+            if hasattr(self, "anti_afk") and self.anti_afk.check_and_relogin():
+                logger.info(
+                    f"Anti-AFK: Relogin completed before {self._current_state.name}, restarting state"
+                )
+                continue
+
             # Execute current state
             result = self._execute_state(self._current_state)
 
