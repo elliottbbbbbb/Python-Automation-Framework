@@ -750,19 +750,23 @@ INVENTORY = InventoryConfig()
 @dataclass
 class GameViewportConfig:
     """
-    Configuration for game viewport regions.
+    Configuration for the 3D game viewport region.
 
-    Defines the viewable game area (3D viewport) separate from UI elements.
-    Used to restrict NPC/loot detection to the playable area only.
+    OSRS fixed mode: 3D viewport is always 512 x 334 pixels.
+    Offsets position the viewport within the RuneLite window,
+    accounting for title bar, borders, and window shadow.
+
+    These values can be overridden via config.json "viewport" section.
     """
 
-    # Viewport region as a fraction of window width
-    # Standard OSRS fixed mode: ~70% of window width is 3D viewport
-    # Remaining 30% is right-side UI (minimap, inventory, etc.)
-    viewport_width_fraction: float = 0.70
+    # 3D game viewport dimensions (fixed for OSRS fixed mode)
+    viewport_width: int = 512
+    viewport_height: int = 334
 
-    # Full height of window is viewport (top to bottom)
-    viewport_height_fraction: float = 1.0
+    # Offset from window top-left to 3D viewport top-left
+    # Accounts for: RuneLite title bar, window borders/shadow
+    viewport_x_offset: int = 8
+    viewport_y_offset: int = 35
 
 
 # Global game viewport configuration

@@ -314,15 +314,15 @@ class BankQueries:
                 logger.warning(f"Error checking template {template_path}: {e}")
                 continue
 
+        # Log summary at INFO level (matches find_template's logging pattern)
+        logger.info(
+            f"Multi-template match: best='{best_template_name}' "
+            f"best_confidence={best_confidence:.3f}, threshold={threshold}, "
+            f"region={region}, templates_tried={len(template_paths)}"
+        )
+
         # Check if we found a match above threshold
         if best_match is not None and best_confidence >= threshold:
-            logger.debug(
-                f"Found best template '{best_template_name}' at {best_center} "
-                f"with confidence {best_confidence:.3f}"
-            )
             return (*best_center, best_confidence, best_template_name)
         else:
-            logger.debug(
-                f"No templates found (best confidence: {best_confidence:.3f} < {threshold})"
-            )
             return None

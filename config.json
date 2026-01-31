@@ -37,7 +37,11 @@
     "red_cross_icon": "#FF0000",
     "construction_skill_icon": "#8B4513",
     "built_chair_color": "#654321",
-    "transparent_hotspot": "#808080"
+    "transparent_hotspot": "#808080",
+    "sand_crab_afk_marker": "#04A5FF",
+    "sand_crab_npc_highlight": "#FF0000",
+    "sand_crab_path_pink": "#FF00D4",
+    "sand_crab_path_green": "#00FF00"
   },
   "coordinates": {
     "inventory": {
@@ -185,6 +189,12 @@
       0,
       0
     ]
+  },
+  "viewport": {
+    "x_offset": 8,
+    "y_offset": 35,
+    "width": 512,
+    "height": 334
   },
   "ocr": {
     "hp_ttl": 0.1,

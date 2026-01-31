@@ -15,6 +15,7 @@ from osrsbot.scripts.afk.nmz_afk import NMZAfkBot
 from osrsbot.scripts.bosses.zulrah import ZulrahBot
 from osrsbot.scripts.combat.basic_npc_killer import BasicNPCKiller
 from osrsbot.scripts.skills.construction_training import ConstructionTrainingBot
+from osrsbot.scripts.combat.sand_crabs_combat import SandCrabsCombatBot
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,7 @@ def main() -> None:
         print("7. Zulrah Boss Bot (Color-Coded Tile Marker Strategy)")
         print("8. Basic NPC Killer (Combat + Looting)")
         print("9. Construction Skilling 1-40")
+        print("10. Sand Crabs Combat (AFK Beach Training)")
 
         choice = input("\nSelect: ").strip()
 
@@ -395,6 +397,38 @@ def main() -> None:
                 runner.run_script(ConstructionTrainingBot, runs=runs, bank_location="")
             except Exception as e:
                 logger.error(f"Construction Training Bot failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "10":
+            logger.info("Starting Sand Crabs Combat Bot")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                runs = get_valid_int("Number of cycles [default: 999]: ", default=999)
+
+                print("\n🦀 Sand Crabs Combat Bot (AFK Beach Training)")
+                print("This bot will:")
+                print("  1. Find dormant sand crab shells (template matching)")
+                print("  2. Walk over shells to trigger crab spawn")
+                print("  3. Wait for aggro (combat indicator)")
+                print("  4. Walk to AFK tile marker spot")
+                print("  5. AFK fight until crabs die")
+                print("  6. Repeat")
+                print("\nMake sure:")
+                print("  • RuneLite tile marker placed at your AFK spot")
+                print("  • Sand crab shell template images in:")
+                print("    src/osrsbot/images/bot/combat/sand_crabs/")
+                print("  • config.json: colors.sand_crab_afk_marker set to tile marker color")
+                print("\n📝 Logs will be saved to: bot_debug.log")
+                print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
+                print("\n⚠️  Press 'q' at any time to stop the bot safely")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(SandCrabsCombatBot, runs=runs, bank_location="")
+            except Exception as e:
+                logger.error(f"Sand Crabs Combat Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
                 sys.exit(1)
 

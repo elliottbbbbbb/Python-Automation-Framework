@@ -108,12 +108,14 @@ class ScreenService:
 
         _, _, window_width, window_height = bounds
 
-        # Calculate viewport dimensions (3D game area only)
-        viewport_width = int(window_width * GAME_VIEWPORT.viewport_width_fraction)
-        viewport_height = int(window_height * GAME_VIEWPORT.viewport_height_fraction)
+        x_offset = GAME_VIEWPORT.viewport_x_offset
+        y_offset = GAME_VIEWPORT.viewport_y_offset
 
-        # Viewport starts at (0, 0) relative to window
-        return (0, 0, viewport_width, viewport_height)
+        # Use fixed OSRS dimensions, clamped to window bounds
+        vp_width = min(GAME_VIEWPORT.viewport_width, window_width - x_offset)
+        vp_height = min(GAME_VIEWPORT.viewport_height, window_height - y_offset)
+
+        return (x_offset, y_offset, vp_width, vp_height)
 
     def get_inventory_region(self) -> Optional[Tuple[int, int, int, int]]:
         """
