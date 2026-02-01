@@ -1125,13 +1125,14 @@ class SandCrabsCombatBot(StateMachineBot):
             f"threshold=0.65"
         )
 
-        result = self.state.find_multi_template(
+        # Get ALL matches above threshold, not just the best one
+        matches = self.state.find_all_multi_template(
             self.shell_templates,
             threshold=0.65,
             region=viewport_region,
         )
 
-        if result is None:
+        if not matches:
             logger.info("FIND_CRABS: No dormant shells found above threshold (0.65).")
 
             # Diagnostic: check best sub-threshold match so we can tune thresholds
@@ -1158,32 +1159,54 @@ class SandCrabsCombatBot(StateMachineBot):
 
             return StateResult.FAILURE
 
-        center_x, center_y, confidence, template_name = result
-
-        # Check if this match is too close to a recently visited shell
+        # Filter out matches too close to recently visited shells
         DEDUP_RADIUS = 60  # pixels
-        for vx, vy in self._visited_shells:
-            dist = ((center_x - vx) ** 2 + (center_y - vy) ** 2) ** 0.5
-            if dist < DEDUP_RADIUS:
-                logger.info(
-                    f"FIND_CRABS: Match at ({center_x}, {center_y}) is {dist:.0f}px from "
-                    f"visited shell ({vx}, {vy}) — skipping (dedup radius={DEDUP_RADIUS}px)"
-                )
-                # Walk randomly to change view and find new shells
-                direction = random.choice(["up", "down", "left", "right"])
-                tiles = random.randint(2, 4)
-                logger.info(f"FIND_CRABS: Walking {tiles} tiles {direction} to find new shells...")
-                self.actions.walk_tiles(direction, tiles)
-                self.actions.wait("long")
-                return StateResult.FAILURE
+        valid_matches = []
+        for match_x, match_y, confidence, template_name in matches:
+            too_close = False
+            for vx, vy in self._visited_shells:
+                dist = ((match_x - vx) ** 2 + (match_y - vy) ** 2) ** 0.5
+                if dist < DEDUP_RADIUS:
+                    logger.debug(
+                        f"FIND_CRABS: Filtering match at ({match_x}, {match_y}) — "
+                        f"{dist:.0f}px from visited ({vx}, {vy})"
+                    )
+                    too_close = True
+                    break
+            if not too_close:
+                valid_matches.append((match_x, match_y, confidence, template_name))
+
+        if not valid_matches:
+            logger.info(
+                f"FIND_CRABS: Found {len(matches)} shells but all within "
+                f"dedup radius of visited shells. Walking to find new area..."
+            )
+            direction = random.choice(["up", "down", "left", "right"])
+            tiles = random.randint(2, 4)
+            self.actions.walk_tiles(direction, tiles)
+            self.actions.wait("long")
+            return StateResult.FAILURE
+
+        # Sort by distance to viewport center (player position), closest first
+        cx = viewport_region[0] + viewport_region[2] // 2
+        cy = viewport_region[1] + viewport_region[3] // 2
+        valid_matches.sort(
+            key=lambda m: (m[0] - cx) ** 2 + (m[1] - cy) ** 2
+        )
+
+        # Pick the closest valid shell
+        center_x, center_y, confidence, template_name = valid_matches[0]
+        dist_to_player = ((center_x - cx) ** 2 + (center_y - cy) ** 2) ** 0.5
 
         self._last_crab_x = center_x
         self._last_crab_y = center_y
         self._crabs_found += 1
 
         logger.info(
-            f"FIND_CRABS: MATCH! Shell at ({center_x}, {center_y}) "
+            f"FIND_CRABS: MATCH! Closest shell at ({center_x}, {center_y}) "
             f"confidence={confidence:.3f} template={template_name} "
+            f"distance={dist_to_player:.0f}px from player "
+            f"({len(valid_matches)} valid / {len(matches)} total found) "
             f"(total crabs found: {self._crabs_found})"
         )
 

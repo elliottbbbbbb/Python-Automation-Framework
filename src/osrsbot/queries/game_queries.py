@@ -231,6 +231,32 @@ class GameState:
         logger.warning("BankQueries not available for find_multi_template")
         return None
 
+    def find_all_multi_template(
+        self,
+        template_paths: List[str],
+        threshold: float = 0.7,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        cross_template_dedup_radius: int = 30,
+    ) -> List[Tuple[int, int, float, str]]:
+        """Find ALL matching locations from multiple templates above threshold.
+
+        Args:
+            template_paths: List of paths to template images
+            threshold: Match confidence threshold (0.0-1.0)
+            region: Optional (x, y, width, height) to restrict search area
+            cross_template_dedup_radius: Pixel radius to dedup matches across templates
+
+        Returns:
+            List of (center_x, center_y, confidence, template_name), sorted by
+            confidence descending. Empty list if none found.
+        """
+        if self.bank_queries:
+            return self.bank_queries.find_all_multi_template(
+                template_paths, threshold, region, cross_template_dedup_radius
+            )
+        logger.warning("BankQueries not available for find_all_multi_template")
+        return []
+
     # --- Screen Region Queries (delegate to ScreenService) ---
     def get_game_viewport_region(self) -> Optional[Tuple[int, int, int, int]]:
         """Get the game viewport region excluding UI elements.

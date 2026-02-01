@@ -326,3 +326,106 @@ class BankQueries:
             return (*best_center, best_confidence, best_template_name)
         else:
             return None
+
+    def find_all_multi_template(
+        self,
+        template_paths: List[str],
+        threshold: float = 0.7,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        cross_template_dedup_radius: int = 30,
+    ) -> List[Tuple[int, int, float, str]]:
+        """
+        Find ALL matching locations from multiple templates above threshold.
+
+        Uses iterative non-maximum suppression to extract multiple matches per
+        template, then deduplicates across templates.
+
+        Args:
+            template_paths: List of paths to template images
+            threshold: Match confidence threshold (0.0-1.0)
+            region: Optional (x, y, width, height) to restrict search area
+            cross_template_dedup_radius: Pixel radius to dedup matches across templates
+
+        Returns:
+            List of (center_x, center_y, confidence, template_name), sorted by
+            confidence descending. Empty list if none found.
+        """
+        MAX_MATCHES_PER_TEMPLATE = 20
+
+        # Capture screen once for all templates
+        screenshot = self.screen.capture()
+        if screenshot is None:
+            return []
+        img_np = cv.cvtColor(np.array(screenshot), cv.COLOR_RGB2BGR)
+
+        # Apply region crop
+        offset_x, offset_y = 0, 0
+        if region:
+            rx, ry, rw, rh = region
+            img_h, img_w = img_np.shape[:2]
+            rx = max(0, min(rx, img_w))
+            ry = max(0, min(ry, img_h))
+            rw = min(rw, img_w - rx)
+            rh = min(rh, img_h - ry)
+            img_np = img_np[ry:ry + rh, rx:rx + rw]
+            offset_x, offset_y = rx, ry
+
+        all_matches = []
+
+        for template_path in template_paths:
+            try:
+                resolved_path = _resolve_template_path(template_path)
+                template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
+                if template is None:
+                    logger.warning(f"Failed to load template: {template_path}")
+                    continue
+
+                th, tw = template.shape[:2]
+                result = cv.matchTemplate(img_np, template, cv.TM_CCOEFF_NORMED)
+                template_name = Path(template_path).name
+
+                # Iterative NMS: find max, zero out region, repeat
+                result_copy = result.copy()
+                for _ in range(MAX_MATCHES_PER_TEMPLATE):
+                    _, max_val, _, max_loc = cv.minMaxLoc(result_copy)
+                    if max_val < threshold:
+                        break
+
+                    mx, my = max_loc
+                    center_x = offset_x + mx + tw // 2
+                    center_y = offset_y + my + th // 2
+                    all_matches.append((center_x, center_y, max_val, template_name))
+
+                    # Zero out region around this match to suppress re-detection
+                    y_start = max(0, my - th // 2)
+                    y_end = min(result_copy.shape[0], my + th // 2 + 1)
+                    x_start = max(0, mx - tw // 2)
+                    x_end = min(result_copy.shape[1], mx + tw // 2 + 1)
+                    result_copy[y_start:y_end, x_start:x_end] = 0.0
+
+            except Exception as e:
+                logger.warning(f"Error checking template {template_path}: {e}")
+                continue
+
+        # Cross-template dedup: keep higher confidence when two templates
+        # match the same physical object
+        all_matches.sort(key=lambda m: m[2], reverse=True)
+        deduped = []
+        for match in all_matches:
+            mx, my = match[0], match[1]
+            is_duplicate = False
+            for kept in deduped:
+                dist = ((mx - kept[0]) ** 2 + (my - kept[1]) ** 2) ** 0.5
+                if dist < cross_template_dedup_radius:
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                deduped.append(match)
+
+        logger.info(
+            f"find_all_multi_template: {len(deduped)} matches "
+            f"(raw={len(all_matches)}, threshold={threshold}, "
+            f"templates={len(template_paths)})"
+        )
+
+        return deduped
