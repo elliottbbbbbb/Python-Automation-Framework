@@ -203,3 +203,4 @@ user_images/
 .DS_Store
 Thumbs.db
 desktop.ini
+.license_cache
