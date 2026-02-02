@@ -16,6 +16,9 @@ from osrsbot.scripts.bosses.zulrah import ZulrahBot
 from osrsbot.scripts.combat.basic_npc_killer import BasicNPCKiller
 from osrsbot.scripts.skills.construction_training import ConstructionTrainingBot
 from osrsbot.scripts.combat.sand_crabs_combat import SandCrabsCombatBot
+from osrsbot.scripts.bankstanding.bankstanding_fletching import FletchingBot
+from osrsbot.scripts.bankstanding.fletching_items import get_best_tier
+from osrsbot.services.wom_service import get_skill_level
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -145,6 +148,7 @@ def main() -> None:
         print("9. Construction Skilling 1-40")
         print("10. Sand Crabs Combat (AFK Beach Training)")
         print("11. Anti-AFK Relogin Test (Login Screen Detection)")
+        print("12. Fletching Bankstander (GE Bow Stringing)")
 
         choice = input("\nSelect: ").strip()
 
@@ -479,6 +483,71 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Anti-AFK Relogin Test failed: {e}", exc_info=True)
                 print(f"❌ Test error: {e}")
+                sys.exit(1)
+
+        elif choice == "12":
+            logger.info("Starting Fletching Bankstander")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+
+                print("\n🏹 Fletching Bankstander (GE Bow Stringing)")
+
+                # Look up Fletching level via Wise Old Man API
+                rsn = window_title.replace("RuneLite - ", "") if window_title.startswith("RuneLite - ") else ""
+                tier = None
+                if rsn:
+                    print(f"\nLooking up {rsn} on Wise Old Man...")
+                    fletch_level = get_skill_level(rsn, "fletching")
+                    if fletch_level is not None:
+                        tier = get_best_tier(fletch_level)
+                        if tier:
+                            print(f"  Fletching level: {fletch_level}")
+                            print(f"  Best item: {tier['product_name']}")
+                        else:
+                            print(f"  Fletching level {fletch_level} is below 20, defaulting to oak")
+                    else:
+                        print("  Could not fetch stats from WOM")
+
+                if tier is None:
+                    tier = get_best_tier(20)  # fallback to oak
+                    print(f"  Using default: {tier['product_name']}")
+
+                mat_name = tier["material_name"]
+                prod_name = tier["product_name"]
+                mat_slug = mat_name.replace(" ", "_").replace("(", "").replace(")", "")
+
+                print(f"\nThis bot will:")
+                print(f"  1. Right-click tagged banker -> 'Bank Banker'")
+                print(f"  2. Deposit all, withdraw 14 bowstrings + 14 {mat_name}")
+                print(f"  3. Combine bowstring with {mat_name} in inventory")
+                print(f"  4. Press Space for Make All, auto-dismiss level-up popups")
+                print(f"  5. Detect completion and repeat")
+
+                runs = get_valid_int("\nNumber of cycles [default: 999]: ", default=999)
+
+                print(f"\nMake sure:")
+                print(f"  - You are at the Grand Exchange")
+                print(f"  - Banker is tagged with RuneLite NPC Indicator")
+                print(f"  - config.json has 'ge_banker' color matching your tag")
+                print(f"  - Bank tab set up with bow string + {mat_name}")
+                print(f"  - Withdraw quantity set to 14")
+                print(f"  - Template images in: src/osrsbot/images/bot/items/")
+                print(f"    - bowstring.png")
+                print(f"    - {mat_slug}.png")
+                print(f"\n📝 Logs: osrs_bot_debug.log")
+                print(f"🔄 Will run for {runs} cycles")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(
+                    FletchingBot,
+                    runs=runs,
+                    bank_location="",
+                )
+            except Exception as e:
+                logger.error(f"Fletching Bankstander failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
                 sys.exit(1)
 
         else:
