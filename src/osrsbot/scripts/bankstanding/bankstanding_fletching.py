@@ -43,10 +43,10 @@ class FletchingBot(BankstanderBot):
     FLETCHING_TIMEOUT = 90.0
 
     # Minimum seconds before considering re-initiation (fletching 14 items takes ~20-25s)
-    MIN_TIME_BEFORE_REINITIATE = 15.0
+    MIN_TIME_BEFORE_REINITIATE = 25.0
 
     # Re-check WOM every N cycles to confirm/correct level counter
-    WOM_CHECK_INTERVAL = 10
+    WOM_CHECK_INTERVAL = 5
 
     def __init__(self, *args, **kwargs):
         """
@@ -634,10 +634,11 @@ class FletchingBot(BankstanderBot):
             logger.info("PROCESS: Pressing Space for Make All")
             self.keyboard.press("space", mode="humanized")
 
-            # Step 5: Fletching wait loop - press Space periodically, handle level-ups
+            # Step 5: Fletching wait loop — monitor for completion and level-ups
+            # No periodic space presses; space is only pressed when a level-up
+            # popup is detected, so the template matcher can reliably catch it.
             start_time = time.time()
             last_craft_start = time.time()
-            space_count = 0
 
             while True:
                 self._check_exit_requested()
@@ -651,7 +652,7 @@ class FletchingBot(BankstanderBot):
                     )
                     break
 
-                # Wait for the space interval with some jitter
+                # Wait with jitter (no space press)
                 jitter = random.uniform(-0.5, 1.0)
                 sleep_time = max(1.0, self._space_interval + jitter)
                 self._update_ui(
@@ -668,15 +669,7 @@ class FletchingBot(BankstanderBot):
                     )
                     break
 
-                # Press Space to dismiss any level-up popup
-                space_count += 1
-                self.keyboard.press("space", mode="humanized")
-                logger.info(
-                    f"PROCESS: Space press #{space_count} at {elapsed:.0f}s"
-                )
-
-                # Brief pause then check if level-up popup is visible
-                time.sleep(1.0)
+                # Check for level-up popup (no prior space press to dismiss it)
                 levelup_result = self.state.find_multi_template(
                     self._levelup_templates, threshold=0.7
                 )
@@ -695,10 +688,42 @@ class FletchingBot(BankstanderBot):
                             f"{self._current_level} (WOM: {wom_level})"
                         )
                     self._upgrade_tier()
-                    # Dismiss popup and re-press Space for Make All
+                    # Dismiss level-up dialog
                     self.keyboard.press("space", mode="humanized")
-                    time.sleep(1.0)
+                    # Wait for "items unlocked" screen to appear
+                    time.sleep(2.0)
+                    # Dismiss items unlocked screen
                     self.keyboard.press("space", mode="humanized")
+                    time.sleep(0.5)
+
+                    # Re-initiate craft: click bowstring → material → Make All
+                    logger.info("PROCESS: Re-initiating craft after level-up")
+                    self._update_ui("PROCESS", "Re-initiating craft after level-up...")
+                    tool_match = self.state.find_multi_template(
+                        self._tool_template, threshold=0.7
+                    )
+                    if tool_match:
+                        cx, cy, conf, _ = tool_match
+                        ax, ay = actions.coord_resolver.to_absolute(cx, cy)
+                        actions.mouse.click_at(ax, ay, move_style="curved")
+                        actions.wait("short")
+
+                        mat_match = self.state.find_multi_template(
+                            self._material_template, threshold=0.7
+                        )
+                        if mat_match:
+                            cx, cy, conf, _ = mat_match
+                            ax, ay = actions.coord_resolver.to_absolute(cx, cy)
+                            actions.mouse.click_at(ax, ay, move_style="curved")
+                            time.sleep(2.0)
+                            self.keyboard.press("space", mode="humanized")
+                            logger.info("PROCESS: Craft re-initiated after level-up")
+                        else:
+                            logger.warning("PROCESS: Can't find material after level-up")
+                    else:
+                        logger.warning("PROCESS: Can't find bowstring after level-up")
+
+                    last_craft_start = time.time()
                     continue
 
                 # Only consider re-initiation after minimum time has passed
@@ -729,8 +754,31 @@ class FletchingBot(BankstanderBot):
                                     )
                                 self._upgrade_tier()
                                 self.keyboard.press("space", mode="humanized")
-                                time.sleep(1.0)
+                                time.sleep(2.0)
                                 self.keyboard.press("space", mode="humanized")
+                                time.sleep(0.5)
+
+                                # Re-initiate craft after level-up
+                                logger.info("PROCESS: Re-initiating craft after level-up (re-check)")
+                                tool_match_lu = self.state.find_multi_template(
+                                    self._tool_template, threshold=0.7
+                                )
+                                if tool_match_lu:
+                                    cx, cy, conf, _ = tool_match_lu
+                                    ax, ay = actions.coord_resolver.to_absolute(cx, cy)
+                                    actions.mouse.click_at(ax, ay, move_style="curved")
+                                    actions.wait("short")
+                                    mat_match_lu = self.state.find_multi_template(
+                                        self._material_template, threshold=0.7
+                                    )
+                                    if mat_match_lu:
+                                        cx, cy, conf, _ = mat_match_lu
+                                        ax, ay = actions.coord_resolver.to_absolute(cx, cy)
+                                        actions.mouse.click_at(ax, ay, move_style="curved")
+                                        time.sleep(2.0)
+                                        self.keyboard.press("space", mode="humanized")
+                                        logger.info("PROCESS: Craft re-initiated after level-up (re-check)")
+
                                 last_craft_start = time.time()
                             else:
                                 # Fletching stopped — re-click items to restart
