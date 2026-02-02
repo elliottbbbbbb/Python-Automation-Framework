@@ -26,7 +26,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from osrsbot.core.anti_afk import AntiAFK
 from osrsbot.core.state_helpers import build_metadata_dict
 from osrsbot.core.state_machine_bot import StateMachineBot
 from osrsbot.core.state_types import (
@@ -73,9 +72,6 @@ class SandCrabsCombatBot(StateMachineBot):
             enable_exit_key=True,
             enable_status_ui=True,
         )
-
-        # Anti-AFK relogin handler
-        self.anti_afk = AntiAFK(actions=self.actions, screen=self.actions.screen)
 
         # Load shell template paths from the images directory
         self.shell_templates = self._discover_shell_templates()

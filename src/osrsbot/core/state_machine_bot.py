@@ -8,6 +8,7 @@ from collections import deque
 from enum import Enum
 from typing import Callable, Dict, List, Optional
 
+from osrsbot.core.anti_afk import AntiAFK
 from osrsbot.core.base_bot import Bot
 from osrsbot.core.state_types import (
     StateExecutionContext,
@@ -26,6 +27,9 @@ class StateMachineBot(Bot):
     def __init__(self, *args, debug_ui: bool = False, **kwargs):
         """Initialize state machine bot."""
         super().__init__(*args, **kwargs)
+
+        # Anti-AFK: auto-relogin on disconnect (checked in run_cycle before every state)
+        self.anti_afk = AntiAFK(actions=self.actions, screen=self.actions.screen)
 
         # State config
         self._states: Optional[type[Enum]] = None
@@ -203,7 +207,7 @@ class StateMachineBot(Bot):
                     )
 
             # Check for disconnect/logout before executing any state
-            if hasattr(self, "anti_afk") and self.anti_afk.check_and_relogin():
+            if self.anti_afk.check_and_relogin():
                 logger.info(
                     f"Anti-AFK: Relogin completed before {self._current_state.name}, restarting state"
                 )
