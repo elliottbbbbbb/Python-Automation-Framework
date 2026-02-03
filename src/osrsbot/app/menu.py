@@ -46,45 +46,6 @@ def get_valid_int(prompt: str, default: int) -> int:
         return default
 
 
-def detect_skill_level_ocr(runner, skill_name: str, display_name: str):
-    """
-    Read a skill level from the in-game skills tab via OCR.
-
-    Opens the skills tab, reads the level, switches back to inventory.
-
-    Args:
-        runner: Initialized ScriptRunner with screen/ocr/actions ready.
-        skill_name: Lowercase skill name (e.g. "fletching", "herblore").
-        display_name: Human-readable name for console output.
-
-    Returns:
-        Detected level as int, or None if OCR failed.
-    """
-    from osrsbot.queries.stat_queries import StatQueries
-
-    stat_queries = StatQueries(runner.screen, runner.ocr, runner.config)
-
-    print(f"\n  Reading {display_name} level from skills tab...")
-
-    if not runner.actions.open_skills_tab():
-        print(f"  Could not open skills tab")
-        return None
-
-    time.sleep(0.5)  # Let the tab render
-
-    level = stat_queries.get_skill_level(skill_name)
-
-    # Switch back to inventory
-    runner.actions.ensure_inventory_open()
-
-    if level is not None:
-        print(f"  OCR detected {display_name} level: {level}")
-    else:
-        print(f"  OCR could not read {display_name} level")
-
-    return level
-
-
 def main() -> None:
     # Determine log file location (next to .exe when frozen, or in cwd when dev)
     if getattr(sys, "frozen", False):
@@ -537,29 +498,22 @@ def main() -> None:
 
                 print("\nFletching Bankstander (GE Bow Stringing)")
 
-                # Create runner early so OCR is available for level detection
                 runner = ScriptRunner(window_title)
 
-                # Three-tier level detection: OCR -> manual prompt -> WOM
+                # Two-tier level detection: manual prompt -> WOM
                 fletch_level = None
 
-                # Tier 1: OCR from skills tab
-                ocr_level = detect_skill_level_ocr(runner, "fletching", "Fletching")
-                if ocr_level is not None:
-                    fletch_level = ocr_level
+                # Tier 1: Manual prompt
+                manual = input(
+                    f"  Enter your Fletching level (or press Enter for WOM): "
+                ).strip()
+                if manual:
+                    try:
+                        fletch_level = int(manual)
+                    except ValueError:
+                        print(f"  Invalid number, falling back to WOM")
 
-                # Tier 2: Manual prompt
-                if fletch_level is None:
-                    manual = input(
-                        f"  Enter your Fletching level (or press Enter for WOM): "
-                    ).strip()
-                    if manual:
-                        try:
-                            fletch_level = int(manual)
-                        except ValueError:
-                            print(f"  Invalid number, falling back to WOM")
-
-                # Tier 3: WOM fallback
+                # Tier 2: WOM fallback
                 if fletch_level is None and rsn:
                     print(f"\n  Looking up {rsn} on Wise Old Man...")
                     fletch_level = get_skill_level(rsn, "fletching")
@@ -626,29 +580,22 @@ def main() -> None:
 
                 print("\nHerblore Bankstander (GE Potion Making)")
 
-                # Create runner early so OCR is available for level detection
                 runner = ScriptRunner(window_title)
 
-                # Three-tier level detection: OCR -> manual prompt -> WOM
+                # Two-tier level detection: manual prompt -> WOM
                 herb_level = None
 
-                # Tier 1: OCR from skills tab
-                ocr_level = detect_skill_level_ocr(runner, "herblore", "Herblore")
-                if ocr_level is not None:
-                    herb_level = ocr_level
+                # Tier 1: Manual prompt
+                manual = input(
+                    f"  Enter your Herblore level (or press Enter for WOM): "
+                ).strip()
+                if manual:
+                    try:
+                        herb_level = int(manual)
+                    except ValueError:
+                        print(f"  Invalid number, falling back to WOM")
 
-                # Tier 2: Manual prompt
-                if herb_level is None:
-                    manual = input(
-                        f"  Enter your Herblore level (or press Enter for WOM): "
-                    ).strip()
-                    if manual:
-                        try:
-                            herb_level = int(manual)
-                        except ValueError:
-                            print(f"  Invalid number, falling back to WOM")
-
-                # Tier 3: WOM fallback
+                # Tier 2: WOM fallback
                 if herb_level is None and rsn:
                     print(f"\n  Looking up {rsn} on Wise Old Man...")
                     herb_level = get_skill_level(rsn, "herblore")

@@ -7,10 +7,11 @@ Used by HerbloreBot and menu.py to auto-select items based on player level.
 Potion recipes from the OSRS Wiki — combining unfinished potions with
 secondary ingredients:
   3 attack potion, 5 antipoison, 12 strength potion, 22 restore potion,
-  26 energy potion, 36 combat potion, 38 prayer potion, 45 super attack,
-  48 superantipoison, 52 super energy, 55 super strength,
-  63 super restore, 66 super defence, 69 antifire potion,
-  72 ranging potion, 76 magic potion, 78 zamorak brew, 81 saradomin brew.
+  26 energy potion, 34 agility potion, 36 combat potion, 38 prayer potion,
+  45 super attack, 48 superantipoison, 50 fishing potion, 52 super energy,
+  53 hunter potion, 55 super strength, 63 super restore, 66 super defence,
+  69 antifire potion, 72 ranging potion, 76 magic potion, 78 zamorak brew,
+  81 saradomin brew.
 """
 
 # Ordered highest-first so get_best_tier() returns the best available.
@@ -64,10 +65,22 @@ HERBLORE_TIERS = [
         "product_name": "super strength",
     },
     {
+        "min_level": 53,
+        "tool_name": "avantoe potion (unf)",
+        "material_name": "kebbit teeth dust",
+        "product_name": "hunter potion",
+    },
+    {
         "min_level": 52,
         "tool_name": "avantoe potion (unf)",
         "material_name": "mort myre fungus",
         "product_name": "super energy",
+    },
+    {
+        "min_level": 50,
+        "tool_name": "avantoe potion (unf)",
+        "material_name": "snape grass",
+        "product_name": "fishing potion",
     },
     {
         "min_level": 48,
@@ -92,6 +105,12 @@ HERBLORE_TIERS = [
         "tool_name": "harralander potion (unf)",
         "material_name": "goat horn dust",
         "product_name": "combat potion",
+    },
+    {
+        "min_level": 34,
+        "tool_name": "toadflax potion (unf)",
+        "material_name": "toad's legs",
+        "product_name": "agility potion",
     },
     {
         "min_level": 26,
