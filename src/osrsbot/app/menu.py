@@ -1,5 +1,6 @@
 import logging
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,6 +19,8 @@ from osrsbot.scripts.skills.construction_training import ConstructionTrainingBot
 from osrsbot.scripts.combat.sand_crabs_combat import SandCrabsCombatBot
 from osrsbot.scripts.bankstanding.bankstanding_fletching import FletchingBot
 from osrsbot.scripts.bankstanding.fletching_items import get_best_tier
+from osrsbot.scripts.bankstanding.bankstanding_herblore import HerbloreBot
+from osrsbot.scripts.bankstanding.herblore_items import get_best_tier as get_best_herblore_tier
 from osrsbot.services.wom_service import get_skill_level
 load_dotenv()
 
@@ -41,6 +44,45 @@ def get_valid_int(prompt: str, default: int) -> int:
         logger.warning(f"Invalid integer input: {e}. Using default: {default}")
         print(f"⚠️  Invalid number. Using default: {default}")
         return default
+
+
+def detect_skill_level_ocr(runner, skill_name: str, display_name: str):
+    """
+    Read a skill level from the in-game skills tab via OCR.
+
+    Opens the skills tab, reads the level, switches back to inventory.
+
+    Args:
+        runner: Initialized ScriptRunner with screen/ocr/actions ready.
+        skill_name: Lowercase skill name (e.g. "fletching", "herblore").
+        display_name: Human-readable name for console output.
+
+    Returns:
+        Detected level as int, or None if OCR failed.
+    """
+    from osrsbot.queries.stat_queries import StatQueries
+
+    stat_queries = StatQueries(runner.screen, runner.ocr, runner.config)
+
+    print(f"\n  Reading {display_name} level from skills tab...")
+
+    if not runner.actions.open_skills_tab():
+        print(f"  Could not open skills tab")
+        return None
+
+    time.sleep(0.5)  # Let the tab render
+
+    level = stat_queries.get_skill_level(skill_name)
+
+    # Switch back to inventory
+    runner.actions.ensure_inventory_open()
+
+    if level is not None:
+        print(f"  OCR detected {display_name} level: {level}")
+    else:
+        print(f"  OCR could not read {display_name} level")
+
+    return level
 
 
 def main() -> None:
@@ -149,6 +191,7 @@ def main() -> None:
         print("10. Sand Crabs Combat (AFK Beach Training)")
         print("11. Anti-AFK Relogin Test (Login Screen Detection)")
         print("12. Fletching Bankstander (GE Bow Stringing)")
+        print("13. Herblore Bankstander (GE Potion Making)")
 
         choice = input("\nSelect: ").strip()
 
@@ -490,31 +533,56 @@ def main() -> None:
             try:
                 config = Config()
                 window_title = config.get_window_title()
-
-                print("\n🏹 Fletching Bankstander (GE Bow Stringing)")
-
-                # Look up Fletching level via Wise Old Man API
                 rsn = window_title.replace("RuneLite - ", "") if window_title.startswith("RuneLite - ") else ""
-                tier = None
-                if rsn:
-                    print(f"\nLooking up {rsn} on Wise Old Man...")
+
+                print("\nFletching Bankstander (GE Bow Stringing)")
+
+                # Create runner early so OCR is available for level detection
+                runner = ScriptRunner(window_title)
+
+                # Three-tier level detection: OCR -> manual prompt -> WOM
+                fletch_level = None
+
+                # Tier 1: OCR from skills tab
+                ocr_level = detect_skill_level_ocr(runner, "fletching", "Fletching")
+                if ocr_level is not None:
+                    fletch_level = ocr_level
+
+                # Tier 2: Manual prompt
+                if fletch_level is None:
+                    manual = input(
+                        f"  Enter your Fletching level (or press Enter for WOM): "
+                    ).strip()
+                    if manual:
+                        try:
+                            fletch_level = int(manual)
+                        except ValueError:
+                            print(f"  Invalid number, falling back to WOM")
+
+                # Tier 3: WOM fallback
+                if fletch_level is None and rsn:
+                    print(f"\n  Looking up {rsn} on Wise Old Man...")
                     fletch_level = get_skill_level(rsn, "fletching")
                     if fletch_level is not None:
-                        tier = get_best_tier(fletch_level)
-                        if tier:
-                            print(f"  Fletching level: {fletch_level}")
-                            print(f"  Best item: {tier['product_name']}")
-                        else:
-                            print(f"  Fletching level {fletch_level} is below 20, defaulting to oak")
+                        print(f"  WOM Fletching level: {fletch_level}")
                     else:
-                        print("  Could not fetch stats from WOM")
+                        print(f"  WOM lookup failed, defaulting to level 20")
 
-                if tier is None:
-                    tier = get_best_tier(20)  # fallback to oak
-                    print(f"  Using default: {tier['product_name']}")
+                if fletch_level is None:
+                    fletch_level = 20
+
+                # Inject into config so bot __init__ picks it up
+                runner.config.data["fletching_starting_level"] = str(fletch_level)
+
+                tier = get_best_tier(fletch_level)
+                if tier:
+                    print(f"\n  Fletching level: {fletch_level}")
+                    print(f"  Best item: {tier['product_name']}")
+                else:
+                    tier = get_best_tier(20)
+                    print(f"  Level {fletch_level} too low, defaulting to {tier['product_name']}")
 
                 mat_name = tier["material_name"]
-                prod_name = tier["product_name"]
                 mat_slug = mat_name.replace(" ", "_").replace("(", "").replace(")", "")
 
                 print(f"\nThis bot will:")
@@ -535,11 +603,10 @@ def main() -> None:
                 print(f"  - Template images in: src/osrsbot/images/bot/items/")
                 print(f"    - bowstring.png")
                 print(f"    - {mat_slug}.png")
-                print(f"\n📝 Logs: osrs_bot_debug.log")
-                print(f"🔄 Will run for {runs} cycles")
+                print(f"\nLogs: osrs_bot_debug.log")
+                print(f"Will run for {runs} cycles")
                 input("\nPress Enter to start...")
 
-                runner = ScriptRunner(window_title)
                 runner.run_script(
                     FletchingBot,
                     runs=runs,
@@ -547,12 +614,103 @@ def main() -> None:
                 )
             except Exception as e:
                 logger.error(f"Fletching Bankstander failed: {e}", exc_info=True)
-                print(f"❌ Script error: {e}")
+                print(f"Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "13":
+            logger.info("Starting Herblore Bankstander")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                rsn = window_title.replace("RuneLite - ", "") if window_title.startswith("RuneLite - ") else ""
+
+                print("\nHerblore Bankstander (GE Potion Making)")
+
+                # Create runner early so OCR is available for level detection
+                runner = ScriptRunner(window_title)
+
+                # Three-tier level detection: OCR -> manual prompt -> WOM
+                herb_level = None
+
+                # Tier 1: OCR from skills tab
+                ocr_level = detect_skill_level_ocr(runner, "herblore", "Herblore")
+                if ocr_level is not None:
+                    herb_level = ocr_level
+
+                # Tier 2: Manual prompt
+                if herb_level is None:
+                    manual = input(
+                        f"  Enter your Herblore level (or press Enter for WOM): "
+                    ).strip()
+                    if manual:
+                        try:
+                            herb_level = int(manual)
+                        except ValueError:
+                            print(f"  Invalid number, falling back to WOM")
+
+                # Tier 3: WOM fallback
+                if herb_level is None and rsn:
+                    print(f"\n  Looking up {rsn} on Wise Old Man...")
+                    herb_level = get_skill_level(rsn, "herblore")
+                    if herb_level is not None:
+                        print(f"  WOM Herblore level: {herb_level}")
+                    else:
+                        print(f"  WOM lookup failed, defaulting to level 5")
+
+                if herb_level is None:
+                    herb_level = 5
+
+                # Inject into config so bot __init__ picks it up
+                runner.config.data["herblore_starting_level"] = str(herb_level)
+
+                tier = get_best_herblore_tier(herb_level)
+                if tier:
+                    print(f"\n  Herblore level: {herb_level}")
+                    print(f"  Best potion: {tier['product_name']}")
+                else:
+                    tier = get_best_herblore_tier(5)
+                    print(f"  Level {herb_level} too low, defaulting to {tier['product_name']}")
+
+                tool_name = tier["tool_name"]
+                mat_name = tier["material_name"]
+                tool_slug = tool_name.replace(" ", "_").replace("(", "").replace(")", "")
+                mat_slug = mat_name.replace(" ", "_").replace("(", "").replace(")", "")
+
+                print(f"\nThis bot will:")
+                print(f"  1. Right-click tagged banker -> 'Bank Banker'")
+                print(f"  2. Deposit all, withdraw 14 {tool_name} + 14 {mat_name}")
+                print(f"  3. Combine {tool_name} with {mat_name} in inventory")
+                print(f"  4. Press Space for Make All, auto-dismiss level-up popups")
+                print(f"  5. Detect completion and repeat")
+
+                runs = get_valid_int("\nNumber of cycles [default: 999]: ", default=999)
+
+                print(f"\nMake sure:")
+                print(f"  - You are at the Grand Exchange")
+                print(f"  - Banker is tagged with RuneLite NPC Indicator")
+                print(f"  - config.json has 'ge_banker' color matching your tag")
+                print(f"  - Bank tab set up with {tool_name} + {mat_name}")
+                print(f"  - Withdraw quantity set to 14")
+                print(f"  - Template images in: src/osrsbot/images/bot/items/")
+                print(f"    - {tool_slug}.png")
+                print(f"    - {mat_slug}.png")
+                print(f"\nLogs: osrs_bot_debug.log")
+                print(f"Will run for {runs} cycles")
+                input("\nPress Enter to start...")
+
+                runner.run_script(
+                    HerbloreBot,
+                    runs=runs,
+                    bank_location="",
+                )
+            except Exception as e:
+                logger.error(f"Herblore Bankstander failed: {e}", exc_info=True)
+                print(f"Script error: {e}")
                 sys.exit(1)
 
         else:
             logger.info(f"Invalid choice: {choice}")
-            print("❌ Invalid choice. Exiting...")
+            print("Invalid choice. Exiting...")
             sys.exit(0)
 
     except KeyboardInterrupt:
