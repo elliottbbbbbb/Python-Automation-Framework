@@ -5,6 +5,7 @@ Handles:
 - HP reading (OCR-based)
 - Prayer points reading (OCR-based)
 - Run energy reading (OCR-based)
+- Skill level reading from skills tab (OCR-based)
 
 Responsibilities:
 - Read player stats via OCR
@@ -22,6 +23,7 @@ from osrsbot.services.template_ocr_service import (
     CYAN,
     ORB_GREEN,
     ORB_RED,
+    WHITE,
     YELLOW,
     TemplateOCRService,
 )
@@ -30,6 +32,38 @@ if TYPE_CHECKING:
     from osrsbot.services.screen_service import ScreenService
 
 logger = logging.getLogger(__name__)
+
+# OSRS skills tab grid layout (Fixed Mode).
+# Each skill cell shows current/base level. We read the base level.
+# Grid is 3 columns x 8 rows. Mapping: skill -> (col, row).
+SKILL_POSITIONS = {
+    # Column 0 (left)
+    "attack": (0, 0),
+    "strength": (0, 1),
+    "defence": (0, 2),
+    "ranged": (0, 3),
+    "prayer": (0, 4),
+    "magic": (0, 5),
+    "runecraft": (0, 6),
+    "construction": (0, 7),
+    # Column 1 (middle)
+    "hitpoints": (1, 0),
+    "agility": (1, 1),
+    "herblore": (1, 2),
+    "thieving": (1, 3),
+    "crafting": (1, 4),
+    "fletching": (1, 5),
+    "slayer": (1, 6),
+    "hunter": (1, 7),
+    # Column 2 (right)
+    "mining": (2, 0),
+    "smithing": (2, 1),
+    "fishing": (2, 2),
+    "cooking": (2, 3),
+    "firemaking": (2, 4),
+    "woodcutting": (2, 5),
+    "farming": (2, 6),
+}
 
 
 class StatQueries:
@@ -261,3 +295,72 @@ class StatQueries:
             colors=colors,
             correlation_threshold=threshold,
         )
+
+    def get_skill_level(self, skill_name: str) -> Optional[int]:
+        """
+        Read a skill's base level from the skills tab via OCR.
+
+        The skills tab must already be open when this is called.
+
+        Args:
+            skill_name: Lowercase skill name (e.g. "fletching", "herblore").
+
+        Returns:
+            Base level as int (1-99), or None if OCR failed.
+        """
+        if skill_name not in SKILL_POSITIONS:
+            logger.warning(f"get_skill_level: Unknown skill '{skill_name}'")
+            return None
+
+        col, row = SKILL_POSITIONS[skill_name]
+
+        grid = self.config.get("coordinates", "ocr", "skills_tab")
+        if not grid:
+            logger.warning("get_skill_level: skills_tab not in config")
+            return None
+
+        # Compute pixel region for the base level number within the cell
+        x = grid["origin_x"] + col * grid["cell_width"] + grid["base_level_offset_x"]
+        y = grid["origin_y"] + row * grid["cell_height"] + grid["base_level_offset_y"]
+        w = grid["base_level_width"]
+        h = grid["base_level_height"]
+
+        img = self.screen.capture(region=(x, y, w, h), relative=True)
+        if img is None:
+            logger.debug(f"get_skill_level: Failed to capture region for {skill_name}")
+            return None
+
+        img_np = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+        # Try YELLOW first (standard skills tab text color)
+        level = self.ocr.extract_number(
+            img_np,
+            font_name="plain11",
+            colors=[YELLOW],
+            correlation_threshold=0.95,
+        )
+
+        if level is None:
+            # Retry with contrast enhancement for dim/anti-aliased text
+            enhanced = cv2.convertScaleAbs(img_np, alpha=2.5, beta=50)
+            level = self.ocr.extract_number(
+                enhanced,
+                font_name="plain11",
+                colors=[YELLOW, WHITE],
+                correlation_threshold=0.85,
+            )
+
+        # Validate range
+        if level is not None and not (1 <= level <= 99):
+            logger.warning(
+                f"get_skill_level: OCR returned {level} for {skill_name}, "
+                f"outside valid range 1-99"
+            )
+            return None
+
+        if level is not None:
+            logger.info(f"get_skill_level: {skill_name} = {level}")
+        else:
+            logger.debug(f"get_skill_level: OCR returned None for {skill_name}")
+
+        return level
