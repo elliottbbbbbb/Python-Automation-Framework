@@ -162,6 +162,10 @@ class FletchingBot(BankstanderBot):
         # Track whether X quantity button has been clicked this session
         self._x_quantity_set = False
 
+        # Track consecutive "no materials found" scans for graceful exit
+        self._no_materials_count = 0
+        self.MAX_NO_MATERIALS_ATTEMPTS = 3
+
         # Fletching Make All menu template(s) for detection
         menu_templates = sorted(images_dir.glob("ui_templates/fletching_menu*.png"))
         self._fletching_menu_templates = (
@@ -564,7 +568,19 @@ class FletchingBot(BankstanderBot):
                         self._x_quantity_set = False
                         return StateResult.FAILURE
                 else:
-                    logger.error("BANKING: No materials available at any tier")
+                    self._no_materials_count += 1
+                    logger.error(
+                        f"BANKING: No materials available at any tier "
+                        f"({self._no_materials_count}/{self.MAX_NO_MATERIALS_ATTEMPTS})"
+                    )
+                    if self._no_materials_count >= self.MAX_NO_MATERIALS_ATTEMPTS:
+                        logger.info("BANKING: Max no-materials attempts reached, stopping bot")
+                        print(
+                            f"\n✅ No craftable materials found after "
+                            f"{self.MAX_NO_MATERIALS_ATTEMPTS} scans. "
+                            f"Bot stopping gracefully.\n"
+                        )
+                        self._exit_requested = True
                     self._bank_open = False
                     self._x_quantity_set = False
                     return StateResult.FAILURE
@@ -591,6 +607,9 @@ class FletchingBot(BankstanderBot):
                 return StateResult.FAILURE
 
             logger.info("BANKING: Withdrawal verified - both items in inventory")
+
+            # Reset no-materials counter on successful withdrawal
+            self._no_materials_count = 0
 
             # Step 3: Close bank
             logger.info("BANKING: Closing bank interface")
