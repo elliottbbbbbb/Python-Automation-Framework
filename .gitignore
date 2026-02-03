@@ -136,9 +136,11 @@ dmypy.json
 config.json
 ocr_debug/
 segmentation_debug/
-*.png
-*.jpg
-*.jpeg
+
+# Debug/runtime images (NOT bot template images - those are tracked)
+screenshots/
+*_debug*.png
+*_debug*.jpg
 
 # License system
 .license_cache
@@ -204,3 +206,9 @@ user_images/
 Thumbs.db
 desktop.ini
 .license_cache
+
+# Documentation (local dev notes, not for repo)
+*_TODO.md
+*_DEPENDENCIES.md
+CODE_CLEANUP_TODO.md
+NMZ_DEPENDENCIES.md
