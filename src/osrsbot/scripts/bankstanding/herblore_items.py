@@ -109,7 +109,7 @@ HERBLORE_TIERS = [
     {
         "min_level": 34,
         "tool_name": "toadflax potion (unf)",
-        "material_name": "toad's legs",
+        "material_name": "toad legs",
         "product_name": "agility potion",
     },
     {
