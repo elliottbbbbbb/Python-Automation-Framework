@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from osrsbot.utils.path_helpers import resolve_template_path
+
 logger = logging.getLogger(__name__)
 
 
@@ -117,12 +119,8 @@ class TemplateOCRService:
             fonts_dir: Path to fonts directory. If None, uses src/osrsbot/fonts
         """
         if fonts_dir is None:
-            # Default to src/osrsbot/fonts
-            fonts_dir = pathlib.Path(__file__).parent.parent / "fonts"
-        else:
-            fonts_dir = pathlib.Path(fonts_dir)
-
-        self.fonts_dir = fonts_dir
+            fonts_dir = "fonts"
+        self.fonts_dir = resolve_template_path(fonts_dir)
 
         # Load fonts (lazy loading - only load when needed)
         self._fonts = {}

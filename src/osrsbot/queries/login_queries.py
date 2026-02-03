@@ -19,7 +19,7 @@ from typing import Optional, Tuple
 import cv2 as cv
 import numpy as np
 
-from osrsbot.queries.bank_queries import _resolve_template_path
+from osrsbot.utils.path_helpers import resolve_template_path as _resolve_template_path
 from osrsbot.services.screen_service import ScreenService
 
 logger = logging.getLogger(__name__)
@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 class LoginQueries:
     """Query layer for login/disconnect state detection."""
 
-    # Template paths for the 3 login screens
-    OK_BUTTON_TEMPLATE = "src/osrsbot/images/bot/login/ok_button.png"
-    PLAY_NOW_TEMPLATE = "src/osrsbot/images/bot/login/play_now_button.png"
-    CLICK_TO_PLAY_TEMPLATE = "src/osrsbot/images/bot/login/click_to_play_button.png"
+    # Template paths for the 3 login screens (resolved via _resolve_template_path)
+    OK_BUTTON_TEMPLATE = "images/bot/login/ok_button.png"
+    PLAY_NOW_TEMPLATE = "images/bot/login/play_now_button.png"
+    CLICK_TO_PLAY_TEMPLATE = "images/bot/login/click_to_play_button.png"
 
     # Default confidence threshold for login screen detection
     DEFAULT_THRESHOLD = 0.6

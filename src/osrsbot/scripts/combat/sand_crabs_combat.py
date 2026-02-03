@@ -15,7 +15,7 @@ Strategy:
 Setup Requirements:
 1. RuneLite tile marker placed at your AFK spot
 2. RuneLite NPC Indicators: sand crabs highlighted with configured color
-3. Sand crab shell template images in src/osrsbot/images/bot/combat/sand_crabs/
+3. Sand crab shell template images in images/bot/combat/sand_crabs/
 4. config.json colors: sand_crab_afk_marker, sand_crab_npc_highlight
 """
 
@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from osrsbot.core.state_helpers import build_metadata_dict
+from osrsbot.utils.path_helpers import resolve_template_path
 from osrsbot.core.state_machine_bot import StateMachineBot
 from osrsbot.core.state_types import (
     StateExecutionContext,
@@ -63,7 +64,7 @@ class SandCrabsCombatBot(StateMachineBot):
     """
 
     # Default template image directory
-    TEMPLATE_DIR = "src/osrsbot/images/bot/combat/sand_crabs"
+    TEMPLATE_DIR = "images/bot/combat/sand_crabs"
 
     def __init__(self, **kwargs):
         super().__init__(
@@ -72,6 +73,9 @@ class SandCrabsCombatBot(StateMachineBot):
             enable_exit_key=True,
             enable_status_ui=True,
         )
+
+        # Resolve template directory relative to package root
+        self._resolved_template_dir = resolve_template_path(self.TEMPLATE_DIR)
 
         # Load shell template paths from the images directory
         self.shell_templates = self._discover_shell_templates()
@@ -150,7 +154,7 @@ class SandCrabsCombatBot(StateMachineBot):
         Returns:
             List of template paths (relative from project root)
         """
-        template_dir = Path(self.TEMPLATE_DIR)
+        template_dir = self._resolved_template_dir
         templates = []
 
         if template_dir.exists():
@@ -182,7 +186,7 @@ class SandCrabsCombatBot(StateMachineBot):
             List of waypoint entries, each a list of template variant paths.
             Walk order: pathway_1..6, then cyan_afk_tile.
         """
-        template_dir = Path(self.TEMPLATE_DIR)
+        template_dir = self._resolved_template_dir
         waypoints = []
 
         # Ordered pathway templates (with optional variants like pathway_6_2.png)

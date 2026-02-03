@@ -12,7 +12,7 @@ Features:
 - Configurable confidence threshold
 
 Usage:
-    service = ItemDetectionService("src/osrsbot/images/items", threshold=0.75)
+    service = ItemDetectionService("images/items", threshold=0.75)
     item_name = service.identify_item_in_slot(slot_image)
     slots = service.find_item("shark", snapshot, screenshot, grid)
 """
@@ -24,6 +24,8 @@ from typing import Dict, List, Optional, Tuple
 
 import cv2 as cv
 import numpy as np
+
+from osrsbot.utils.path_helpers import resolve_template_path
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +45,7 @@ class ItemDetectionService:
     - Cached in memory for fast lookup
     """
 
-    def __init__(self, items_dir: str = "src/osrsbot/images/items", threshold: float = 0.75):
+    def __init__(self, items_dir: str = "images/items", threshold: float = 0.75):
         """
         Initialize ItemDetectionService and load all item templates.
 
@@ -51,7 +53,8 @@ class ItemDetectionService:
             items_dir: Root directory containing manual/ and auto/ subdirectories
             threshold: Minimum confidence for template matching (0.0-1.0)
         """
-        self.items_dir = Path(items_dir)
+        # Resolve relative to package root so paths work from any CWD
+        self.items_dir = resolve_template_path(items_dir)
         self.threshold = threshold
         self.templates: Dict[str, np.ndarray] = {}  # item_name → grayscale template
         self.template_sizes: Dict[str, Tuple[int, int]] = {}  # item_name → (width, height)
