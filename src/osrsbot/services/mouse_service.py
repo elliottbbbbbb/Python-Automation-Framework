@@ -84,13 +84,25 @@ class MouseService:
             # Apply anti-ban speed variance
             duration *= speed_multiplier
 
-            # Introduce small variation so repeated 'curved' calls don't look identical
+            # Distance-aware style variation for natural movement
             if style == "curved":
                 r = random.random()
-                if r < 0.12:
-                    style = "linear"
-                elif r < 0.28:
-                    style = "overshoot"
+                if distance < 80:
+                    # Close targets: mostly direct, never overshoot
+                    if r < 0.25:
+                        style = "linear"
+                elif distance < 350:
+                    # Medium range: balanced mix
+                    if r < 0.10:
+                        style = "linear"
+                    elif r < 0.22:
+                        style = "overshoot"
+                else:
+                    # Far targets: wider curves, more overshoot
+                    if r < 0.05:
+                        style = "linear"
+                    elif r < 0.30:
+                        style = "overshoot"
 
             if style == "instant":
                 pyautogui.moveTo(x, y, duration=0)
@@ -214,10 +226,10 @@ class MouseService:
         dy = end_y - start_y
         dist = math.hypot(dx, dy)
 
-        # Base control offsets scale with distance for natural curves
-        base_off = int(max(1, dist * 0.2))
-        off_min = BEZIER_CURVE.control_point_offset_min
-        off_max = BEZIER_CURVE.control_point_offset_max
+        # Control point offsets scale proportionally with distance.
+        # Capped at 5-120px so short moves don't get absurdly curved
+        # and long moves still get noticeable arcs.
+        max_offset = max(5.0, min(dist * 0.35, 120.0))
 
         # Compute unit perpendicular vector
         if dist == 0:
@@ -234,14 +246,9 @@ class MouseService:
         cp2_base_x = start_x + dx * 0.66
         cp2_base_y = start_y + dy * 0.66
 
-        # Random perpendicular offset magnitude
-        mag1 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
-        mag2 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
-        # Randomly flip direction
-        if random.random() < 0.5:
-            mag1 *= -1
-        if random.random() < 0.5:
-            mag2 *= -1
+        # Random perpendicular offset magnitude (distance-scaled)
+        mag1 = random.uniform(-max_offset, max_offset)
+        mag2 = random.uniform(-max_offset, max_offset)
 
         cp1_x = cp1_base_x + perp_x * mag1
         cp1_y = cp1_base_y + perp_y * mag1

@@ -227,7 +227,7 @@ class InventoryActions:
         random.shuffle(drop_slots)
 
         dropped = 0
-        for slot in drop_slots:
+        for idx, slot in enumerate(drop_slots):
             # Small chance of anti-ban misclick
             if random.random() < INVENTORY_ACTIONS.misclick_chance:
                 wrong_slot = random.choice([s for s in drop_slots if s != slot])
@@ -247,6 +247,11 @@ class InventoryActions:
 
             if self.drop_item(slot, shift_drop=False):
                 dropped += 1
+
+            # Rhythm-varied inter-item delay (replaces uniform timing)
+            if self.anti_ban and idx < len(drop_slots) - 1:
+                rhythm = self.anti_ban.get_rhythm_delay(idx, 0.08)
+                time.sleep(rhythm)
 
         logger.info(f"Dropped {dropped} items (kept slots: {keep_slots})")
         return dropped
