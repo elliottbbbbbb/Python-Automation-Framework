@@ -371,40 +371,6 @@ class SandCrabsCombatBot(StateMachineBot):
 
     # ==================== Helper Methods ====================
 
-    def _detect_npc_highlight(self) -> bool:
-        """
-        Check if the sand crab NPC highlight color is visible on screen.
-
-        Uses the screen service find_color to detect the RuneLite NPC highlight.
-
-        Returns:
-            True if NPC highlight color is found on screen
-        """
-        hex_color = self.config.get("colors", self.npc_highlight_color)
-        if not hex_color:
-            logger.warning(f"NPC highlight color '{self.npc_highlight_color}' not in config")
-            return False
-
-        viewport_region = self.state.get_game_viewport_region()
-        logger.debug(
-            f"[NPC_HIGHLIGHT] Searching for color {hex_color} "
-            f"in viewport region={viewport_region}, tolerance=10"
-        )
-
-        match = self.actions.screen.find_color(hex_color, tolerance=10, region=viewport_region)
-
-        if match is not None:
-            logger.info(
-                f"[NPC_HIGHLIGHT] FOUND at ({match.x}, {match.y}), "
-                f"confidence={match.confidence:.3f}, actual_rgb={match.color}"
-            )
-            return True
-        else:
-            logger.debug(f"[NPC_HIGHLIGHT] Color {hex_color} NOT found in viewport")
-            return False
-
-    # ==================== Reset Aggro Helpers ====================
-
     def _cluster_color_matches(self, matches, cluster_radius: int = 25) -> List[Tuple[int, int]]:
         """
         Cluster nearby color match pixels into distinct tile center positions.
@@ -445,74 +411,6 @@ class SandCrabsCombatBot(StateMachineBot):
             clusters.append((cx, cy))
 
         return clusters
-
-    def _find_color_tiles(
-        self,
-        color_key: str,
-        visited: Optional[List[Tuple[int, int]]] = None,
-        dedup_radius: int = 80,
-    ) -> List[Tuple[int, int]]:
-        """
-        Find all tile markers for a color in the game viewport.
-
-        Clusters nearby pixels into tile centers, filters out already-visited
-        tiles, and sorts by distance from screen center (nearest first).
-
-        Args:
-            color_key: Config color key name (e.g., "sand_crab_path_pink")
-            visited: Optional list of already-visited tile coordinates to skip
-            dedup_radius: Min pixel distance from visited tiles to count as unvisited
-
-        Returns:
-            List of (x, y) unvisited tile centers, sorted nearest-first
-        """
-        hex_color = self.config.get("colors", color_key)
-        if not hex_color:
-            logger.warning(f"Color '{color_key}' not in config")
-            return []
-
-        viewport_region = self.state.get_game_viewport_region()
-        matches = self.actions.screen.find_color(
-            hex_color, tolerance=25, region=viewport_region, find_all=True
-        )
-
-        # V17: Debug logging for raw pixel matches (diagnose GREEN detection)
-        match_count = len(matches) if matches else 0
-        logger.info(
-            f"_find_color_tiles('{color_key}'): raw_pixels={match_count}, "
-            f"hex={hex_color}, tolerance=25"
-        )
-
-        if not matches:
-            return []
-
-        # Cluster pixels into tile centers
-        tile_centers = self._cluster_color_matches(matches, cluster_radius=25)
-
-        # Filter out visited tiles
-        if visited:
-            unvisited = []
-            for tx, ty in tile_centers:
-                is_visited = False
-                for vx, vy in visited:
-                    dist = ((tx - vx) ** 2 + (ty - vy) ** 2) ** 0.5
-                    if dist < dedup_radius:
-                        is_visited = True
-                        break
-                if not is_visited:
-                    unvisited.append((tx, ty))
-        else:
-            unvisited = tile_centers
-
-        # Sort by distance from screen center (nearest first, window-relative)
-        if viewport_region:
-            cx = viewport_region[0] + viewport_region[2] // 2
-            cy = viewport_region[1] + viewport_region[3] // 2
-        else:
-            cx, cy = 400, 300
-        unvisited.sort(key=lambda t: ((t[0] - cx) ** 2 + (t[1] - cy) ** 2) ** 0.5)
-
-        return unvisited
 
     def _find_color_center(
         self,
@@ -576,63 +474,6 @@ class SandCrabsCombatBot(StateMachineBot):
             speed_multiplier=self.actions._get_mouse_speed_multiplier(),
         )
         return True
-
-    def _mark_nearby_tiles_as_passed(
-        self,
-        passed_tiles: List[Tuple[int, int]],
-        pass_radius: int = 80,
-    ) -> int:
-        """
-        Scan for colored path tiles near viewport center (player position)
-        and add them to the passed_tiles list.
-
-        In OSRS fixed camera (bird's-eye, 350 view), the player character is
-        always at viewport center. Tiles near center have been walked past.
-
-        Args:
-            passed_tiles: Mutable list to append newly passed tile coords to.
-            pass_radius: Max pixel distance from viewport center to count as passed.
-
-        Returns:
-            Number of new tiles marked as passed.
-        """
-        viewport_region = self.state.get_game_viewport_region()
-        if not viewport_region:
-            return 0
-
-        # Window-relative center (accounts for viewport offset)
-        center_x = viewport_region[0] + viewport_region[2] // 2
-        center_y = viewport_region[1] + viewport_region[3] // 2
-        new_count = 0
-
-        for color_key in [self.path_pink_color, self.path_green_color]:
-            hex_color = self.config.get("colors", color_key)
-            if not hex_color:
-                continue
-
-            matches = self.actions.screen.find_color(
-                hex_color, tolerance=25, region=viewport_region, find_all=True
-            )
-            if not matches:
-                continue
-
-            tile_centers = self._cluster_color_matches(matches, cluster_radius=25)
-
-            for tx, ty in tile_centers:
-                dist = ((tx - center_x) ** 2 + (ty - center_y) ** 2) ** 0.5
-                if dist > pass_radius:
-                    continue
-
-                # Check not already in passed list (40px internal dedup)
-                already = any(
-                    ((tx - px) ** 2 + (ty - py) ** 2) ** 0.5 < 40
-                    for px, py in passed_tiles
-                )
-                if not already:
-                    passed_tiles.append((tx, ty))
-                    new_count += 1
-
-        return new_count
 
     # ==================== State Handlers ====================
 
@@ -761,230 +602,6 @@ class SandCrabsCombatBot(StateMachineBot):
 
         return StateResult.SUCCESS
 
-    def _walk_toward_crabs(
-        self,
-        label: str,
-        check_cyan: bool = True,
-        walk_randomly_if_stuck: bool = True,
-        reverse_color_priority: bool = False,
-    ) -> int:
-        """
-        Walk along colored waypoints using player-center passed-tile detection (V14).
-
-        Instead of phase-locked progression, finds ALL colored tiles (PINK + GREEN)
-        simultaneously, marks tiles near the player (viewport center) as "passed",
-        and clicks the nearest unvisited tile. Tiles the player has walked past are
-        filtered out via dedup radius matching against the passed list.
-
-        Args:
-            label: Log prefix for context (e.g., "NAVIGATE_TO_CRABS", "RESET_AGGRO")
-            check_cyan: If True, check for cyan destination tile each iteration.
-            walk_randomly_if_stuck: If True, walk randomly when no tiles found.
-                If False, break out of loop (end of path reached).
-
-        Returns:
-            Number of tiles walked.
-        """
-        PASS_RADIUS = 80       # Tiles within 80px of center are "passed"
-        DEDUP_RADIUS = 120     # Tolerance when filtering passed tiles from candidates
-        MIN_CLICK_DIST = 60    # Don't click tiles too close to center (under player)
-        MAX_STEPS = 20
-        MAX_STUCK_ATTEMPTS = 3
-
-        afk_hex = self.config.get("colors", self.afk_marker_color) if check_cyan else None
-
-        passed_tiles: List[Tuple[int, int]] = []
-        walk_steps = 0
-        stuck_attempts = 0
-
-        # Mark tiles near starting position as passed
-        initial_passed = self._mark_nearby_tiles_as_passed(passed_tiles, PASS_RADIUS)
-        logger.info(
-            f"{label}: [V14] Starting passed-tile navigation. "
-            f"Initial passed tiles: {initial_passed}"
-        )
-
-        for step in range(MAX_STEPS):
-            self._check_exit_requested()
-
-            # --- Priority: Check cyan destination tile ---
-            if afk_hex:
-                if self._click_tile_centroid(afk_hex, tolerance=10):
-                    logger.info(f"{label}: Cyan AFK tile found! Clicking to arrive.")
-                    self.actions.wait("long")
-                    self.actions.wait("medium")
-                    logger.info(f"{label}: Arrived at crab area.")
-                    break
-
-            # --- Find ALL colored tiles (both pink + green), filtered by passed list ---
-            viewport_region = self.state.get_game_viewport_region()
-            if not viewport_region:
-                logger.warning(f"{label}: No viewport region available")
-                break
-
-            # Window-relative center (accounts for viewport offset)
-            center_x = viewport_region[0] + viewport_region[2] // 2
-            center_y = viewport_region[1] + viewport_region[3] // 2
-
-            # --- Find colored tiles per color ---
-            pink_tiles = self._find_color_tiles(
-                self.path_pink_color, passed_tiles, dedup_radius=DEDUP_RADIUS
-            )
-            green_tiles = self._find_color_tiles(
-                self.path_green_color, passed_tiles, dedup_radius=DEDUP_RADIUS
-            )
-            logger.info(
-                f"{label}: Color scan: PINK={len(pink_tiles)}, GREEN={len(green_tiles)}"
-            )
-
-            # V16: Color priority — prefer forward-direction color
-            if reverse_color_priority:
-                # Walking AWAY from crabs: prefer PINK (far segment) over GREEN
-                primary = [(tx, ty, "PINK") for tx, ty in pink_tiles]
-                fallback = [(tx, ty, "GREEN") for tx, ty in green_tiles]
-            else:
-                # Walking TOWARD crabs: prefer GREEN (near segment) over PINK
-                primary = [(tx, ty, "GREEN") for tx, ty in green_tiles]
-                fallback = [(tx, ty, "PINK") for tx, ty in pink_tiles]
-
-            # Filter out tiles too close to center (under the player)
-            primary = [
-                (tx, ty, cn) for tx, ty, cn in primary
-                if ((tx - center_x) ** 2 + (ty - center_y) ** 2) ** 0.5 >= MIN_CLICK_DIST
-            ]
-            fallback = [
-                (tx, ty, cn) for tx, ty, cn in fallback
-                if ((tx - center_x) ** 2 + (ty - center_y) ** 2) ** 0.5 >= MIN_CLICK_DIST
-            ]
-
-            # Use primary color if available, otherwise fall back
-            candidates = primary if primary else fallback
-
-            # Sort by distance from center (nearest first within chosen color)
-            candidates.sort(
-                key=lambda t: ((t[0] - center_x) ** 2 + (t[1] - center_y) ** 2) ** 0.5
-            )
-
-            if candidates:
-                tx, ty, color_name = candidates[0]
-                dist = ((tx - center_x) ** 2 + (ty - center_y) ** 2) ** 0.5
-                logger.info(
-                    f"{label}: [STEP {walk_steps + 1}] "
-                    f"Clicking {color_name} tile at ({tx}, {ty}), "
-                    f"dist={dist:.0f}px, "
-                    f"passed={len(passed_tiles)}, "
-                    f"remaining={len(candidates)}"
-                )
-
-                abs_x, abs_y = self.actions.coord_resolver.to_absolute(tx, ty)
-                self.actions.mouse.click_at(
-                    abs_x, abs_y,
-                    move_style="curved",
-                    speed_multiplier=self.actions._get_mouse_speed_multiplier(),
-                )
-
-                # V15: Mark clicked tile as passed immediately (pre-walk coords)
-                # This prevents oscillation when viewport shifts bring tiles back
-                # to the same screen position on alternating steps.
-                passed_tiles.append((tx, ty))
-
-                walk_steps += 1
-                stuck_attempts = 0
-
-                # Wait for player to walk
-                self.actions.wait("long")
-                self.actions.wait("long")
-
-                # After walk: also scan for nearby tiles (catches adjacent tiles)
-                new_passed = self._mark_nearby_tiles_as_passed(passed_tiles, PASS_RADIUS)
-                logger.debug(
-                    f"{label}: Post-walk scan: {new_passed} new tiles passed "
-                    f"(total passed: {len(passed_tiles)})"
-                )
-                continue
-
-            # --- No tiles found ---
-            if not walk_randomly_if_stuck:
-                logger.info(
-                    f"{label}: No unvisited tiles found. "
-                    f"End of path ({walk_steps} tiles walked)."
-                )
-                break
-
-            stuck_attempts += 1
-            if stuck_attempts >= MAX_STUCK_ATTEMPTS:
-                logger.warning(
-                    f"{label}: Stuck after {MAX_STUCK_ATTEMPTS} attempts. "
-                    f"Breaking ({walk_steps} tiles walked)."
-                )
-                break
-
-            # V17: Click in game viewport instead of minimap walk_tiles()
-            # Determine forward direction from passed tiles centroid
-            # Window-relative center (accounts for viewport offset)
-            vp_cx = viewport_region[0] + viewport_region[2] // 2
-            vp_cy = viewport_region[1] + viewport_region[3] // 2
-            # Viewport bounds in window coords (for clamping)
-            vp_left = viewport_region[0]
-            vp_top = viewport_region[1]
-            vp_right = viewport_region[0] + viewport_region[2]
-            vp_bottom = viewport_region[1] + viewport_region[3]
-            # Half-dimensions for direction scaling
-            half_w = viewport_region[2] // 2
-            half_h = viewport_region[3] // 2
-
-            if len(passed_tiles) >= 2:
-                # Centroid of passed tiles = "behind" us → walk opposite direction
-                avg_px = sum(p[0] for p in passed_tiles) / len(passed_tiles)
-                avg_py = sum(p[1] for p in passed_tiles) / len(passed_tiles)
-                dx = vp_cx - avg_px
-                dy = vp_cy - avg_py
-                mag = max((dx ** 2 + dy ** 2) ** 0.5, 1)
-                target_x = int(vp_cx + (dx / mag) * (half_w * 0.7))
-                target_y = int(vp_cy + (dy / mag) * (half_h * 0.7))
-                # Clamp to viewport with margin (window-relative coords)
-                target_x = max(vp_left + 30, min(target_x, vp_right - 30))
-                target_y = max(vp_top + 30, min(target_y, vp_bottom - 30))
-                logger.info(
-                    f"{label}: No tiles found (attempt {stuck_attempts}/{MAX_STUCK_ATTEMPTS}). "
-                    f"Walking forward in viewport toward ({target_x}, {target_y}) "
-                    f"(away from passed centroid at ({avg_px:.0f}, {avg_py:.0f}))"
-                )
-            else:
-                # No direction info — pick random viewport edge point (window-relative)
-                edge = random.choice(["top", "bottom", "left", "right"])
-                if edge == "top":
-                    target_x = random.randint(vp_left + 100, vp_right - 100)
-                    target_y = vp_top + 50
-                elif edge == "bottom":
-                    target_x = random.randint(vp_left + 100, vp_right - 100)
-                    target_y = vp_bottom - 50
-                elif edge == "left":
-                    target_x = vp_left + 50
-                    target_y = random.randint(vp_top + 100, vp_bottom - 100)
-                else:
-                    target_x = vp_right - 50
-                    target_y = random.randint(vp_top + 100, vp_bottom - 100)
-                logger.info(
-                    f"{label}: No tiles found (attempt {stuck_attempts}/{MAX_STUCK_ATTEMPTS}). "
-                    f"Walking randomly in viewport toward ({target_x}, {target_y}) [{edge}]"
-                )
-
-            abs_x, abs_y = self.actions.coord_resolver.to_absolute(target_x, target_y)
-            self.actions.mouse.click_at(
-                abs_x, abs_y,
-                move_style="curved",
-                speed_multiplier=self.actions._get_mouse_speed_multiplier(),
-            )
-            self.actions.wait("long")
-            self.actions.wait("long")
-
-            # Mark tiles near new position after walk
-            self._mark_nearby_tiles_as_passed(passed_tiles, PASS_RADIUS)
-
-        logger.info(f"{label}: [V14] Navigation complete. {walk_steps} tiles walked.")
-        return walk_steps
-
     def _walk_waypoints(
         self,
         label: str,
@@ -1007,7 +624,7 @@ class SandCrabsCombatBot(StateMachineBot):
             Number of waypoints successfully walked.
         """
         MAX_SEARCH_ATTEMPTS = 5
-        THRESHOLD = 0.65
+        THRESHOLD = 0.60
 
         waypoints = list(self.waypoint_templates)
         if reverse:
@@ -1079,8 +696,26 @@ class SandCrabsCombatBot(StateMachineBot):
                 logger.info(
                     f"{label}: Skipping {wp_name} "
                     f"(not found after {MAX_SEARCH_ATTEMPTS} attempts). "
-                    f"May have already passed it."
+                    f"Walking forward to bring next waypoints into view."
                 )
+                # Walk in the travel direction so the next waypoint becomes visible
+                viewport_region = self.state.get_game_viewport_region()
+                if viewport_region:
+                    vp_cx = viewport_region[0] + viewport_region[2] // 2
+                    if reverse:
+                        # Walking AWAY from crabs: click bottom of viewport
+                        target_y = viewport_region[1] + viewport_region[3] - 50
+                    else:
+                        # Walking TOWARD crabs: click top of viewport
+                        target_y = viewport_region[1] + 50
+                    abs_x, abs_y = self.actions.coord_resolver.to_absolute(vp_cx, target_y)
+                    self.actions.mouse.click_at(
+                        abs_x, abs_y,
+                        move_style="curved",
+                        speed_multiplier=self.actions._get_mouse_speed_multiplier(),
+                    )
+                    self.actions.wait("long")
+                    self.actions.wait("long")
 
         logger.info(
             f"{label}: Waypoint navigation complete. "
@@ -1300,6 +935,7 @@ class SandCrabsCombatBot(StateMachineBot):
                 "Moving to AFK spot. (_ready_for_combat=True)"
             )
         else:
+            self._ready_for_combat = False
             logger.info(
                 f"AGGRO_MORE_CRABS: Need more crabs. "
                 f"Shell visits: {self._current_aggro_count}/{self.target_aggro_count}. "
@@ -1647,6 +1283,7 @@ class SandCrabsCombatBot(StateMachineBot):
         self._consecutive_no_combat_cycles = 0
         self._consecutive_failed_hunts = 0
         self._current_aggro_count = 0
+        self._ready_for_combat = False
         self._visited_shells.clear()
         self._aggro_resets += 1
 
@@ -1678,6 +1315,7 @@ class SandCrabsCombatBot(StateMachineBot):
         logger.warning("=" * 60)
 
         self._current_aggro_count = 0
+        self._ready_for_combat = False
         self._visited_shells.clear()
         self._needs_aggro_reset = False
         self._consecutive_no_combat_cycles = 0
