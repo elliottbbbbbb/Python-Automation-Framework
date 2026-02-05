@@ -103,6 +103,7 @@ class ConstructionTrainingBot(StateMachineBot):
         # State tracking
         self._last_chair_type = None
         self._needs_more_planks = False  # Used for conditional state transitions
+        self._consecutive_recoveries = 0
         self._chair_already_built = False  # Used for conditional FIND_CHAIR_SPACE transitions
         self._is_inside_house = False  # Track if inside house to skip TELEPORT_TO_HOUSE
 
@@ -144,7 +145,7 @@ class ConstructionTrainingBot(StateMachineBot):
             "src/osrsbot/images/bot/construction/outside_portal_4.png",
         ]
 
-        # Note: Chair hotspot detection now uses yellow tile markers instead of templates
+        # Note: Chair hotspot detection now uses cyan tile markers instead of templates
 
         # Built chairs (different types) - use lists for multi-template matching
         self.BUILT_CHAIR_CRUDE_TEMPLATES = [
@@ -222,13 +223,13 @@ class ConstructionTrainingBot(StateMachineBot):
         self.HOUSE_PORTAL_COLOR = "#34114D"
         self.HOUSE_PORTAL_COLOR_TOLERANCE = 15
 
-        # Yellow tile marker (bright yellow) - for walking to/from Phials area
-        self.YELLOW_TILE_COLOR = "#fcfc01"
-        self.YELLOW_TILE_TOLERANCE = 15
+        # Cyan tile marker - for walking to/from Phials area
+        self.TILE_MARKER_COLOR = "#00FFFF"
+        self.TILE_MARKER_TOLERANCE = 15
 
         # Phials NPC highlight (gold) - for targeting when exchanging planks
         self.PHIALS_COLOR = "#FFD700"
-        self.PHIALS_COLOR_TOLERANCE = 15
+        self.PHIALS_COLOR_TOLERANCE = 30
 
         # Template matching thresholds
         self.THRESHOLD_PORTAL = 0.4
@@ -442,6 +443,9 @@ class ConstructionTrainingBot(StateMachineBot):
         """
         logger.info("[CHECK_SUPPLIES] Verifying inventory items...")
 
+        # Ensure inventory tab is open before template matching
+        self.actions.ensure_inventory_open()
+
         # Debug: save inventory region for visual verification
         self._debug_save_inventory_region()
 
@@ -646,10 +650,10 @@ class ConstructionTrainingBot(StateMachineBot):
 
     def _handle_find_phials(self, context: StateExecutionContext) -> StateResult:
         """
-        FIND_PHIALS state - Walk to Phials area by clicking yellow tile marker.
+        FIND_PHIALS state - Walk to Phials area by clicking cyan tile marker.
 
         Steps:
-        1. Click yellow tile marker (#fcfc01) to walk closer to Phials
+        1. Click cyan tile marker (#00FFFF) to walk closer to Phials
         2. Wait for player to arrive
 
         Transitions:
@@ -668,19 +672,19 @@ class ConstructionTrainingBot(StateMachineBot):
         # Get viewport region to exclude minimap/UI
         viewport_region = self.state.get_game_viewport_region()
 
-        # Step 1: Click yellow tile center to walk closer (restricted to game viewport)
+        # Step 1: Click cyan tile center to walk closer (restricted to game viewport)
         tile_center = self._find_color_center(
-            self.YELLOW_TILE_COLOR,
-            tolerance=self.YELLOW_TILE_TOLERANCE,
+            self.TILE_MARKER_COLOR,
+            tolerance=self.TILE_MARKER_TOLERANCE,
             region=viewport_region
         )
 
         if not tile_center:
-            logger.warning("FIND_PHIALS: Yellow tile marker not found")
+            logger.warning("FIND_PHIALS: Cyan tile marker not found")
             return StateResult.FAILURE
 
         center_x, center_y = tile_center
-        logger.info(f"FIND_PHIALS: Yellow tile center at ({center_x}, {center_y})")
+        logger.info(f"FIND_PHIALS: Tile marker center at ({center_x}, {center_y})")
 
         # Convert to absolute coordinates and click
         abs_x, abs_y = self.actions.coord_resolver.to_absolute(center_x, center_y)
@@ -731,7 +735,7 @@ class ConstructionTrainingBot(StateMachineBot):
                 return StateResult.FAILURE
 
             logger.info("EXCHANGE_NOTES: Clicked noted planks in inventory")
-            self.actions.wait("short")
+            self.actions.wait("medium")
 
             viewport_region = self.state.get_game_viewport_region()
 
@@ -769,6 +773,7 @@ class ConstructionTrainingBot(StateMachineBot):
             if self.state.find_template(self.PLANK_TEMPLATE, threshold=0.7):
                 logger.info("EXCHANGE_NOTES: Exchange verified - unnoted planks found")
                 self._exchanges_completed += 1
+                self._consecutive_recoveries = 0
                 return StateResult.SUCCESS
 
             logger.warning("EXCHANGE_NOTES: Exchange not verified, will retry...")
@@ -790,7 +795,7 @@ class ConstructionTrainingBot(StateMachineBot):
         Steps:
         1. Check for outside portal template (rocky) - if found, click to enter
         2. Check for inside portal template (thin) - if found, already inside
-        3. Neither found - walk to yellow tile and retry (no color fallback!)
+        3. Neither found - walk to cyan tile and retry (no color fallback!)
 
         Transitions:
         - SUCCESS → FIND_CHAIR_SPACE
@@ -824,23 +829,23 @@ class ConstructionTrainingBot(StateMachineBot):
             if center_x < MIN_X or center_x > MAX_X or center_y < MIN_Y or center_y > MAX_Y:
                 logger.info(f"ENTER_HOUSE: Portal at edge ({center_x}, {center_y}), walking closer first...")
 
-                # Walk to yellow tile to get closer
+                # Walk to cyan tile to get closer
                 tile_center = self._find_color_center(
-                    self.YELLOW_TILE_COLOR,
-                    tolerance=self.YELLOW_TILE_TOLERANCE,
+                    self.TILE_MARKER_COLOR,
+                    tolerance=self.TILE_MARKER_TOLERANCE,
                     region=viewport_region
                 )
 
                 if tile_center:
                     tile_x, tile_y = tile_center
-                    logger.info(f"ENTER_HOUSE: Walking to yellow tile at ({tile_x}, {tile_y})")
+                    logger.info(f"ENTER_HOUSE: Walking to cyan tile at ({tile_x}, {tile_y})")
                     abs_x, abs_y = self.actions.coord_resolver.to_absolute(tile_x, tile_y)
                     self.actions.mouse.click_at(abs_x, abs_y, move_style="curved")
                     self.actions.wait("long")
                     self.actions.wait("long")
                     return StateResult.FAILURE  # Retry after walking closer
                 else:
-                    logger.warning("ENTER_HOUSE: No yellow tile found to walk closer")
+                    logger.warning("ENTER_HOUSE: No cyan tile found to walk closer")
 
             # Portal is in clickable zone - click it
             logger.info("ENTER_HOUSE: We are OUTSIDE - clicking portal to enter")
@@ -880,16 +885,16 @@ class ConstructionTrainingBot(StateMachineBot):
         # DO NOT use color fallback - it can't distinguish inside vs outside!
         logger.warning("ENTER_HOUSE: No portal template matched - location uncertain")
 
-        # Walk to yellow tile to get closer and retry
+        # Walk to cyan tile to get closer and retry
         tile_center = self._find_color_center(
-            self.YELLOW_TILE_COLOR,
-            tolerance=self.YELLOW_TILE_TOLERANCE,
+            self.TILE_MARKER_COLOR,
+            tolerance=self.TILE_MARKER_TOLERANCE,
             region=viewport_region
         )
 
         if tile_center:
             center_x, center_y = tile_center
-            logger.info(f"ENTER_HOUSE: Walking to yellow tile at ({center_x}, {center_y}) to get closer...")
+            logger.info(f"ENTER_HOUSE: Walking to cyan tile at ({center_x}, {center_y}) to get closer...")
             abs_x, abs_y = self.actions.coord_resolver.to_absolute(center_x, center_y)
             self.actions.mouse.click_at(abs_x, abs_y, move_style="curved")
 
@@ -912,7 +917,7 @@ class ConstructionTrainingBot(StateMachineBot):
         - SUCCESS → BUILD_CHAIR
         - FAILURE if hotspot not found → RETRY
         """
-        logger.info("[FIND_CHAIR_SPACE] Locating chair build hotspot (yellow tile)...")
+        logger.info("[FIND_CHAIR_SPACE] Locating chair build hotspot (cyan tile)...")
 
         # Always detect fresh - stored location doesn't work due to character movement
         # during build/remove animations (screen coordinates become stale)
@@ -974,7 +979,7 @@ class ConstructionTrainingBot(StateMachineBot):
             center_x, center_y, confidence = ghostly_check
             if center_x <= self.VIEWPORT_EDGE_THRESHOLD_X:  # Not at UI edge
                 logger.info(f"FIND_CHAIR_SPACE: Ghostly chair hotspot at ({center_x}, {center_y}), conf={confidence:.2f}")
-                # Use template position directly for click (skip yellow tile detection)
+                # Use template position directly for click (skip cyan tile detection)
                 abs_x, abs_y = self.actions.coord_resolver.to_absolute(center_x, center_y)
                 self.actions.mouse.click_at(abs_x, abs_y, button="right", move_style="curved")
 
@@ -996,7 +1001,7 @@ class ConstructionTrainingBot(StateMachineBot):
             else:
                 logger.warning(f"FIND_CHAIR_SPACE: Ignoring ghostly edge detection at x={center_x}")
 
-        # FALLBACK: Yellow tile detection (if template matching fails)
+        # FALLBACK: Cyan tile detection (if template matching fails)
         upper_region = (
             viewport_region[0],
             viewport_region[1],
@@ -1004,18 +1009,18 @@ class ConstructionTrainingBot(StateMachineBot):
             self.CHAIR_SEARCH_HEIGHT
         )
 
-        tile_center = self._find_color_center(
-            self.YELLOW_TILE_COLOR,
-            tolerance=self.YELLOW_TILE_TOLERANCE,
+        tile_center = self._find_color_cluster_center(
+            self.TILE_MARKER_COLOR,
+            tolerance=self.TILE_MARKER_TOLERANCE,
             region=upper_region  # Restricted to upper viewport
         )
 
         if not tile_center:
-            logger.warning("FIND_CHAIR_SPACE: Yellow tile marker not found in upper viewport (fallback)")
+            logger.warning("FIND_CHAIR_SPACE: Cyan tile marker not found in upper viewport (fallback)")
             return StateResult.FAILURE
 
         center_x, center_y = tile_center
-        logger.info(f"FIND_CHAIR_SPACE: Chair hotspot tile at ({center_x}, {center_y}) (via yellow tile fallback)")
+        logger.info(f"FIND_CHAIR_SPACE: Chair hotspot tile at ({center_x}, {center_y}) (via cyan tile fallback)")
 
         # Step 2: Right-click on chair hotspot
         abs_x, abs_y = self.actions.coord_resolver.to_absolute(center_x, center_y)
@@ -1133,6 +1138,7 @@ class ConstructionTrainingBot(StateMachineBot):
         self._chairs_built += 1
         self._planks_used += 1  # Each chair uses 1 plank
         self._last_chair_type = chair_type
+        self._consecutive_recoveries = 0
 
         return StateResult.SUCCESS
 
@@ -1158,7 +1164,7 @@ class ConstructionTrainingBot(StateMachineBot):
         # Get viewport region to exclude minimap/UI
         viewport_region = self.state.get_game_viewport_region()
 
-        # Find built chair using template matching (more accurate than yellow tile)
+        # Find built chair using template matching (more accurate than cyan tile)
         # Use SINGLE template for testing (user's request to simplify debugging)
         SINGLE_CHAIR_TEMPLATE = "src/osrsbot/images/bot/construction/built_chair_rocking_5.png"
 
@@ -1169,15 +1175,15 @@ class ConstructionTrainingBot(StateMachineBot):
         )
 
         if not chair_result:
-            # Fallback to yellow tile detection if template not found
-            logger.warning("REMOVE_CHAIR: Chair template not found, trying yellow tile")
+            # Fallback to cyan tile detection if template not found
+            logger.warning("REMOVE_CHAIR: Chair template not found, trying cyan tile")
             tile_center = self._find_color_center(
-                self.YELLOW_TILE_COLOR,
-                tolerance=self.YELLOW_TILE_TOLERANCE,
+                self.TILE_MARKER_COLOR,
+                tolerance=self.TILE_MARKER_TOLERANCE,
                 region=viewport_region
             )
             if not tile_center:
-                logger.warning("REMOVE_CHAIR: Yellow tile marker not found either")
+                logger.warning("REMOVE_CHAIR: Cyan tile marker not found either")
                 return StateResult.FAILURE
             center_x, center_y = tile_center
             # Keep Y offset for tile-based detection
@@ -1283,7 +1289,7 @@ class ConstructionTrainingBot(StateMachineBot):
             self._needs_more_planks = False  # Conditional transition will go to FIND_CHAIR_SPACE
 
         # Clear stored chair location since character has moved during removal animation
-        # Next FIND_CHAIR_SPACE will re-detect the yellow tile fresh
+        # Next FIND_CHAIR_SPACE will re-detect the cyan tile fresh
 
         # No extra wait here - state already takes ~8-9s, near the 10s timeout limit
 
@@ -1303,6 +1309,12 @@ class ConstructionTrainingBot(StateMachineBot):
         """
         logger.warning("[RECOVERY] Attempting error recovery...")
 
+        self._consecutive_recoveries += 1
+        if self._consecutive_recoveries >= 3:
+            logger.error("RECOVERY: 3 consecutive recoveries without progress — stopping bot")
+            self._log_session_stats()
+            raise RuntimeError("Too many consecutive recoveries — stopping bot")
+
         # Close interfaces
         self.keyboard.escape()
         self.actions.wait("short")
@@ -1311,7 +1323,7 @@ class ConstructionTrainingBot(StateMachineBot):
         self.keyboard.escape()
         self.actions.wait("medium")
 
-        logger.info("RECOVERY: Interfaces closed, returning to IDLE")
+        logger.info(f"RECOVERY: Interfaces closed, returning to IDLE (recovery #{self._consecutive_recoveries})")
 
         return StateResult.SUCCESS
 
@@ -1670,6 +1682,77 @@ class ConstructionTrainingBot(StateMachineBot):
         total_y = sum(m.y for m in matches)
         center_x = total_x // len(matches)
         center_y = total_y // len(matches)
+
+        return (center_x, center_y)
+
+    def _find_color_cluster_center(
+        self,
+        hex_color: str,
+        tolerance: int,
+        region: Optional[Tuple[int, int, int, int]] = None,
+        cell_size: int = 40
+    ) -> Optional[Tuple[int, int]]:
+        """
+        Find centroid of the largest cluster of matching pixels.
+
+        Unlike _find_color_center which averages ALL matching pixels,
+        this groups pixels into spatial clusters and returns the centroid
+        of the largest one. Prevents the click from being pulled off-target
+        by secondary tile markers or stray color matches.
+
+        Args:
+            hex_color: Target color as hex string (e.g., "#00FFFF")
+            tolerance: Color matching tolerance
+            region: Optional search region (x, y, width, height)
+            cell_size: Grid cell size in pixels for clustering
+
+        Returns:
+            (x, y) center coordinates of largest cluster, or None if no matches
+        """
+        matches = self.actions.screen.find_color(
+            hex_color,
+            tolerance=tolerance,
+            region=region,
+            find_all=True
+        )
+
+        if not matches:
+            return None
+
+        # Grid-based clustering: assign each pixel to a cell
+        cells: dict = {}  # (cell_x, cell_y) -> list of (x, y)
+        for m in matches:
+            key = (m.x // cell_size, m.y // cell_size)
+            cells.setdefault(key, []).append((m.x, m.y))
+
+        # Flood fill to merge adjacent cells into clusters
+        visited: set = set()
+        clusters: list = []
+        for key in cells:
+            if key in visited:
+                continue
+            cluster_pixels: list = []
+            stack = [key]
+            while stack:
+                k = stack.pop()
+                if k in visited or k not in cells:
+                    continue
+                visited.add(k)
+                cluster_pixels.extend(cells[k])
+                cx, cy = k
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    stack.append((cx + dx, cy + dy))
+            clusters.append(cluster_pixels)
+
+        # Pick largest cluster
+        largest = max(clusters, key=len)
+        center_x = sum(x for x, y in largest) // len(largest)
+        center_y = sum(y for x, y in largest) // len(largest)
+
+        logger.info(
+            f"Color cluster: {len(clusters)} cluster(s), "
+            f"largest has {len(largest)} pixels, center=({center_x}, {center_y})"
+        )
 
         return (center_x, center_y)
 
