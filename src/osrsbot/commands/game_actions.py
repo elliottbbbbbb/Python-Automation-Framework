@@ -31,7 +31,6 @@ from osrsbot.commands.bank_actions import BankActions
 from osrsbot.commands.combat_actions import CombatActions
 from osrsbot.commands.inventory_actions import InventoryActions
 from osrsbot.constants import GAME_TIMING, LOOT_DETECTION, MINIMAP_NAVIGATION, MovementStyle
-from osrsbot.queries.bank_queries import BankQueries
 
 # Type hints only - actual instances injected by runner
 if TYPE_CHECKING:
@@ -81,9 +80,6 @@ class GameActions:
         self.coord_resolver = coord_resolver
         self.timing = timing_helper
 
-        # Initialize bank queries
-        bank_queries = BankQueries(screen)
-
         # Initialize focused modules
         self.inventory = InventoryActions(
             mouse, self.coord_resolver, self.timing, anti_ban_service
@@ -91,15 +87,10 @@ class GameActions:
         self.combat = CombatActions(
             mouse, screen, self.coord_resolver, self.timing, config, anti_ban_service
         )
-        self.bank = BankActions(mouse, bank_queries, self.coord_resolver, self.timing)
+        self.bank = BankActions(mouse, self.coord_resolver, self.timing)
 
     # ==================== Backward Compatibility Methods ====================
     # These delegate to new modules while maintaining exact same API
-
-    def click_banker(self, banker_templates: List[str], threshold: float = 0.7) -> bool:
-        """Find and click banker (delegates to BankActions)."""
-        return self.bank.click_banker(banker_templates, threshold)
-
 
     # --- Timing/Wait (delegates to TimingHelper) ---
     def wait(self, timing_type: str) -> None:
@@ -476,31 +467,101 @@ class GameActions:
 
         return self.walker.walk_path(waypoints, move_style=move_style)
 
-    # ==================== Banking Helper Methods ====================
-    # Delegate to BankActions module
+    # ==================== Template Matching + Click Methods ====================
+    # These do query+click in one call for convenience. The query uses
+    # template_service (already injected), keeping Commands layer clean.
 
-    def is_bank_open(self, search_button_template: str) -> bool:
-        """Check if bank is open (delegates to BankActions)."""
-        return self.bank.is_bank_open(search_button_template)
+    def is_bank_open(self, search_button_template: str, threshold: float = 0.7) -> bool:
+        """Check if bank interface is open by detecting the search button."""
+        if not self.template_service:
+            logger.warning("Template service not available")
+            return False
+
+        match = self.template_service.find_template(search_button_template, threshold=threshold)
+        is_open = match is not None
+        logger.debug(f"Bank open check: {'YES' if is_open else 'NO'}")
+        return is_open
 
     def click_banker(
         self, banker_templates: List[str], threshold: float = 0.7
     ) -> bool:
-        """Find and click banker (delegates to BankActions)."""
-        return self.bank.click_banker(banker_templates, threshold)
+        """Find and click banker using multiple templates."""
+        if not self.template_service:
+            logger.warning("Template service not available")
+            return False
+
+        # Try each template, take best match
+        best_match = None
+        best_confidence = 0.0
+
+        for template_path in banker_templates:
+            match = self.template_service.find_template(template_path, threshold=threshold)
+            if match and match.get('confidence', 0) > best_confidence:
+                best_match = match
+                best_confidence = match.get('confidence', 0)
+
+        if not best_match:
+            logger.warning(f"Banker not found (threshold: {threshold})")
+            return False
+
+        center_x, center_y = best_match['center']
+        logger.info(f"Found banker at ({center_x}, {center_y}) with confidence {best_confidence:.3f}")
+
+        abs_x, abs_y = self._to_absolute(center_x, center_y)
+        return self.mouse.click_at(
+            abs_x, abs_y, move_style="curved", speed_multiplier=self._get_mouse_speed_multiplier()
+        )
 
     def click_template(
         self, template_path, item_name: str, threshold: float = 0.7
     ) -> bool:
         """
-        Find and click template (delegates to BankActions).
+        Find and click template on screen.
 
         Args:
             template_path: Single path (str) or multiple paths (List[str])
             item_name: Name for logging
             threshold: Match confidence (0.0-1.0)
         """
-        return self.bank.click_template(template_path, item_name, threshold)
+        if not self.template_service:
+            logger.warning("Template service not available")
+            return False
+
+        # Handle both single path and list of paths
+        if isinstance(template_path, str):
+            match = self.template_service.find_template(template_path, threshold=threshold)
+        elif isinstance(template_path, list):
+            # Try each template, take best match
+            match = None
+            best_confidence = 0.0
+            for path in template_path:
+                m = self.template_service.find_template(path, threshold=threshold)
+                if m and m.get('confidence', 0) > best_confidence:
+                    match = m
+                    best_confidence = m.get('confidence', 0)
+        else:
+            logger.error(f"Invalid template_path type: {type(template_path)}")
+            return False
+
+        if not match:
+            logger.warning(f"{item_name} not found (threshold: {threshold})")
+            return False
+
+        center_x, center_y = match['center']
+        confidence = match.get('confidence', 0)
+        logger.info(f"Found {item_name} at ({center_x}, {center_y}) with confidence {confidence:.3f}")
+
+        abs_x, abs_y = self._to_absolute(center_x, center_y)
+        success = self.mouse.click_at(
+            abs_x, abs_y, move_style="curved", speed_multiplier=self._get_mouse_speed_multiplier()
+        )
+
+        if success:
+            logger.info(f"Successfully clicked {item_name}")
+        else:
+            logger.warning(f"Failed to click {item_name}")
+
+        return success
 
     def bank_search_and_withdraw(
         self,
@@ -510,14 +571,41 @@ class GameActions:
         search_text: str,
         item_threshold: float = 0.7,
     ) -> bool:
-        """Search and withdraw item (delegates to BankActions)."""
-        return self.bank.search_and_withdraw(
-            search_button_template,
-            item_template,
-            item_name,
-            search_text,
-            item_threshold,
-        )
+        """Search for an item in bank and withdraw it."""
+        try:
+            # Click search button
+            if not self.click_template(search_button_template, "bank search button", threshold=0.7):
+                logger.error("Failed to find bank search button")
+                return False
+
+            self.wait("medium")
+
+            # Type search text
+            logger.info(f"Typing '{search_text}' in bank search")
+            pyautogui.write(search_text, interval=0.05)
+            self.wait("long")
+
+            # Click item
+            if not self.click_template(item_template, item_name, threshold=item_threshold):
+                logger.error(f"Failed to find {item_name} in bank")
+                pyautogui.press("escape")
+                return False
+
+            self.wait("medium")
+
+            # Clear search
+            pyautogui.press("escape")
+            self.wait("medium")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error in bank search and withdraw: {e}")
+            try:
+                pyautogui.press("escape")
+            except Exception:
+                pass
+            return False
 
     # ==================== ANTI-BAN: Pre-Action Behaviors ====================
 
