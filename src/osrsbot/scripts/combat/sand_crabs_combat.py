@@ -73,6 +73,9 @@ class SandCrabsCombatBot(StateMachineBot):
             enable_status_ui=True,
         )
 
+        # Watchdog: stop if stuck idle for 5 minutes (prevents ban from bugged loops)
+        self.enable_watchdog(timeout_seconds=300)
+
         # Load shell template paths from the images directory
         self.shell_templates = self._discover_shell_templates()
 
@@ -1140,12 +1143,14 @@ class SandCrabsCombatBot(StateMachineBot):
 
         while True:
             self._check_exit_requested()
+            self._check_watchdog()
 
             in_combat = self.state.in_combat()
 
             if in_combat:
                 no_combat_start = None
                 combat_ticks += 1
+                self.record_watchdog_activity()  # Combat = progress
 
                 # Periodic status log while in combat
                 now = time.time()
