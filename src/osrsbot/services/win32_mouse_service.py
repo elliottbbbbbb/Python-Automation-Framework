@@ -1,7 +1,7 @@
 """
 Win32MouseService - native SendInput mouse control via ctypes.
 
-Provides the same interface as MouseService/InterceptionMouseService but uses
+Provides the same interface as MouseService but uses
 Win32 SendInput for lower-level control. Movement is humanized using Bezier
 curves with easing and micro-jitter.
 

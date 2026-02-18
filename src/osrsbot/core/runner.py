@@ -145,49 +145,18 @@ class ScriptRunner:
                 except Exception:
                     logger.debug("Failed to load .env file for runner", exc_info=True)
 
-            use_win32 = os.getenv("USE_WIN32", "").lower() in ("1", "true", "yes")
-            use_interception = os.getenv("USE_INTERCEPTION", "").lower() in (
-                "1",
-                "true",
-                "yes",
-            )
+            # Win32 SendInput is the default. Falls back to MouseService if unavailable.
+            try:
+                from osrsbot.services.win32_mouse_service import Win32MouseService
 
-            # Prefer Win32 if explicitly requested
-            if use_win32:
-                try:
-                    from osrsbot.services.win32_mouse_service import Win32MouseService
-
-                    logger.debug("Initializing Win32MouseService (SendInput)")
-                    self.mouse = Win32MouseService(mouse_config)
-                    logger.info("Win32MouseService initialized successfully")
-                except Exception as e:
-                    logger.warning(f"Win32MouseService not available: {e}. Falling back to other services.")
-                    use_win32 = False
-
-            # If Win32 was requested and initialized above, keep it.
-            if not use_win32:
-                if use_interception:
-                    try:
-                        from osrsbot.services.interception_mouse_service import (
-                            InterceptionMouseService,
-                        )
-
-                        logger.debug("Initializing InterceptionMouseService (kernel-level)")
-                        self.mouse = InterceptionMouseService(mouse_config)
-                        logger.info("InterceptionMouseService initialized successfully")
-                    except (ImportError, RuntimeError) as e:
-                        logger.warning(
-                            f"InterceptionMouseService not available: {e}. "
-                            "Falling back to MouseService. "
-                            "To use Interception: install driver and reboot system (see INTERCEPTION_SETUP.md)"
-                        )
-                        logger.debug("Initializing MouseService (fallback)")
-                        self.mouse = MouseService(mouse_config)
-                        logger.info("MouseService initialized successfully (fallback)")
-                else:
-                    logger.debug("Initializing MouseService")
-                    self.mouse = MouseService(mouse_config)
-                    logger.info("MouseService initialized successfully")
+                logger.debug("Initializing Win32MouseService (SendInput)")
+                self.mouse = Win32MouseService(mouse_config)
+                logger.info("Win32MouseService initialized successfully")
+            except Exception as e:
+                logger.warning(f"Win32MouseService not available: {e}. Falling back to MouseService.")
+                logger.debug("Initializing MouseService (fallback)")
+                self.mouse = MouseService(mouse_config)
+                logger.info("MouseService initialized successfully (fallback)")
 
             logger.debug("Initializing ScreenService")
             self.screen = ScreenService(window_getter=self.interface.get_bounds)

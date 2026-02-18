@@ -1,12 +1,12 @@
 """
 Bezier curve utilities for humanized mouse movement.
 
-Extracts the shared Bezier curve generation logic used by MouseService,
-Win32MouseService, and InterceptionMouseService into a single module.
+Extracts the shared Bezier curve generation logic used by MouseService
+and Win32MouseService into a single module.
 
 Design: generate_bezier_path() produces a sequence of (x, y) waypoints.
 Each mouse service iterates and applies its own move function
-(pyautogui.moveTo, Win32 SendInput, or interception move_to).
+(pyautogui.moveTo or Win32 SendInput).
 """
 
 import math
@@ -16,7 +16,7 @@ from typing import Callable, List, Tuple
 
 from osrsbot.constants import BEZIER_CURVE
 
-# Standardized constants (was 0.08 in MouseService/Interception, 0.06 in Win32)
+# Standardized constants (was 0.08 in MouseService, 0.06 in Win32)
 JITTER_PROBABILITY = 0.08
 JITTER_RANGE = (-1.2, 1.2)
 TIMING_VARIANCE = (0.85, 1.15)
