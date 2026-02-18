@@ -32,14 +32,18 @@ class WikiItemScraper:
     Saves to auto/ directory with format: {item_id}_{item_name}.png
     """
 
-    def __init__(self, output_dir: str = "src/osrsbot/images/items/auto"):
+    def __init__(self, output_dir: str = "images/items/auto"):
         """
         Initialize WikiItemScraper.
 
         Args:
             output_dir: Directory to save downloaded images (auto/ directory)
         """
-        self.output_dir = Path(output_dir)
+        output_path = Path(output_dir)
+        if not output_path.is_absolute():
+            package_root = Path(__file__).resolve().parent.parent
+            output_path = package_root / output_dir
+        self.output_dir = output_path
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.base_url = "https://oldschool.runescape.wiki"

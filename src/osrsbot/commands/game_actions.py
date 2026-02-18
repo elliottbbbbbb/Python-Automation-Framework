@@ -402,7 +402,7 @@ class GameActions:
         """Click bank deposit all button."""
     
         if not self.click_template(
-            "src\\osrsbot\\images\\bot\\ui_templates\\bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
+            "images/bot/ui_templates/bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
         ):
             logger.error("Failed to click bank deposit all")
             return False

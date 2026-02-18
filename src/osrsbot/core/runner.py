@@ -227,7 +227,7 @@ class ScriptRunner:
                     from osrsbot.services.item_detection_service import ItemDetectionService
 
                     logger.debug("Initializing ItemDetectionService")
-                    items_dir = item_detection_config.get("items_dir", "src/osrsbot/images/items")
+                    items_dir = item_detection_config.get("items_dir", "images/items")
                     threshold = item_detection_config.get("threshold", 0.75)
 
                     self.item_detection = ItemDetectionService(items_dir, threshold)

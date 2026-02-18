@@ -112,73 +112,73 @@ class ConstructionTrainingBot(StateMachineBot):
     def _init_item_templates(self):
         """Initialize item template paths."""
         # Items in inventory
-        self.TELEPORT_SCROLL_TEMPLATE = "src/osrsbot/images/bot/items/teleport_to_house.png"
+        self.TELEPORT_SCROLL_TEMPLATE = "images/bot/items/teleport_to_house.png"
         # Use multi-template for planks (different lighting in different inventory positions)
         # plank.png = upper-left positions, plank_br.png = bottom-right positions
         self.PLANK_TEMPLATES = [
-            "src/osrsbot/images/bot/items/plank.png",
-            "src/osrsbot/images/bot/construction/plank_br.png",
+            "images/bot/items/plank.png",
+            "images/bot/construction/plank_br.png",
         ]
         self.PLANK_TEMPLATE = self.PLANK_TEMPLATES[0]  # Backward compat
-        self.PLANK_NOTED_TEMPLATE = "src/osrsbot/images/bot/items/plank_noted.png"
-        self.IRON_NAILS_TEMPLATE = "src/osrsbot/images/bot/items/iron_nails.png"
-        self.HAMMER_TEMPLATE = "src/osrsbot/images/bot/items/hammer.png"
-        self.SAW_TEMPLATE = "src/osrsbot/images/bot/items/saw.png"
-        self.COINS_TEMPLATE = "src/osrsbot/images/bot/items/coins.png"
+        self.PLANK_NOTED_TEMPLATE = "images/bot/items/plank_noted.png"
+        self.IRON_NAILS_TEMPLATE = "images/bot/items/iron_nails.png"
+        self.HAMMER_TEMPLATE = "images/bot/items/hammer.png"
+        self.SAW_TEMPLATE = "images/bot/items/saw.png"
+        self.COINS_TEMPLATE = "images/bot/items/coins.png"
 
     def _init_construction_templates(self):
         """Initialize construction object template paths."""
         # Portal templates for location detection (multi-template matching)
         # Inside house = thin purple exit portal
         self.HOUSE_PORTAL_TEMPLATES = [
-            "src/osrsbot/images/bot/construction/house_portal.png",
-            "src/osrsbot/images/bot/construction/house_portal_2.png",
+            "images/bot/construction/house_portal.png",
+            "images/bot/construction/house_portal_2.png",
         ]
 
         # Outside house = rocky entrance portal with purple glow
         # Multiple templates for different angles/lighting conditions
         self.OUTSIDE_PORTAL_TEMPLATES = [
-            "src/osrsbot/images/bot/construction/outside_portal.png",
-            "src/osrsbot/images/bot/construction/outside_portal_2.png",
-            "src/osrsbot/images/bot/construction/outside_portal_3.png",
-            "src/osrsbot/images/bot/construction/outside_portal_4.png",
+            "images/bot/construction/outside_portal.png",
+            "images/bot/construction/outside_portal_2.png",
+            "images/bot/construction/outside_portal_3.png",
+            "images/bot/construction/outside_portal_4.png",
         ]
 
         # Note: Chair hotspot detection now uses yellow tile markers instead of templates
 
         # Built chairs (different types) - use lists for multi-template matching
         self.BUILT_CHAIR_CRUDE_TEMPLATES = [
-            "src/osrsbot/images/bot/construction/built_chair_crude.png",
+            "images/bot/construction/built_chair_crude.png",
         ]
         self.BUILT_CHAIR_WOODEN_TEMPLATES = [
-            "src/osrsbot/images/bot/construction/built_chair_wooden.png",
+            "images/bot/construction/built_chair_wooden.png",
         ]
         self.BUILT_CHAIR_ROCKING_TEMPLATES = [
-            "src/osrsbot/images/bot/construction/built_chair_rocking.png",
-            "src/osrsbot/images/bot/construction/built_chair_rocking_2.png",
-            "src/osrsbot/images/bot/construction/built_chair_rocking_3.png",
-            "src/osrsbot/images/bot/construction/built_chair_rocking_4.png",
-            "src/osrsbot/images/bot/construction/built_chair_rocking_5.png",
+            "images/bot/construction/built_chair_rocking.png",
+            "images/bot/construction/built_chair_rocking_2.png",
+            "images/bot/construction/built_chair_rocking_3.png",
+            "images/bot/construction/built_chair_rocking_4.png",
+            "images/bot/construction/built_chair_rocking_5.png",
         ]
 
         # UI elements
-        self.RED_CROSS_TEMPLATE = "src/osrsbot/images/bot/construction/red_cross.png"
-        self.CONSTRUCTION_SKILL_POPUP_TEMPLATE = "src/osrsbot/images/bot/ui_templates/construction_skill_icon.png"
+        self.RED_CROSS_TEMPLATE = "images/bot/construction/red_cross.png"
+        self.CONSTRUCTION_SKILL_POPUP_TEMPLATE = "images/bot/ui_templates/construction_skill_icon.png"
 
         # Right-click menu options
-        self.BUILD_CHAIR_SPACE_TEMPLATE = "src/osrsbot/images/bot/construction/build_chair_space.png"
-        self.REMOVE_CHAIR_TEMPLATE = "src/osrsbot/images/bot/construction/remove_chair.png"
+        self.BUILD_CHAIR_SPACE_TEMPLATE = "images/bot/construction/build_chair_space.png"
+        self.REMOVE_CHAIR_TEMPLATE = "images/bot/construction/remove_chair.png"
 
         # Chair option templates in construction interface (for clicking the correct chair type)
-        self.CHAIR_OPTION_ROCKING_TEMPLATE = "src/osrsbot/images/bot/construction/chair_option_rocking.png"
-        self.CHAIR_OPTION_WOODEN_TEMPLATE = "src/osrsbot/images/bot/construction/chair_option_wooden.png"
-        self.CHAIR_OPTION_CRUDE_TEMPLATE = "src/osrsbot/images/bot/construction/chair_option_crude.png"
+        self.CHAIR_OPTION_ROCKING_TEMPLATE = "images/bot/construction/chair_option_rocking.png"
+        self.CHAIR_OPTION_WOODEN_TEMPLATE = "images/bot/construction/chair_option_wooden.png"
+        self.CHAIR_OPTION_CRUDE_TEMPLATE = "images/bot/construction/chair_option_crude.png"
 
         # Chair option templates when UNAVAILABLE (with red cross overlay)
         # Used to detect when we're out of materials or don't have the level
-        self.CHAIR_OPTION_ROCKING_UNAVAILABLE_TEMPLATE = "src/osrsbot/images/bot/construction/chair_option_rocking_unavailable.png"
-        self.CHAIR_OPTION_WOODEN_UNAVAILABLE_TEMPLATE = "src/osrsbot/images/bot/construction/chair_option_wooden_unavailable.png"
-        self.CHAIR_OPTION_CRUDE_UNAVAILABLE_TEMPLATE = "src/osrsbot/images/bot/construction/chair_option_crude_unavailable.png"
+        self.CHAIR_OPTION_ROCKING_UNAVAILABLE_TEMPLATE = "images/bot/construction/chair_option_rocking_unavailable.png"
+        self.CHAIR_OPTION_WOODEN_UNAVAILABLE_TEMPLATE = "images/bot/construction/chair_option_wooden_unavailable.png"
+        self.CHAIR_OPTION_CRUDE_UNAVAILABLE_TEMPLATE = "images/bot/construction/chair_option_crude_unavailable.png"
 
         # Chair type → template mappings (avoids repeating dict literals)
         self.CHAIR_AVAILABLE_TEMPLATE_MAP = {
@@ -922,7 +922,7 @@ class ConstructionTrainingBot(StateMachineBot):
         # If chair is built, we need to remove it before we can build a new one
         # Use HIGH threshold (0.75) to avoid false positives on UI elements at viewport edges
         # Restrict to center portion of viewport (exclude rightmost 100px where UI may bleed in)
-        SINGLE_CHAIR_TEMPLATE = "src/osrsbot/images/bot/construction/built_chair_rocking_5.png"
+        SINGLE_CHAIR_TEMPLATE = "images/bot/construction/built_chair_rocking_5.png"
 
         # Restrict search region to avoid false positives at viewport edges
         center_region = (
@@ -1160,7 +1160,7 @@ class ConstructionTrainingBot(StateMachineBot):
 
         # Find built chair using template matching (more accurate than yellow tile)
         # Use SINGLE template for testing (user's request to simplify debugging)
-        SINGLE_CHAIR_TEMPLATE = "src/osrsbot/images/bot/construction/built_chair_rocking_5.png"
+        SINGLE_CHAIR_TEMPLATE = "images/bot/construction/built_chair_rocking_5.png"
 
         chair_result = self.state.find_template(
             SINGLE_CHAIR_TEMPLATE,

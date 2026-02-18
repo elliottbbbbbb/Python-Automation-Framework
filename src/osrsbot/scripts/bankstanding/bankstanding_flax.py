@@ -12,7 +12,6 @@ All banking logic is handled by the base class - we just define item processing!
 import logging
 import random
 import time
-from pathlib import Path
 
 from osrsbot.core.state_types import StateExecutionContext, StateResult
 from osrsbot.core.base_bankstander import BankstanderBot
@@ -30,16 +29,12 @@ class GrimyFlaxBot(BankstanderBot):
 
     def __init__(self, *args, **kwargs):
         """Initialize manual cleaning bankstander."""
-        # Setup template path for grimy toadflax
-        images_dir = Path(__file__).parent.parent / "images" / "bot" / "items"
-        grimy_toadflax_template = str(images_dir / "grimy_toadflax.PNG")
-
         # Pass item config to base class - that's it!
         # Base class handles ALL the banking logic
         super().__init__(
             item_name="grimy toadflax",
             item_search_text="toadflax",
-            item_template=grimy_toadflax_template,
+            item_template="images/bot/items/grimy_toadflax.PNG",
             item_search_threshold=0.75,
             processed_item_name="cleaned toadflax",
             *args,
