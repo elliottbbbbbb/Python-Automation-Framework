@@ -14,7 +14,7 @@ from osrsbot.constants import MovementStyle
 from osrsbot.core.game_interface import GameInterface
 from osrsbot.services.mouse_service import MouseService
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.services.status_socket_service import StatusSocketService
+from osrsbot.services.coordinate_ocr_service import CoordinateOCRService
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class WalkerService:
     def __init__(
         self,
         config: WalkerConfig,
-        status_socket: StatusSocketService,
+        status_socket: CoordinateOCRService,
         mouse: MouseService,
         screen: ScreenService,
         interface: GameInterface,

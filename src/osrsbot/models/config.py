@@ -60,13 +60,10 @@ class Config:
         system = platform.system()
         if system == "Windows":
             tesseract_default = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-            status_socket_default = r"C:\Users\YourUsername\.runelite\live_data.json"
         elif system == "Darwin":  # macOS
             tesseract_default = "/opt/homebrew/bin/tesseract"
-            status_socket_default = "~/.runelite/live_data.json"
         else:  # Linux
             tesseract_default = "/usr/bin/tesseract"
-            status_socket_default = "~/.runelite/live_data.json"
 
         return {
             "account_name": "YourAccountName",
@@ -164,11 +161,6 @@ class Config:
                 "click_variance": 3,
                 "post_click_delay_min": 0.05,
                 "post_click_delay_max": 0.15,
-            },
-            "status_socket": {
-                "enabled": True,
-                "data_file": status_socket_default,
-                "poll_interval": 0.1,
             },
             "walker": {
                 "minimap_center_x": 654,
