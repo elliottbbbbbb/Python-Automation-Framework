@@ -8,7 +8,6 @@ Requires interception-python package and Interception driver installation.
 import logging
 import random
 import time
-import math
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
@@ -23,7 +22,7 @@ except ImportError:
         "Install with: pip install interception-python"
     )
 
-from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT
+from osrsbot.constants import MOUSE_MOVEMENT
 
 logger = logging.getLogger(__name__)
 
@@ -252,82 +251,15 @@ class InterceptionMouseService:
     def _move_bezier(
         self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
     ) -> None:
-        """
-        Move mouse along a Bezier curve.
+        """Move mouse along a Bezier curve (delegates to bezier_utils)."""
+        from osrsbot.services.bezier_utils import execute_bezier_path, generate_bezier_path
 
-        Creates a smooth curved path with random control points.
-        """
-        # Improved control points: place them along the line and offset perpendicular
-        dx = end_x - start_x
-        dy = end_y - start_y
-        dist = math.hypot(dx, dy)
-
-        base_off = int(max(1, dist * 0.2))
-        off_min = BEZIER_CURVE.control_point_offset_min
-        off_max = BEZIER_CURVE.control_point_offset_max
-
-        if dist == 0:
-            perp_x, perp_y = 0, 0
-        else:
-            ux = dx / dist
-            uy = dy / dist
-            perp_x = -uy
-            perp_y = ux
-
-        cp1_base_x = start_x + dx * 0.33
-        cp1_base_y = start_y + dy * 0.33
-        cp2_base_x = start_x + dx * 0.66
-        cp2_base_y = start_y + dy * 0.66
-
-        mag1 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
-        mag2 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
-        if random.random() < 0.5:
-            mag1 *= -1
-        if random.random() < 0.5:
-            mag2 *= -1
-
-        cp1_x = cp1_base_x + perp_x * mag1
-        cp1_y = cp1_base_y + perp_y * mag1
-        cp2_x = cp2_base_x + perp_x * mag2
-        cp2_y = cp2_base_y + perp_y * mag2
-
-        steps = max(BEZIER_CURVE.min_steps, int(duration * BEZIER_CURVE.steps_per_second))
-
-        def ease_in_out(t: float) -> float:
-            if t < 0.5:
-                return 2 * t * t
-            return 1 - pow(-2 * t + 2, 2) / 2
-
-        start_time = time.time()
-
-        for i in range(steps + 1):
-            t = i / steps
-            u = ease_in_out(t)
-
-            x = (
-                (1 - u) ** 3 * start_x
-                + 3 * (1 - u) ** 2 * u * cp1_x
-                + 3 * (1 - u) * u ** 2 * cp2_x
-                + u ** 3 * end_x
-            )
-            y = (
-                (1 - u) ** 3 * start_y
-                + 3 * (1 - u) ** 2 * u * cp1_y
-                + 3 * (1 - u) * u ** 2 * cp2_y
-                + u ** 3 * end_y
-            )
-
-            if random.random() < 0.08:
-                x += random.uniform(-1.2, 1.2)
-                y += random.uniform(-1.2, 1.2)
-
-            move_to(int(round(x)), int(round(y)), blocking=True)
-
-            elapsed = time.time() - start_time
-            expected_time = ease_in_out(i / steps) * duration
-            sleep_time = expected_time - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time * random.uniform(0.85, 1.15))
+        waypoints = generate_bezier_path(start_x, start_y, end_x, end_y, duration)
+        execute_bezier_path(
+            waypoints,
+            lambda bx, by: move_to(bx, by, blocking=True),
+            duration,
+        )
 
     def _move_with_overshoot(
         self, start_x: int, start_y: int, end_x: int, end_y: int, duration: float
@@ -417,3 +349,21 @@ class InterceptionMouseService:
         offset_y = random.randint(-radius, radius)
 
         self.move_to(current_x + offset_x, current_y + offset_y, style="curved")
+
+    def hover_at(
+        self,
+        x: int,
+        y: int,
+        duration: float = 0.5,
+        style: MovementStyle = "curved",
+    ) -> bool:
+        """Move mouse to position and hover without clicking (Interception implementation)."""
+        try:
+            if not self.move_to(x, y, style=style):
+                return False
+            time.sleep(duration)
+            logger.debug(f"Hovered at ({x}, {y}) for {duration:.2f}s")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to hover: {e}", exc_info=True)
+            return False

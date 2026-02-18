@@ -348,6 +348,7 @@ class ScriptRunner:
                 timing_helper=self.timing,
                 walker=self.walker,
                 ui_manager=self.ui_manager,
+                inventory_state=self.state.inventory,
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:

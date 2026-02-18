@@ -20,11 +20,8 @@ Migration path:
 import logging
 import random
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
-import cv2 as cv
-import numpy as np
 import pyautogui  # Used for keyboard input (write/press) - no keyboard service yet
 
 from osrsbot.commands.bank_actions import BankActions
@@ -64,6 +61,7 @@ class GameActions:
         timing_helper: Optional[Any] = None,
         walker: Optional[Any] = None,
         ui_manager: Optional[Any] = None,
+        inventory_state: Optional[Any] = None,
     ):
         """Initialize actions with services (all injected via DI)."""
         # Services (injected by runner)
@@ -86,7 +84,8 @@ class GameActions:
 
         # Initialize focused modules
         self.inventory = InventoryActions(
-            mouse, self.coord_resolver, self.timing, anti_ban_service
+            mouse, self.coord_resolver, self.timing, anti_ban_service,
+            inventory_state=inventory_state,
         )
         self.combat = CombatActions(
             mouse, screen, self.coord_resolver, self.timing, config, anti_ban_service
@@ -95,11 +94,6 @@ class GameActions:
 
     # ==================== Backward Compatibility Methods ====================
     # These delegate to new modules while maintaining exact same API
-
-    def click_banker(self, banker_templates: List[str], threshold: float = 0.7) -> bool:
-        """Find and click banker (delegates to BankActions)."""
-        return self.bank.click_banker(banker_templates, threshold)
-
 
     # --- Timing/Wait (delegates to TimingHelper) ---
     def wait(self, timing_type: str) -> None:

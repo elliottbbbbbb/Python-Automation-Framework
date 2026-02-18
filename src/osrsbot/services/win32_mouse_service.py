@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass
 from typing import Literal, Optional, Tuple
 
-from osrsbot.constants import BEZIER_CURVE, MOUSE_MOVEMENT
+from osrsbot.constants import MOUSE_MOVEMENT
 
 logger = logging.getLogger(__name__)
 
@@ -155,72 +155,21 @@ class Win32MouseService:
                         time.sleep(duration / steps)
                     return True
 
-                # curved / overshoot: reuse Bezier generator
-                # compute control points
-                ux = dx / dist if dist else 0
-                uy = dy / dist if dist else 0
-                perp_x = -uy
-                perp_y = ux
-                cp1_base_x = start_x + dx * 0.33
-                cp1_base_y = start_y + dy * 0.33
-                cp2_base_x = start_x + dx * 0.66
-                cp2_base_y = start_y + dy * 0.66
-                base_off = int(max(1, dist * 0.2))
-                off_min = BEZIER_CURVE.control_point_offset_min
-                off_max = BEZIER_CURVE.control_point_offset_max
-                mag1 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
-                mag2 = random.uniform(off_min, off_max) + random.uniform(-base_off, base_off)
-                if random.random() < 0.5:
-                    mag1 *= -1
-                if random.random() < 0.5:
-                    mag2 *= -1
-                cp1_x = cp1_base_x + perp_x * mag1
-                cp1_y = cp1_base_y + perp_y * mag1
-                cp2_x = cp2_base_x + perp_x * mag2
-                cp2_y = cp2_base_y + perp_y * mag2
+                # curved / overshoot: delegate to shared Bezier generator
+                from osrsbot.services.bezier_utils import execute_bezier_path, generate_bezier_path
 
-                steps = max(BEZIER_CURVE.min_steps, int(duration * BEZIER_CURVE.steps_per_second))
-
-                def ease_in_out(t: float) -> float:
-                    if t < 0.5:
-                        return 2 * t * t
-                    return 1 - pow(-2 * t + 2, 2) / 2
-
-                start_time = time.time()
-                for i in range(steps + 1):
-                    t = i / steps
-                    u = ease_in_out(t)
-                    x_pos = (
-                        (1 - u) ** 3 * start_x
-                        + 3 * (1 - u) ** 2 * u * cp1_x
-                        + 3 * (1 - u) * u ** 2 * cp2_x
-                        + u ** 3 * x
-                    )
-                    y_pos = (
-                        (1 - u) ** 3 * start_y
-                        + 3 * (1 - u) ** 2 * u * cp1_y
-                        + 3 * (1 - u) * u ** 2 * cp2_y
-                        + u ** 3 * y
-                    )
-
-                    if random.random() < 0.06:
-                        x_pos += random.uniform(-1.2, 1.2)
-                        y_pos += random.uniform(-1.2, 1.2)
-
-                    self._send_move_abs(int(round(x_pos)), int(round(y_pos)))
-
-                    elapsed = time.time() - start_time
-                    expected_time = ease_in_out(i / steps) * duration
-                    sleep_time = expected_time - elapsed
-                    if sleep_time > 0:
-                        time.sleep(sleep_time * random.uniform(0.85, 1.15))
-
+                waypoints = generate_bezier_path(start_x, start_y, x, y, duration)
+                execute_bezier_path(
+                    waypoints,
+                    lambda bx, by: self._send_move_abs(bx, by),
+                    duration,
+                )
                 return True
 
             return False
 
         except Exception as e:
-            logger.exception("Win32MouseService.move_to failed: %s", e)
+            logger.error("Win32MouseService.move_to failed: %s", e, exc_info=True)
             return False
 
     def click(self, x: Optional[int] = None, y: Optional[int] = None, button: Literal["left", "right", "middle"] = "left", variance: bool = True, delay_after: bool = True) -> bool:
@@ -253,7 +202,7 @@ class Win32MouseService:
 
             return True
         except Exception as e:
-            logger.exception("Win32MouseService.click failed: %s", e)
+            logger.error("Win32MouseService.click failed: %s", e, exc_info=True)
             return False
 
     def click_at(self, x: int, y: int, button: Literal["left", "right", "middle"] = "left", move_style: MovementStyle = "curved", variance: bool = True, speed_multiplier: float = 1.0) -> bool:
@@ -281,7 +230,7 @@ class Win32MouseService:
             # no explicit release here because _send_click sends down+up; to emulate hold you'd need separate down/up implementation
             return True
         except Exception as e:
-            logger.exception("Win32MouseService.drag_to failed: %s", e)
+            logger.error("Win32MouseService.drag_to failed: %s", e, exc_info=True)
             return False
 
     def get_position(self) -> Tuple[int, int]:
@@ -327,5 +276,5 @@ class Win32MouseService:
             return True
 
         except Exception as e:
-            logger.exception("Win32MouseService.hover_at failed: %s", e)
+            logger.error("Win32MouseService.hover_at failed: %s", e, exc_info=True)
             return False

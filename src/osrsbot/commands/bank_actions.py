@@ -93,10 +93,9 @@ class BankActions:
 
         # Command layer: click banker
         abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
-        for _ in range(1):  # Try up to 1 times to click banker
-            success = self.mouse.click_at(
-                abs_x, abs_y, move_style="curved", speed_multiplier=1.0
-            )
+        success = self.mouse.click_at(
+            abs_x, abs_y, move_style="curved", speed_multiplier=1.0
+        )
 
         if success:
             logger.info("Successfully clicked banker")

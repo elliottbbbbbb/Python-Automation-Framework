@@ -56,7 +56,7 @@ class ScreenService:
         try:
             return self.window_getter()
         except Exception:
-            logger.exception("Failed to get window bounds from window_getter")
+            logger.error("Failed to get window bounds from window_getter", exc_info=True)
             return None
 
     def get_viewport_dimensions(self) -> Optional[Tuple[int, int]]:
@@ -316,7 +316,7 @@ class ScreenService:
             gray = cv.cvtColor(arr, cv.COLOR_RGB2GRAY)
             return gray
         except Exception:
-            logger.exception("Failed to capture grayscale image")
+            logger.error("Failed to capture grayscale image", exc_info=True)
             return None
 
     # ==================== Color Helpers ====================
@@ -400,7 +400,7 @@ class ScreenService:
 
             return matches
         except Exception:
-            logger.exception("find_color failed")
+            logger.error("find_color failed", exc_info=True)
             return None
 
     def find_color_with_distance(
@@ -508,7 +508,7 @@ class ScreenService:
             return matches_with_distance
 
         except Exception:
-            logger.exception("find_color_with_distance failed")
+            logger.error("find_color_with_distance failed", exc_info=True)
             return []
 
     def get_pixel_color(
@@ -545,7 +545,7 @@ class ScreenService:
                 return (location.left, location.top, location.width, location.height)
             return None
         except Exception:
-            logger.exception("find_image failed")
+            logger.error("find_image failed", exc_info=True)
             return None
 
     # ==================== Vision Wrappers ====================
@@ -603,7 +603,7 @@ class ScreenService:
             try:
                 self.vision.invalidate_cache()
             except Exception:
-                logger.exception("invalidate_vision_cache failed")
+                logger.error("invalidate_vision_cache failed", exc_info=True)
 
     def wait_for_color(
         self,

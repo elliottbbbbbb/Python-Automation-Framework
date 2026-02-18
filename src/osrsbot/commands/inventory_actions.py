@@ -42,11 +42,13 @@ class InventoryActions:
         coord_resolver: CoordinateResolver,
         timing: TimingHelper,
         anti_ban_service: Optional[Any] = None,
+        inventory_state: Optional[Any] = None,
     ):
         self.mouse = mouse
         self.coords = coord_resolver
         self.timing = timing
         self.anti_ban = anti_ban_service
+        self.inventory_state = inventory_state
 
     def click_slot(self, slot_num: int, move_style: MovementStyle = "curved") -> bool:
         """
@@ -268,7 +270,11 @@ class InventoryActions:
             keep_slots = []
 
         total_slots = INVENTORY.total_slots
-        current_filled = total_slots - 0  # TODO: Implement inventory detection
+        if self.inventory_state:
+            current_filled = self.inventory_state.count_filled_slots()
+        else:
+            logger.warning("No inventory state available — cannot detect filled slots")
+            return 0
         current_empty = total_slots - current_filled
 
         if current_empty >= target_empty:

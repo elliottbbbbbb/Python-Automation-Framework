@@ -289,7 +289,7 @@ class InventoryState:
                     try:
                         pixel_color_sample = tuple(int(c) for c in img_array[py, px])
                         sampled_colors.append(pixel_color_sample)
-                    except:
+                    except (IndexError, ValueError):
                         pass  # Out of bounds, skip this point
 
                 # Calculate variance of the sampled pixels
