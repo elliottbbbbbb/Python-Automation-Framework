@@ -199,6 +199,15 @@ src/osrsbot/models/*.h5
 # User custom images (created next to .exe for end users)
 user_images/
 
+# VS Code workspace files
+*.code-workspace
+
+# RuneLite plugin build artifacts
+runelite-status-socket/bin/
+
+# Claude Code project settings
+**/.claude/
+
 # OS files
 .DS_Store
 Thumbs.db
