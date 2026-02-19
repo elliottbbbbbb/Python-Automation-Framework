@@ -110,7 +110,8 @@ class FletchingBot(BankstanderBot):
                     f"defaulting to oak shortbow"
                 )
 
-        images_dir = Path(__file__).parent.parent.parent / "images" / "bot"
+        # Anchor to package root (src/osrsbot/) so paths work from any CWD
+        images_dir = Path(__file__).resolve().parent.parent.parent / "images" / "bot"
 
         # Tool templates (bowstring - shared across all tiers)
         tool_templates = sorted(images_dir.glob("items/bowstring*.png"))

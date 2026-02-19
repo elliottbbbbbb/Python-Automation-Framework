@@ -89,14 +89,16 @@ class BankstanderBot(StateMachineBot):
         self._item_search_threshold = item_search_threshold
         self._processed_item_name = processed_item_name or item_name
 
-        # Banker templates (multiple for better accuracy)
-        images_dir = Path(__file__).parent.parent / "images" / "bot" / "bank"
-        self._banker_templates = [
-            str(images_dir / "banker_santa_hat.PNG"),
-            str(images_dir / "banker_2.PNG"),
-            str(images_dir / "banker_3_zoomed_out.PNG"),
-        ]
-        self._bank_search_template = str(images_dir / "bank_search_button.PNG")
+        # Banker templates from config (multiple for better accuracy)
+        self._banker_templates = self.config.get("templates", "banker_templates", default=[
+            "images/bot/bank/banker_santa_hat.PNG",
+            "images/bot/bank/banker_2.PNG",
+            "images/bot/bank/banker_3_zoomed_out.PNG",
+        ])
+        self._bank_search_template = self.config.get(
+            "templates", "bank_search_button",
+            default="images/bot/bank/bank_search_button.PNG",
+        )
 
         # State tracking
         self._bank_open = False

@@ -332,7 +332,7 @@ class MiningBot(StateMachineBot):
             # Make sure shift is released
             try:
                 pyautogui.keyUp("shift")
-            except:
+            except Exception:
                 pass
             return StateResult.FAILURE
 
@@ -357,7 +357,7 @@ class MiningBot(StateMachineBot):
             # Make sure shift key is released
             try:
                 pyautogui.keyUp("shift")
-            except:
+            except Exception:
                 pass
 
             # Wait for any animations to complete

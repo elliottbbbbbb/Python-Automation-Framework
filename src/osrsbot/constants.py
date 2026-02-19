@@ -1042,25 +1042,3 @@ class PathfindingConfig:
 PATHFINDING = PathfindingConfig()
 
 
-# ============================================================================
-# STATUS SOCKET SERVICE CONSTANTS
-# ============================================================================
-
-
-@dataclass
-class StatusSocketConfig:
-    """
-    Configuration for live data monitoring via status socket.
-
-    Monitors RuneLite data file for real-time game state.
-    """
-
-    # Default poll interval for checking data file (seconds)
-    poll_interval: float = 0.1
-
-    # Threshold for warning about stale data (seconds)
-    stale_threshold: float = 5.0
-
-
-# Global status socket configuration
-STATUS_SOCKET = StatusSocketConfig()

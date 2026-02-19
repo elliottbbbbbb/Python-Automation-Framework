@@ -16,10 +16,21 @@ from dataclasses import dataclass
 
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_ocr_service import TemplateOCRService, YELLOW, WHITE, GRAY, LIGHT_GRAY
-from osrsbot.services.status_socket_service import PlayerState
 from osrsbot.models.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PlayerState:
+    """Player position and state data."""
+    world_x: int
+    world_y: int
+    plane: int = 0
+    camera_yaw: int = 0
+    timestamp: float = 0.0
+    is_moving: bool = False
+    animation_id: int = -1
 
 
 class CoordinateOCRService:
@@ -94,7 +105,7 @@ class CoordinateOCRService:
             logger.warning(f"Coordinates out of range: ({x}, {y}, {plane})")
             return self._last_state
 
-        # Create PlayerState (compatible with StatusSocketService)
+        # Create PlayerState
         state = PlayerState(
             world_x=x,
             world_y=y,
@@ -185,7 +196,7 @@ class CoordinateOCRService:
         """
         Get current player state - alias for get_coordinates().
 
-        Matches StatusSocketService interface for drop-in replacement.
+        Alias for get_coordinates().
 
         Returns:
             PlayerState if successfully read, None otherwise
@@ -198,7 +209,7 @@ class CoordinateOCRService:
         """
         Poll until player reaches target coordinates or timeout.
 
-        Compatible interface with StatusSocketService.
+        Polls until player reaches target or timeout.
 
         Args:
             target_x: Target world X coordinate

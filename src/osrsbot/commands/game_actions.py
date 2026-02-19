@@ -20,11 +20,8 @@ Migration path:
 import logging
 import random
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
-import cv2 as cv
-import numpy as np
 import pyautogui  # Used for keyboard input (write/press) - no keyboard service yet
 
 from osrsbot.commands.bank_actions import BankActions
@@ -63,6 +60,7 @@ class GameActions:
         timing_helper: Optional[Any] = None,
         walker: Optional[Any] = None,
         ui_manager: Optional[Any] = None,
+        inventory_state: Optional[Any] = None,
     ):
         """Initialize actions with services (all injected via DI)."""
         # Services (injected by runner)
@@ -82,7 +80,8 @@ class GameActions:
 
         # Initialize focused modules
         self.inventory = InventoryActions(
-            mouse, self.coord_resolver, self.timing, anti_ban_service
+            mouse, self.coord_resolver, self.timing, anti_ban_service,
+            inventory_state=inventory_state,
         )
         self.combat = CombatActions(
             mouse, screen, self.coord_resolver, self.timing, config, anti_ban_service
@@ -393,7 +392,7 @@ class GameActions:
         """Click bank deposit all button."""
     
         if not self.click_template(
-            "src\\osrsbot\\images\\bot\\ui_templates\\bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
+            "images/bot/ui_templates/bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
         ):
             logger.error("Failed to click bank deposit all")
             return False

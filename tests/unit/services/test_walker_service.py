@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from osrsbot.services.status_socket_service import PlayerState
+from osrsbot.services.coordinate_ocr_service import PlayerState
 from osrsbot.services.walker_service import WalkerConfig, WalkerService
 
 

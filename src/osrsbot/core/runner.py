@@ -145,49 +145,18 @@ class ScriptRunner:
                 except Exception:
                     logger.debug("Failed to load .env file for runner", exc_info=True)
 
-            use_win32 = os.getenv("USE_WIN32", "").lower() in ("1", "true", "yes")
-            use_interception = os.getenv("USE_INTERCEPTION", "").lower() in (
-                "1",
-                "true",
-                "yes",
-            )
+            # Win32 SendInput is the default. Falls back to MouseService if unavailable.
+            try:
+                from osrsbot.services.win32_mouse_service import Win32MouseService
 
-            # Prefer Win32 if explicitly requested
-            if use_win32:
-                try:
-                    from osrsbot.services.win32_mouse_service import Win32MouseService
-
-                    logger.debug("Initializing Win32MouseService (SendInput)")
-                    self.mouse = Win32MouseService(mouse_config)
-                    logger.info("Win32MouseService initialized successfully")
-                except Exception as e:
-                    logger.warning(f"Win32MouseService not available: {e}. Falling back to other services.")
-                    use_win32 = False
-
-            # If Win32 was requested and initialized above, keep it.
-            if not use_win32:
-                if use_interception:
-                    try:
-                        from osrsbot.services.interception_mouse_service import (
-                            InterceptionMouseService,
-                        )
-
-                        logger.debug("Initializing InterceptionMouseService (kernel-level)")
-                        self.mouse = InterceptionMouseService(mouse_config)
-                        logger.info("InterceptionMouseService initialized successfully")
-                    except (ImportError, RuntimeError) as e:
-                        logger.warning(
-                            f"InterceptionMouseService not available: {e}. "
-                            "Falling back to MouseService. "
-                            "To use Interception: install driver and reboot system (see INTERCEPTION_SETUP.md)"
-                        )
-                        logger.debug("Initializing MouseService (fallback)")
-                        self.mouse = MouseService(mouse_config)
-                        logger.info("MouseService initialized successfully (fallback)")
-                else:
-                    logger.debug("Initializing MouseService")
-                    self.mouse = MouseService(mouse_config)
-                    logger.info("MouseService initialized successfully")
+                logger.debug("Initializing Win32MouseService (SendInput)")
+                self.mouse = Win32MouseService(mouse_config)
+                logger.info("Win32MouseService initialized successfully")
+            except Exception as e:
+                logger.warning(f"Win32MouseService not available: {e}. Falling back to MouseService.")
+                logger.debug("Initializing MouseService (fallback)")
+                self.mouse = MouseService(mouse_config)
+                logger.info("MouseService initialized successfully (fallback)")
 
             logger.debug("Initializing ScreenService")
             self.screen = ScreenService(window_getter=self.interface.get_bounds)
@@ -227,7 +196,7 @@ class ScriptRunner:
                     from osrsbot.services.item_detection_service import ItemDetectionService
 
                     logger.debug("Initializing ItemDetectionService")
-                    items_dir = item_detection_config.get("items_dir", "src/osrsbot/images/items")
+                    items_dir = item_detection_config.get("items_dir", "images/items")
                     threshold = item_detection_config.get("threshold", 0.75)
 
                     self.item_detection = ItemDetectionService(items_dir, threshold)
@@ -239,46 +208,27 @@ class ScriptRunner:
                 logger.debug("Item detection disabled in config")
                 self.item_detection = None
 
-            # Initialize Position Tracking Service
-            # Try Status Socket plugin first, fall back to OCR-based tracking
+            # Initialize Position Tracking Service (OCR-based)
             logger.debug("Initializing position tracking service")
-            status_socket_config = self.config.get("status_socket", default={})
-            from osrsbot.services.status_socket_service import StatusSocketService
             from osrsbot.services.coordinate_ocr_service import CoordinateOCRService
 
-            # Try RuneLite plugin first
-            status_socket_plugin = StatusSocketService(
-                data_file=status_socket_config.get("data_file", "live_data.json"),
-                poll_interval=status_socket_config.get("poll_interval", 0.1),
+            ocr_service = CoordinateOCRService(
+                screen=self.screen,
+                ocr=self.ocr,
+                config=self.config
             )
 
-            if status_socket_plugin.is_available():
-                logger.info("✓ Using StatusSocketService (RuneLite plugin detected)")
-                self.status_socket = status_socket_plugin
+            if ocr_service.is_available():
+                logger.info("Using CoordinateOCRService for position tracking")
+                self.position_service = ocr_service
                 position_service_available = True
             else:
-                logger.info("✗ RuneLite plugin not detected, trying OCR-based tracking")
-                # Fall back to OCR-based coordinate reading
-                ocr_service = CoordinateOCRService(
-                    screen=self.screen,
-                    ocr=self.ocr,
-                    config=self.config
-                )
-
-                if ocr_service.is_available():
-                    logger.info("✓ Using CoordinateOCRService (reading from screen)")
-                    self.status_socket = ocr_service
-                    position_service_available = True
-                else:
-                    logger.warning(
-                        "✗ Position tracking unavailable (no plugin or OCR). "
-                        "Walker disabled. See PATHFINDING_GUIDE.md"
-                    )
-                    self.status_socket = None
-                    position_service_available = False
+                logger.warning("Position tracking unavailable. Walker disabled.")
+                self.position_service = None
+                position_service_available = False
 
             # Initialize Walker Service if we have position tracking
-            if position_service_available and self.status_socket:
+            if position_service_available and self.position_service:
                 logger.debug("Initializing WalkerService")
                 walker_config_dict = self.config.get("walker", default={})
                 from osrsbot.services.walker_service import WalkerConfig, WalkerService
@@ -292,7 +242,7 @@ class ScriptRunner:
                 )
                 self.walker = WalkerService(
                     config=walker_config,
-                    status_socket=self.status_socket,
+                    status_socket=self.position_service,
                     mouse=self.mouse,
                     screen=self.screen,
                     interface=self.interface,
@@ -367,6 +317,7 @@ class ScriptRunner:
                 timing_helper=self.timing,
                 walker=self.walker,
                 ui_manager=self.ui_manager,
+                inventory_state=self.state.inventory,
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:

@@ -50,7 +50,6 @@ class TestBotStates(Enum):
     IDLE = "idle"
     TEST_MINIMAP = "test_minimap"
     TEST_WALKER = "test_walker"
-    TEST_ARDUINO_MOUSE = "test_arduino_mouse"
     TEST_INVENTORY_DETECTION = "test_inventory_detection"
     TEST_INVENTORY_CLICKING = "test_inventory_clicking"
     TEST_COLOR_DETECTION = "test_color_detection"
@@ -113,12 +112,6 @@ class ComprehensiveTestBot(StateMachineBot):
                     "name": "Test Walker/Pathfinding",
                     "description": "Test world coordinate navigation",
                     "timeout": 60.0,
-                    "failover": TestBotStates.TEST_ARDUINO_MOUSE,
-                },
-                TestBotStates.TEST_ARDUINO_MOUSE: {
-                    "name": "Test Arduino Mouse",
-                    "description": "Test hardware mouse control",
-                    "timeout": 30.0,
                     "failover": TestBotStates.TEST_INVENTORY_DETECTION,
                 },
                 TestBotStates.TEST_INVENTORY_DETECTION: {
@@ -178,10 +171,7 @@ class ComprehensiveTestBot(StateMachineBot):
             StateTransition(TestBotStates.IDLE, TestBotStates.TEST_MINIMAP),
             StateTransition(TestBotStates.TEST_MINIMAP, TestBotStates.TEST_WALKER),
             StateTransition(
-                TestBotStates.TEST_WALKER, TestBotStates.TEST_ARDUINO_MOUSE
-            ),
-            StateTransition(
-                TestBotStates.TEST_ARDUINO_MOUSE, TestBotStates.TEST_INVENTORY_DETECTION
+                TestBotStates.TEST_WALKER, TestBotStates.TEST_INVENTORY_DETECTION
             ),
             StateTransition(
                 TestBotStates.TEST_INVENTORY_DETECTION,
@@ -381,94 +371,6 @@ class ComprehensiveTestBot(StateMachineBot):
         except Exception as e:
             logger.error(f"Walker test failed: {e}")
             self._test_results["walker"] = False
-            return StateResult.FAILURE
-
-    def _handle_test_arduino_mouse(self, context: StateExecutionContext) -> StateResult:
-        """
-        Test Arduino mouse functionality if enabled.
-
-        Returns:
-            StateResult.SUCCESS if test passes or skipped
-            StateResult.FAILURE if test fails
-        """
-        logger.info("\n[TEST 3/9] INTERCEPTION MOUSE (KERNEL-LEVEL CONTROL)")
-        logger.info("-" * 60)
-
-        try:
-            from osrsbot.services.interception_mouse_service import (
-                InterceptionMouseService,
-            )
-
-            if not isinstance(self.actions.mouse, InterceptionMouseService):
-                logger.info("  ! Interception mouse not enabled (using standard mouse)")
-                logger.info("  -> Enable with environment variable: USE_INTERCEPTION=1")
-                logger.info("  -> Requires interception-python package")
-                logger.info("  -> Install with: pip install interception-python")
-                logger.info("  -> Requires Interception driver installation")
-                logger.info("  -> Skipping Interception test")
-                self._test_results["interception_mouse"] = "skipped"
-                return StateResult.SUCCESS
-
-            logger.info("  OK Interception mouse detected and enabled")
-
-            logger.info(
-                f"  -> Driver context initialized: {bool(self.actions.mouse.context)}"
-            )
-            logger.info(f"  -> Mouse device ID: {self.actions.mouse.mouse_device}")
-
-            logger.info("\n  Testing Interception mouse movement accuracy...")
-
-            import pyautogui
-
-            start_pos = pyautogui.position()
-            logger.info(f"  -> Start position: {start_pos}")
-
-            test_x = start_pos[0] + 100
-            test_y = start_pos[1] + 50
-
-            logger.info(f"  -> Moving to: ({test_x}, {test_y})")
-            self.actions.mouse.move_to(test_x, test_y, style="linear", duration=0.5)
-
-            self.actions.wait("short")
-
-            final_pos = pyautogui.position()
-            logger.info(f"  -> Final position: {final_pos}")
-
-            error = abs(final_pos[0] - test_x) + abs(final_pos[1] - test_y)
-            logger.info(f"  -> Position error: {error} pixels")
-
-            if error <= 5:
-                logger.info("  OK Interception mouse accuracy: EXCELLENT (<=5px error)")
-            elif error <= 10:
-                logger.info("  OK Interception mouse accuracy: GOOD (<=10px error)")
-            else:
-                logger.warning(
-                    f"  ! Interception mouse accuracy: FAIR ({error}px error)"
-                )
-
-            logger.info("\n  Testing Interception mouse click...")
-            logger.info("  -> Sending test click command...")
-
-            self.actions.mouse.move_to(
-                start_pos[0], start_pos[1], style="linear", duration=0.3
-            )
-            self.actions.mouse.click(button="left")
-
-            logger.info("  OK Interception mouse click sent successfully")
-
-            logger.info("\n  OK Interception mouse test complete")
-            logger.info("  -> Kernel-level input provides hardware-level authenticity")
-            self._test_results["interception_mouse"] = True
-            return StateResult.SUCCESS
-
-        except ImportError:
-            logger.info("  ! InterceptionMouseService not available")
-            self._test_results["interception_mouse"] = "skipped"
-            return StateResult.SUCCESS
-
-        except Exception as e:
-            logger.error(f"Interception mouse test failed: {e}")
-            self._test_results["interception_mouse"] = False
             return StateResult.FAILURE
 
     def _handle_test_inventory_detection(
@@ -1112,7 +1014,6 @@ class ComprehensiveTestBot(StateMachineBot):
         tests = [
             ("Minimap Navigation (walk_tiles)", "minimap"),
             ("Walker/Pathfinding (world coords)", "walker"),
-            ("Arduino Mouse (hardware control)", "arduino_mouse"),
             ("Inventory Detection", "inventory_detection"),
             ("Inventory Clicking", "inventory_clicking"),
             ("Color Detection", "color_detection"),

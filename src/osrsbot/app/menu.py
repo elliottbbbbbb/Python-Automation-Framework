@@ -21,6 +21,7 @@ from osrsbot.scripts.bankstanding.bankstanding_fletching import FletchingBot
 from osrsbot.scripts.bankstanding.fletching_items import get_best_tier
 from osrsbot.scripts.bankstanding.bankstanding_herblore import HerbloreBot
 from osrsbot.scripts.bankstanding.herblore_items import get_best_tier as get_best_herblore_tier
+from osrsbot.scripts.combat.chinning_monkeys import ChinningMonkeysBot
 from osrsbot.services.wom_service import get_skill_level
 load_dotenv()
 
@@ -153,6 +154,7 @@ def main() -> None:
         print("11. Anti-AFK Relogin Test (Login Screen Detection)")
         print("12. Fletching Bankstander (GE Bow Stringing)")
         print("13. Herblore Bankstander (GE Potion Making)")
+        print("14. Chinning Monkeys (Maniacal Monkey AoE Training)")
 
         choice = input("\nSelect: ").strip()
 
@@ -399,7 +401,7 @@ def main() -> None:
                 print("\n📝 Logs will be saved to: bot_debug.log")
                 print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
                 print("\n⚠️  IMPORTANT: Create template images before running!")
-                print("   See: src/osrsbot/images/bot/construction/TEMPLATE_REQUIREMENTS.md")
+                print("   See: images/bot/construction/TEMPLATE_REQUIREMENTS.md")
                 input("\nPress Enter to start...")
 
                 runner = ScriptRunner(window_title)
@@ -427,7 +429,7 @@ def main() -> None:
                 print("\nMake sure:")
                 print("  • RuneLite tile marker placed at your AFK spot")
                 print("  • Sand crab shell template images in:")
-                print("    src/osrsbot/images/bot/combat/sand_crabs/")
+                print("    images/bot/combat/sand_crabs/")
                 print("  • config.json: colors.sand_crab_afk_marker set to tile marker color")
                 print("\n📝 Logs will be saved to: bot_debug.log")
                 print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
@@ -454,7 +456,7 @@ def main() -> None:
                 print("  2. Full relogin (detects + clicks through login screens)")
                 print("\nMake sure:")
                 print("  • RuneLite is open (logged in or on a login screen)")
-                print("  • Template images exist in: src/osrsbot/images/bot/login/")
+                print("  • Template images exist in: images/bot/login/")
                 print("    - ok_button.png")
                 print("    - play_now_button.png")
                 print("    - click_to_play_button.png")
@@ -554,7 +556,7 @@ def main() -> None:
                 print(f"  - config.json has 'ge_banker' color matching your tag")
                 print(f"  - Bank tab set up with bow string + {mat_name}")
                 print(f"  - Withdraw quantity set to 14")
-                print(f"  - Template images in: src/osrsbot/images/bot/items/")
+                print(f"  - Template images in: images/bot/items/")
                 print(f"    - bowstring.png")
                 print(f"    - {mat_slug}.png")
                 print(f"\nLogs: osrs_bot_debug.log")
@@ -653,6 +655,44 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Herblore Bankstander failed: {e}", exc_info=True)
                 print(f"Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "14":
+            logger.info("Starting Chinning Monkeys Bot")
+            try:
+                config = Config()
+                window_title = config.get_window_title()
+                runs = get_valid_int("Number of cycles [default: 999]: ", default=999)
+
+                print("\n🐵 Chinning Monkeys Bot (Maniacal Monkey AoE Training)")
+                print("This bot will:")
+                print("  1. Walk to stack tile 1 (cyan marker)")
+                print("  2. Walk to stack tile 2 (magenta marker) to stack monkeys")
+                print("  3. Attack once to start AoE chinning")
+                print("  4. Let auto-retaliate handle combat")
+                print("  5. Drink prayer potion when prayer < 15")
+                print("  6. Re-stack monkeys every ~2 minutes")
+                print("  7. Reset aggro every ~10 minutes (minimap walk)")
+                print("\nMake sure:")
+                print("  • RuneLite tile markers configured:")
+                print("    - Cyan (#00FFFF): Stack tile 1")
+                print("    - Magenta (#FF00FF): Stack tile 2")
+                print("  • Minimap is FULLY ZOOMED OUT (for aggro reset)")
+                print("  • Inventory has: Chinchompas equipped, prayer potions")
+                print("  • Auto-retaliate is ON")
+                print("  • Protect from Melee prayer available")
+                print("\nconfig.json colors:")
+                print("  • chinning_stack_tile_1: #00FFFF")
+                print("  • chinning_stack_tile_2: #FF00FF")
+                print("\n📝 Logs will be saved to: osrs_bot_debug.log")
+                print(f"🔄 Will run for {runs} cycles (Ctrl+C to stop)")
+                input("\nPress Enter to start...")
+
+                runner = ScriptRunner(window_title)
+                runner.run_script(ChinningMonkeysBot, runs=runs, bank_location="")
+            except Exception as e:
+                logger.error(f"Chinning Monkeys Bot failed: {e}", exc_info=True)
+                print(f"❌ Script error: {e}")
                 sys.exit(1)
 
         else:

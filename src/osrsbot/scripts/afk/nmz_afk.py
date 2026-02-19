@@ -86,13 +86,11 @@ class NMZAfkBot(StateMachineBot):
         self.OVERLOAD_DAMAGE = 50  # Overload deals 50 damage
         self.TARGET_HP = 1  # Maintain 1 HP
 
-        # NOTE: Lazily hardcoded template paths for now.
-        # Should be moved to TemplateMatchService/config once this bot is stable.
-        # Item template names (defined in config.json templates section)
-        self.OVERLOAD_TEMPLATE = "src/osrsbot/images/bot/items/overload_potion.png"
-        self.ABSORPTION_TEMPLATE = "src/osrsbot/images/bot/items/absorption_potion.png"
-        self.ROCK_CAKE_TEMPLATE = "src/osrsbot/images/bot/items/dwarven_rock_cake.png"
-        self.LOCATOR_ORB_TEMPLATE = "src/osrsbot/images/bot/items/locator_orb.png"
+        # Item template paths from config (override in config.json)
+        self.OVERLOAD_TEMPLATE = self.config.get("templates", "overload_potion")
+        self.ABSORPTION_TEMPLATE = self.config.get("templates", "absorption_potion")
+        self.ROCK_CAKE_TEMPLATE = self.config.get("templates", "dwarven_rock_cake")
+        self.LOCATOR_ORB_TEMPLATE = self.config.get("templates", "locator_orb")
 
     # ==================== NMZ-SPECIFIC ANTI-BAN HELPERS ====================
 
