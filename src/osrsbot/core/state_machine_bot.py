@@ -45,6 +45,11 @@ class StateMachineBot(Bot):
         # Flags
         self._initialized = False
 
+        # Watchdog: stop script if no progress for too long (None = disabled)
+        self._watchdog_timeout: Optional[float] = None
+        self._watchdog_last_activity: float = time.time()
+        self._watchdog_warned: bool = False
+
         # Debug UI
         self.debug_ui = None
         if debug_ui:
@@ -197,6 +202,7 @@ class StateMachineBot(Bot):
                 if self.actions.anti_ban.should_take_break():
                     logger.info(f"Anti-ban: Break triggered before {self._current_state.value}")
                     self.actions.anti_ban.execute_break()
+                    self.record_watchdog_activity()  # Reset watchdog after break
 
             # Random idle actions between states
             if hasattr(self, "actions") and self.actions.anti_ban:
@@ -211,7 +217,11 @@ class StateMachineBot(Bot):
                 logger.info(
                     f"Anti-AFK: Relogin completed before {self._current_state.name}, restarting state"
                 )
+                self.record_watchdog_activity()  # Reset watchdog after relogin
                 continue
+
+            # Watchdog: stop if no progress for too long
+            self._check_watchdog()
 
             # Execute current state
             result = self._execute_state(self._current_state)
@@ -430,6 +440,50 @@ class StateMachineBot(Bot):
         self._current_state = self.get_initial_state()
         self._retry_counts.clear()
         logger.info(f"State machine reset to {self._current_state.name}")
+
+    # --- Watchdog ---
+
+    def enable_watchdog(self, timeout_seconds: float = 300.0) -> None:
+        """Enable idle watchdog that stops the script if no activity is recorded.
+
+        Args:
+            timeout_seconds: Max idle time before stopping (default 300 = 5 min)
+        """
+        self._watchdog_timeout = timeout_seconds
+        self._watchdog_last_activity = time.time()
+        self._watchdog_warned = False
+        logger.info(f"Watchdog enabled: {timeout_seconds:.0f}s idle threshold")
+
+    def record_watchdog_activity(self) -> None:
+        """Record meaningful progress — resets the watchdog timer."""
+        self._watchdog_last_activity = time.time()
+        self._watchdog_warned = False
+
+    def _check_watchdog(self) -> None:
+        """Check if idle time exceeds threshold. Raises RuntimeError if triggered."""
+        if self._watchdog_timeout is None:
+            return
+
+        idle_seconds = time.time() - self._watchdog_last_activity
+
+        if idle_seconds >= self._watchdog_timeout:
+            logger.error(
+                f"WATCHDOG: No activity for {idle_seconds:.0f}s "
+                f"(threshold: {self._watchdog_timeout:.0f}s) — stopping script"
+            )
+            raise RuntimeError(
+                f"Watchdog timeout: No activity for {idle_seconds:.0f}s"
+            )
+
+        # Warning at 80% threshold
+        warn_threshold = self._watchdog_timeout * 0.8
+        if idle_seconds >= warn_threshold and not self._watchdog_warned:
+            remaining = self._watchdog_timeout - idle_seconds
+            logger.warning(
+                f"WATCHDOG: No activity for {idle_seconds:.0f}s — "
+                f"will stop in {remaining:.0f}s if no progress"
+            )
+            self._watchdog_warned = True
 
     def run(self, bank_location: str = "ferox", runs: int = 1) -> None:
         """

@@ -666,8 +666,37 @@ class AntiBanConfig:
     # ========== SCHEDULED BREAKS ==========
     # Main breaks to prevent fatigue patterns
     enable_breaks: bool = True
-    break_interval_range: Tuple[float, float] = (1800.0, 3600.0)  # 30-60 minutes
-    break_duration_range: Tuple[float, float] = (120.0, 300.0)  # 2-5 minutes
+    break_interval_range: Tuple[float, float] = (1800.0, 3600.0)  # 30-60 min (legacy)
+    break_duration_range: Tuple[float, float] = (120.0, 300.0)  # 2-5 min (legacy)
+
+    # ========== HUMAN-LIKE BREAK PATTERNS ==========
+    # Weighted pattern selection for realistic session variety.
+    # Each pattern: (play_min, play_max, break_min, break_max) in minutes.
+    #   short      — quick bathroom/water break
+    #   medium     — food/stretch break
+    #   long_break — step away (TV, errands)
+    #   extended   — long grind session before a moderate break
+    break_pattern_short: Tuple[float, float, float, float] = (20.0, 40.0, 5.0, 10.0)
+    break_pattern_medium: Tuple[float, float, float, float] = (45.0, 75.0, 15.0, 25.0)
+    break_pattern_long_break: Tuple[float, float, float, float] = (20.0, 35.0, 60.0, 120.0)
+    break_pattern_extended: Tuple[float, float, float, float] = (90.0, 180.0, 15.0, 30.0)
+
+    # Weights control how often each pattern is selected (must sum to 1.0)
+    break_pattern_weight_short: float = 0.40
+    break_pattern_weight_medium: float = 0.25
+    break_pattern_weight_long_break: float = 0.10
+    break_pattern_weight_extended: float = 0.25
+
+    # Hard limits
+    max_continuous_play_minutes: float = 180.0  # 3-hour hard cap
+    min_break_after_cap_minutes: Tuple[float, float] = (30.0, 40.0)  # forced break
+
+    # Ratio enforcement — target 5:1 play:break, correct above 6:1
+    target_play_break_ratio: float = 5.0
+    ratio_enforcement_ceiling: float = 6.0
+
+    # Schedule pre-generation
+    segments_to_pregenerate: int = 8
 
     # ========== MICRO-BREAKS ==========
     # Short pauses between actions (random chance)
@@ -687,6 +716,29 @@ class AntiBanConfig:
     enable_idle_actions: bool = True
     idle_action_interval: float = 300.0  # Every 5 minutes
     mouse_jitter_range: Tuple[int, int] = (5, 25)  # 5-25 pixels
+
+    # Weighted idle action selection (mouse_jitter, camera_nudge,
+    # check_skills_tab, check_equipment_tab, mouse_off_game)
+    idle_action_weights: Tuple[float, ...] = (0.30, 0.25, 0.20, 0.15, 0.10)
+    camera_nudge_duration_range: Tuple[float, float] = (0.3, 1.2)
+    camera_nudge_pause_range: Tuple[float, float] = (0.5, 2.0)
+
+    # ========== VARIANCE DRIFT ==========
+    # Session multipliers drift over time via random walk with fatigue bias.
+    enable_variance_drift: bool = True
+    variance_drift_interval_range: Tuple[float, float] = (180.0, 480.0)  # 3-8 min
+    timing_drift_step_sigma: float = 0.025
+    mouse_drift_step_sigma: float = 0.015
+    drift_mean_reversion_strength: float = 0.3  # Pull toward center (0-1)
+    fatigue_max_bias: float = 0.08  # Max timing slowdown from fatigue
+    fatigue_ramp_minutes: float = 120.0  # Minutes to reach max fatigue bias
+
+    # ========== CLICK RHYTHM ==========
+    # Timing variation for repetitive actions (dropping, banking, etc.)
+    rhythm_long_pause_chance: float = 0.06
+    rhythm_long_pause_multiplier: Tuple[float, float] = (2.0, 4.0)
+    rhythm_wave_amplitude: float = 0.15
+    rhythm_jitter_sigma: float = 0.10
 
     # ========== PATTERN DETECTION ==========
     # Track actions to avoid repetitive patterns

@@ -63,6 +63,9 @@ class NMZAfkBot(StateMachineBot):
         """Initialize NMZ AFK bot with state machine."""
         super().__init__(**kwargs)
 
+        # Watchdog: stop if stuck idle for 5 minutes (prevents ban from bugged loops)
+        self.enable_watchdog(timeout_seconds=300)
+
         # Timer tracking (in seconds)
         self._overload_timer: float = 0.0
         self._absorption_timer: float = 0.0
@@ -494,6 +497,7 @@ class NMZAfkBot(StateMachineBot):
         while True:
             # Check if user pressed 'q' to exit
             self._check_exit_requested()
+            self._check_watchdog()
 
             # ANTI-BAN: Check for zone-out (attention lapse)
             if self._anti_ban_call('should_zone_out', False, min_interval_minutes=10, chance_per_second=0.0005):
@@ -543,6 +547,7 @@ class NMZAfkBot(StateMachineBot):
                 self._actual_overload_click_time = time.time()
                 self._last_overload_time = self._actual_overload_click_time
                 self._overload_variance = 0.0
+                self.record_watchdog_activity()  # Overload dose = progress
 
                 if hasattr(self, '_missed_dose_recovery'):
                     self._missed_dose_recovery = False
@@ -578,6 +583,7 @@ class NMZAfkBot(StateMachineBot):
                     self.actions.wait("micro")
                     self._record_action("use_locator_orb_combat")
                     self._use_locator_orb_safe()
+                    self.record_watchdog_activity()  # Locator orb = progress
                     self.actions.wait("short")
 
             self._assign_dose_variance('_absorption_variance', 'absorption', 370, absorption_elapsed)
@@ -600,6 +606,7 @@ class NMZAfkBot(StateMachineBot):
 
                 self._last_absorption_time = self._actual_absorption_click_time
                 self._absorption_variance = 0.0
+                self.record_watchdog_activity()  # Absorption dose = progress
 
 
             overload_remaining = self.OVERLOAD_DURATION - overload_elapsed

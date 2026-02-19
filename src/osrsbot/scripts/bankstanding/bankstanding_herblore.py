@@ -1,12 +1,12 @@
 """
-Fletching Bankstander - GE bow-stringing workflow using BankstanderBot base class.
+Herblore Bankstander - GE potion-making workflow using BankstanderBot base class.
 
 Workflow:
 1. Right-click tagged banker (color) → select "Bank Banker"
-2. Deposit all finished products, withdraw 14 bowstrings + 14 unstrung bows from tab
-3. Close bank, click bowstring on unstrung bow in inventory
-4. Press Space for Make All, press Space every ~5s for level-up popups
-5. Detect completion via template matching (no more raw materials in inventory)
+2. Deposit all finished potions, withdraw 14 unf potions + 14 secondary ingredients
+3. Close bank, click unf potion on secondary ingredient in inventory
+4. Press Space for Make All, monitor for level-ups
+5. Detect completion via template matching (no more unf potions in inventory)
 6. Loop
 
 Uses a pre-configured bank tab with withdraw quantity set to 14.
@@ -22,27 +22,28 @@ from osrsbot.core.state_types import StateExecutionContext, StateResult
 from osrsbot.core.base_bankstander import BankstanderBot
 from osrsbot.services.keyboard_service import KeyboardService
 from osrsbot.services.wom_service import get_skill_level
-from osrsbot.scripts.bankstanding.fletching_items import get_best_tier, FLETCHING_TIERS
+from osrsbot.scripts.bankstanding.herblore_items import get_best_tier, HERBLORE_TIERS
 
 logger = logging.getLogger(__name__)
 
 
-class FletchingBot(BankstanderBot):
+class HerbloreBot(BankstanderBot):
     """
-    GE bow-stringing bankstander.
+    GE potion-making bankstander.
 
     Right-clicks a color-tagged banker at the Grand Exchange,
-    withdraws bowstrings and unstrung bows from a pre-made bank tab,
-    combines them in inventory, and waits for fletching to complete.
+    withdraws unfinished potions and secondary ingredients from a
+    pre-made bank tab, combines them in inventory, and waits for
+    potion making to complete.
     """
 
     # Menu offset from right-click position to "Bank Banker" option
     DEFAULT_BANK_MENU_OFFSET = 45
 
-    # Safety timeout for fletching wait loop (seconds)
-    FLETCHING_TIMEOUT = 90.0
+    # Safety timeout for herblore wait loop (seconds)
+    HERBLORE_TIMEOUT = 90.0
 
-    # Minimum seconds before considering re-initiation (fletching 14 items takes ~20-25s)
+    # Minimum seconds before considering re-initiation (making 14 potions takes ~20-25s)
     MIN_TIME_BEFORE_REINITIATE = 25.0
 
     # Re-check WOM every N cycles to confirm/correct level counter
@@ -50,27 +51,27 @@ class FletchingBot(BankstanderBot):
 
     def __init__(self, *args, **kwargs):
         """
-        Initialize GE fletching bankstander.
+        Initialize GE herblore bankstander.
 
-        Auto-selects the best bow tier based on the player's Fletching level
-        via the Wise Old Man API. Falls back to oak shortbow if lookup fails.
+        Auto-selects the best potion tier based on the player's Herblore level
+        via the Wise Old Man API. Falls back to antipoison if lookup fails.
         """
         # Auto-select tier from WOM before setting up templates
-        tool_name = "bow string"
-        material_name = "oak shortbow (u)"
-        product_name = "oak shortbow"
-        starting_level = 20  # default if WOM lookup fails
+        tool_name = "marrentill potion (unf)"
+        material_name = "unicorn horn dust"
+        product_name = "antipoison"
+        starting_level = 5  # default if WOM lookup fails
 
         config = kwargs.get("config")
         if config:
             # Manual override takes priority over WOM
-            manual_level = config.get("fletching_starting_level", default="")
+            manual_level = config.get("herblore_starting_level", default="")
             if manual_level:
                 try:
                     starting_level = int(manual_level)
                     logger.info(f"CONFIG: Using manual starting level {starting_level}")
                 except (ValueError, TypeError):
-                    logger.warning(f"CONFIG: Invalid fletching_starting_level '{manual_level}', ignoring")
+                    logger.warning(f"CONFIG: Invalid herblore_starting_level '{manual_level}', ignoring")
                     manual_level = ""
 
             window_title = config.get("window_title", default="")
@@ -88,11 +89,11 @@ class FletchingBot(BankstanderBot):
                 except Exception:
                     pass  # Best-effort update
 
-                level = get_skill_level(rsn, "fletching")
+                level = get_skill_level(rsn, "herblore")
                 if level is not None:
                     starting_level = level
                 else:
-                    logger.warning("WOM: Could not fetch stats, defaulting to oak shortbow")
+                    logger.warning("WOM: Could not fetch stats, defaulting to antipoison")
 
             # Select tier based on starting level (from config, WOM, or default)
             tier = get_best_tier(starting_level)
@@ -101,25 +102,27 @@ class FletchingBot(BankstanderBot):
                 material_name = tier["material_name"]
                 product_name = tier["product_name"]
                 logger.info(
-                    f"Fletching level {starting_level} -> "
+                    f"Herblore level {starting_level} -> "
                     f"crafting {product_name}"
                 )
             elif starting_level > 0:
                 logger.warning(
-                    f"Fletching level {starting_level} too low, "
-                    f"defaulting to oak shortbow"
+                    f"Herblore level {starting_level} too low, "
+                    f"defaulting to antipoison"
                 )
 
         images_dir = Path(__file__).parent.parent.parent / "images" / "bot"
 
-        # Tool templates (bowstring - shared across all tiers)
-        tool_templates = sorted(images_dir.glob("items/bowstring*.png"))
+        # Tool templates (unfinished potion) - derive glob from tool_name
+        # "marrentill potion (unf)" -> "marrentill_potion_unf"
+        tool_slug = tool_name.replace(" ", "_").replace("(", "").replace(")", "")
+        tool_templates = sorted(images_dir.glob(f"items/{tool_slug}*.png"))
         tool_template = [str(p) for p in tool_templates] if tool_templates else [
-            str(images_dir / "items" / "bowstring.png")
+            str(images_dir / "items" / f"{tool_slug}.png")
         ]
 
-        # Material templates - derive glob from material_name
-        # "oak shortbow (u)" -> "oak_shortbow_u"
+        # Material templates (secondary ingredient) - derive glob from material_name
+        # "unicorn horn dust" -> "unicorn_horn_dust"
         mat_slug = material_name.replace(" ", "_").replace("(", "").replace(")", "")
         material_templates = sorted(images_dir.glob(f"items/{mat_slug}*.png"))
         material_template = [str(p) for p in material_templates] if material_templates else [
@@ -135,7 +138,7 @@ class FletchingBot(BankstanderBot):
             processed_item_name=product_name,
             *args,
             **kwargs,
-            script_name="Fletching (GE Bow Stringing)",
+            script_name="Herblore (GE Potion Making)",
         )
 
         # Banker interaction config
@@ -166,11 +169,11 @@ class FletchingBot(BankstanderBot):
         self._no_materials_count = 0
         self.MAX_NO_MATERIALS_ATTEMPTS = 3
 
-        # Fletching Make All menu template(s) for detection
-        menu_templates = sorted(images_dir.glob("ui_templates/fletching_menu*.png"))
-        self._fletching_menu_templates = (
+        # Herblore Make All menu template(s) for detection
+        menu_templates = sorted(images_dir.glob("ui_templates/herblore_menu*.png"))
+        self._herblore_menu_templates = (
             [str(p) for p in menu_templates] if menu_templates
-            else [str(images_dir / "ui_templates" / "fletching_menu.png")]
+            else [str(images_dir / "ui_templates" / "herblore_menu.png")]
         )
 
         # Bank X quantity button template(s)
@@ -196,10 +199,10 @@ class FletchingBot(BankstanderBot):
         )
 
         # Level-up popup template(s) for detection
-        levelup_templates = sorted(images_dir.glob("ui_templates/fletching_level_up*.png"))
+        levelup_templates = sorted(images_dir.glob("ui_templates/herblore_level_up*.png"))
         self._levelup_templates = (
             [str(p) for p in levelup_templates] if levelup_templates
-            else [str(images_dir / "ui_templates" / "fletching_level_up.png")]
+            else [str(images_dir / "ui_templates" / "herblore_level_up.png")]
         )
 
         # Config reference for periodic WOM re-checks
@@ -222,8 +225,19 @@ class FletchingBot(BankstanderBot):
             return False
 
         old_name = self._material_name
+        old_tool = self._tool_name
+
+        self._tool_name = tier["tool_name"]
         self._material_name = tier["material_name"]
         self._product_name = tier["product_name"]
+
+        # Reload tool templates (unf potion changes between tiers)
+        tool_slug = self._tool_name.replace(" ", "_").replace("(", "").replace(")", "")
+        tool_paths = sorted(self._images_dir.glob(f"items/{tool_slug}*.png"))
+        self._tool_template = (
+            [str(p) for p in tool_paths] if tool_paths
+            else [str(self._images_dir / "items" / f"{tool_slug}.png")]
+        )
 
         # Reload material templates
         mat_slug = self._material_name.replace(" ", "_").replace("(", "").replace(")", "")
@@ -243,13 +257,14 @@ class FletchingBot(BankstanderBot):
 
         logger.info(
             f"UPGRADE: Level {self._current_level} - "
-            f"switching from {old_name} to {self._material_name}"
+            f"switching from {old_tool} + {old_name} to "
+            f"{self._tool_name} + {self._material_name}"
         )
         return True
 
     def _find_best_available_tier(self, exclude_current: bool = False) -> Optional[dict]:
         """
-        Scan bank for the highest tier with available materials.
+        Scan bank for the highest potion tier with BOTH tool and material available.
 
         Args:
             exclude_current: If True, skip the current tier (used for fallback after failure)
@@ -257,7 +272,7 @@ class FletchingBot(BankstanderBot):
         Returns:
             Tier dict if found, None if no materials available.
         """
-        for tier in FLETCHING_TIERS:
+        for tier in HERBLORE_TIERS:
             # Skip tiers we can't make yet (level too low)
             if tier["min_level"] > self._current_level:
                 continue
@@ -266,34 +281,49 @@ class FletchingBot(BankstanderBot):
             if exclude_current and tier["material_name"] == self._material_name:
                 continue
 
+            # Check for BOTH tool (unf potion) AND material (secondary)
+            tool_slug = tier["tool_name"].replace(" ", "_").replace("(", "").replace(")", "")
             mat_slug = tier["material_name"].replace(" ", "_").replace("(", "").replace(")", "")
-            test_templates = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
 
-            if not test_templates:
+            tool_templates = sorted(self._images_dir.glob(f"items/{tool_slug}*.png"))
+            mat_templates = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
+
+            if not tool_templates or not mat_templates:
                 continue
 
-            template_paths = [str(p) for p in test_templates]
+            tool_paths = [str(p) for p in tool_templates]
+            mat_paths = [str(p) for p in mat_templates]
 
-            # Check if this material is visible in bank (0.8 threshold to avoid false positives)
-            result = self.state.find_multi_template(template_paths, threshold=0.8)
-            if result is not None:
+            # BOTH must be visible in bank (0.8 threshold to avoid false positives)
+            tool_result = self.state.find_multi_template(tool_paths, threshold=0.8)
+            mat_result = self.state.find_multi_template(mat_paths, threshold=0.8)
+
+            if tool_result is not None and mat_result is not None:
                 return tier
 
         return None
 
     def _switch_to_tier(self, tier: dict) -> None:
-        """Switch to a new tier, reloading all templates."""
+        """Switch to a new potion tier, reloading all templates."""
         old_product = self._product_name
 
+        self._tool_name = tier["tool_name"]
         self._material_name = tier["material_name"]
         self._product_name = tier["product_name"]
         # Note: Do NOT change _current_level here - player's actual level
-        # doesn't change when switching what item we're making
+        # doesn't change when switching what potion we're making
 
-        # Reload material templates
+        # Reload tool templates (unf potion)
+        tool_slug = tier["tool_name"].replace(" ", "_").replace("(", "").replace(")", "")
+        tool_templates = sorted(self._images_dir.glob(f"items/{tool_slug}*.png"))
+        self._tool_template = [str(p) for p in tool_templates] if tool_templates else [
+            str(self._images_dir / "items" / f"{tool_slug}.png")
+        ]
+
+        # Reload material templates (secondary ingredient)
         mat_slug = tier["material_name"].replace(" ", "_").replace("(", "").replace(")", "")
-        material_templates = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
-        self._material_template = [str(p) for p in material_templates] if material_templates else [
+        mat_templates = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
+        self._material_template = [str(p) for p in mat_templates] if mat_templates else [
             str(self._images_dir / "items" / f"{mat_slug}.png")
         ]
 
@@ -308,7 +338,7 @@ class FletchingBot(BankstanderBot):
         print(f"\n  Switched to: {tier['product_name']} (requires level {tier['min_level']})")
 
     def _get_wom_level(self, force_update: bool = True) -> Optional[int]:
-        """Fetch current fletching level from WOM, optionally forcing a refresh."""
+        """Fetch current herblore level from WOM, optionally forcing a refresh."""
         if not self._config:
             return None
 
@@ -332,7 +362,7 @@ class FletchingBot(BankstanderBot):
             except Exception:
                 pass  # Best-effort update
 
-        return get_skill_level(rsn, "fletching")
+        return get_skill_level(rsn, "herblore")
 
     def _wom_level_check(self) -> None:
         """Periodic WOM re-check to confirm/correct level counter."""
@@ -450,9 +480,9 @@ class FletchingBot(BankstanderBot):
 
         Combines deposit + withdraw into one bank session:
         1. Right-click banker → "Bank Banker"
-        2. Deposit all (finished products from previous cycle)
-        3. Click bowstring in bank tab (qty pre-set to 14)
-        4. Click oak shortbow (u) in bank tab (qty pre-set to 14)
+        2. Deposit all (finished potions from previous cycle)
+        3. Click unf potion in bank tab (qty pre-set to 14)
+        4. Click secondary ingredient in bank tab (qty pre-set to 14)
         5. Close bank
         """
         self._check_exit_requested()
@@ -484,7 +514,6 @@ class FletchingBot(BankstanderBot):
                 self._bank_open = True
 
                 # Verify bank actually opened (not collection box)
-                # Use X button template since bank_search_button.PNG doesn't exist
                 bank_check = self.state.find_multi_template(
                     self._bank_x_button_templates, threshold=0.6
                 )
@@ -498,7 +527,6 @@ class FletchingBot(BankstanderBot):
                 logger.info("BANKING: Bank verified open (X button detected)")
 
                 # Deposit any leftover items before withdrawing
-                # (only needed on fresh open — DEPOSIT already cleared inventory)
                 self._update_ui("BANKING", "Depositing inventory...")
                 logger.info("BANKING: Depositing all items before withdrawal")
                 actions.click_template(
@@ -526,23 +554,52 @@ class FletchingBot(BankstanderBot):
             if best_tier and best_tier["material_name"] != self._material_name:
                 self._switch_to_tier(best_tier)
 
-            # Step 1: Click tool (bowstring) in bank tab
+            # Step 1: Click tool (unf potion) in bank tab
             self._update_ui("BANKING", f"Withdrawing {self._tool_name}...")
             logger.info(f"BANKING: Clicking {self._tool_name} in bank tab")
 
             if not actions.click_template(
                 self._tool_template, self._tool_name, threshold=0.8
             ):
-                logger.error(
-                    f"BANKING: Failed to find {self._tool_name} in bank tab"
+                logger.warning(
+                    f"BANKING: {self._tool_name} not found, searching for alternatives..."
                 )
-                self._bank_open = False
-                self._x_quantity_set = False
-                return StateResult.FAILURE
+
+                # Find any available tier (excluding current since it just failed)
+                fallback_tier = self._find_best_available_tier(exclude_current=True)
+                if fallback_tier:
+                    self._switch_to_tier(fallback_tier)
+                    # Retry with new tier
+                    if not actions.click_template(
+                        self._tool_template, self._tool_name, threshold=0.8
+                    ):
+                        logger.error(
+                            f"BANKING: Fallback tool {self._tool_name} also not found"
+                        )
+                        self._bank_open = False
+                        self._x_quantity_set = False
+                        return StateResult.FAILURE
+                else:
+                    self._no_materials_count += 1
+                    logger.error(
+                        f"BANKING: No materials available at any tier "
+                        f"({self._no_materials_count}/{self.MAX_NO_MATERIALS_ATTEMPTS})"
+                    )
+                    if self._no_materials_count >= self.MAX_NO_MATERIALS_ATTEMPTS:
+                        logger.info("BANKING: Max no-materials attempts reached, stopping bot")
+                        print(
+                            f"\n✅ No craftable materials found after "
+                            f"{self.MAX_NO_MATERIALS_ATTEMPTS} scans. "
+                            f"Bot stopping gracefully.\n"
+                        )
+                        self._exit_requested = True
+                    self._bank_open = False
+                    self._x_quantity_set = False
+                    return StateResult.FAILURE
 
             actions.wait("short")
 
-            # Step 2: Click material (oak shortbow u) in bank tab
+            # Step 2: Click material (secondary ingredient) in bank tab
             self._update_ui("BANKING", f"Withdrawing {self._material_name}...")
             logger.info(f"BANKING: Clicking {self._material_name} in bank tab")
 
@@ -631,9 +688,9 @@ class FletchingBot(BankstanderBot):
 
     def _handle_deposit(self, context: StateExecutionContext) -> StateResult:
         """
-        Handle DEPOSIT state - open bank and deposit all finished products.
+        Handle DEPOSIT state - open bank and deposit all finished potions.
 
-        After fletching completes, open the bank and deposit all oak shortbows.
+        After potion making completes, open the bank and deposit all potions.
         Leaves bank open so the next BANKING state can skip re-opening.
         """
         self._check_exit_requested()
@@ -662,7 +719,6 @@ class FletchingBot(BankstanderBot):
                 )
 
             # Verify deposit worked — retry if items still in inventory
-            # Check for finished product (oak shortbow) in inventory region only
             inv_region = self.state.get_inventory_region()
             for retry in range(2):
                 actions.wait("short")
@@ -699,14 +755,14 @@ class FletchingBot(BankstanderBot):
             return StateResult.FAILURE
 
     def _find_tool_in_inventory(self) -> bool:
-        """Check if the tool (bowstring) is still visible in inventory."""
+        """Check if the tool (unf potion) is still visible in inventory."""
         result = self.state.find_multi_template(
             self._tool_template, threshold=0.85
         )
         return result is not None
 
     def _find_material_in_inventory(self) -> bool:
-        """Check if the material (unstrung bow) is still visible in inventory."""
+        """Check if the secondary ingredient is still visible in inventory."""
         result = self.state.find_multi_template(
             self._material_template, threshold=0.85
         )
@@ -714,15 +770,15 @@ class FletchingBot(BankstanderBot):
 
     def process_items(self, context: StateExecutionContext) -> StateResult:
         """
-        Process items - combine bowstring with unstrung bow, wait for fletching.
+        Process items - combine unf potion with secondary ingredient, wait for completion.
 
         Flow:
         1. Ensure inventory is open
-        2. Find and click bowstring in inventory
-        3. Find and click oak shortbow (u) in inventory
+        2. Find and click unf potion in inventory
+        3. Find and click secondary ingredient in inventory
         4. Wait for Make All interface → press Space
-        5. Press Space every ~5s (handles level-up popups)
-        6. Detect completion: bowstring template no longer found in inventory
+        5. Monitor for level-ups and completion
+        6. Detect completion: unf potion template no longer found in inventory
         """
         try:
             actions = self.actions
@@ -734,7 +790,7 @@ class FletchingBot(BankstanderBot):
 
             actions.wait("short")
 
-            # Step 1: Find and click the tool (bowstring) in inventory
+            # Step 1: Find and click the tool (unf potion) in inventory
             self._update_ui("PROCESS", f"Clicking {self._tool_name}...")
             logger.info(f"PROCESS: Finding {self._tool_name} in inventory")
 
@@ -756,7 +812,7 @@ class FletchingBot(BankstanderBot):
             actions.mouse.click_at(abs_x, abs_y, move_style="curved")
             actions.wait("short")
 
-            # Step 2: Find and click the material (oak shortbow u) in inventory
+            # Step 2: Find and click the material (secondary ingredient) in inventory
             self._update_ui("PROCESS", f"Using on {self._material_name}...")
             logger.info(f"PROCESS: Finding {self._material_name} in inventory")
 
@@ -787,7 +843,7 @@ class FletchingBot(BankstanderBot):
 
             while time.time() - poll_start < menu_timeout:
                 result = self.state.find_multi_template(
-                    self._fletching_menu_templates, threshold=0.6
+                    self._herblore_menu_templates, threshold=0.6
                 )
                 if result:
                     logger.info(
@@ -808,7 +864,7 @@ class FletchingBot(BankstanderBot):
             logger.info("PROCESS: Pressing Space for Make All")
             self.keyboard.press("space", mode="humanized")
 
-            # Step 5: Fletching wait loop — monitor for completion and level-ups
+            # Step 5: Herblore wait loop — monitor for completion and level-ups
             # No periodic space presses; space is only pressed when a level-up
             # popup is detected, so the template matcher can reliably catch it.
             start_time = time.time()
@@ -820,9 +876,9 @@ class FletchingBot(BankstanderBot):
                 elapsed = time.time() - start_time
 
                 # Safety timeout
-                if elapsed > self.FLETCHING_TIMEOUT:
+                if elapsed > self.HERBLORE_TIMEOUT:
                     logger.warning(
-                        f"PROCESS: Fletching timeout after {elapsed:.0f}s"
+                        f"PROCESS: Herblore timeout after {elapsed:.0f}s"
                     )
                     break
 
@@ -831,17 +887,17 @@ class FletchingBot(BankstanderBot):
                 sleep_time = max(1.0, self._space_interval + jitter)
                 self._update_ui(
                     "PROCESS",
-                    f"Fletching... ({elapsed:.0f}s elapsed)",
+                    f"Making potions... ({elapsed:.0f}s elapsed)",
                 )
                 time.sleep(sleep_time)
 
-                # Check if raw materials are gone (fletching complete)
-                # Must check BOTH tool AND material - finished bows can falsely
-                # match unstrung bow templates, so checking both is more reliable
+                # Check if raw materials are gone (potion making complete)
+                # Must check BOTH tool AND material - finished potions can falsely
+                # match unf potion templates, so material check is the reliable signal
                 if not self._find_tool_in_inventory() or not self._find_material_in_inventory():
                     logger.info(
                         f"PROCESS: Materials depleted - "
-                        f"fletching complete after {elapsed:.0f}s"
+                        f"potion making complete after {elapsed:.0f}s"
                     )
                     break
 
@@ -861,7 +917,7 @@ class FletchingBot(BankstanderBot):
                     self.keyboard.press("space", mode="humanized")
                     time.sleep(0.5)
 
-                    # Re-initiate craft: click bowstring → material → Make All
+                    # Re-initiate craft: click unf potion → secondary → Make All
                     logger.info("PROCESS: Re-initiating craft after level-up")
                     self._update_ui("PROCESS", "Re-initiating craft after level-up...")
                     tool_match = self.state.find_multi_template(
@@ -884,18 +940,16 @@ class FletchingBot(BankstanderBot):
                             self.keyboard.press("space", mode="humanized")
                             logger.info("PROCESS: Craft re-initiated after level-up")
                         else:
-                            logger.warning("PROCESS: Can't find material after level-up")
+                            logger.warning("PROCESS: Can't find secondary after level-up")
                             self.keyboard.press("escape")  # Cancel "use item on" mode
                     else:
-                        logger.warning("PROCESS: Can't find bowstring after level-up")
+                        logger.warning("PROCESS: Can't find unf potion after level-up")
 
                     last_craft_start = time.time()
                     continue
 
                 # Only consider re-initiation after minimum time has passed
-                # (during normal fletching, bowstrings are present and no
-                # Make All menu — that's the expected state)
-                # Require BOTH tool AND material - avoids false positives from finished bows
+                # Require BOTH tool AND material - avoids false positives from finished products
                 time_since_craft = time.time() - last_craft_start
                 if time_since_craft > self.MIN_TIME_BEFORE_REINITIATE:
                     if self._find_tool_in_inventory() and self._find_material_in_inventory():
@@ -938,14 +992,14 @@ class FletchingBot(BankstanderBot):
                                         self.keyboard.press("space", mode="humanized")
                                         logger.info("PROCESS: Craft re-initiated after level-up (re-check)")
                                     else:
-                                        logger.warning("PROCESS: Can't find material after level-up (re-check)")
+                                        logger.warning("PROCESS: Can't find secondary after level-up (re-check)")
                                         self.keyboard.press("escape")  # Cancel "use item on" mode
 
                                 last_craft_start = time.time()
                             else:
-                                # Fletching stopped — re-click items to restart
+                                # Potion making stopped — re-click items to restart
                                 logger.info(
-                                    "PROCESS: Fletching appears stopped, "
+                                    "PROCESS: Potion making appears stopped, "
                                     "re-initiating craft"
                                 )
                                 self._update_ui(
@@ -958,7 +1012,7 @@ class FletchingBot(BankstanderBot):
                                 )
                                 if not tool_match:
                                     logger.warning(
-                                        "PROCESS: Can't find bowstring for "
+                                        "PROCESS: Can't find unf potion for "
                                         "re-initiation"
                                     )
                                     continue
@@ -975,7 +1029,7 @@ class FletchingBot(BankstanderBot):
                                 )
                                 if not mat_match:
                                     logger.warning(
-                                        "PROCESS: Can't find material for "
+                                        "PROCESS: Can't find secondary for "
                                         "re-initiation"
                                     )
                                     continue
@@ -996,12 +1050,12 @@ class FletchingBot(BankstanderBot):
 
             # Record action for anti-ban
             if hasattr(actions, "anti_ban") and actions.anti_ban:
-                actions.anti_ban.record_action("fletch_cycle")
+                actions.anti_ban.record_action("herblore_cycle")
 
             self._items_processed += 14
             self._cycle_count += 1
             logger.info(
-                f"PROCESS: Fletching cycle complete "
+                f"PROCESS: Herblore cycle complete "
                 f"(~{self._items_processed} items total)"
             )
 
