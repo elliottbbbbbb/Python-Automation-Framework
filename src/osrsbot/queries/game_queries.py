@@ -257,6 +257,43 @@ class GameState:
         logger.warning("BankQueries not available for find_all_multi_template")
         return []
 
+    # --- WOM (Wise Old Man) Queries ---
+    def get_skill_level_from_wom(
+        self, skill: str, force_update: bool = False
+    ) -> Optional[int]:
+        """Look up skill level from Wise Old Man API.
+
+        Extracts RSN from config window_title (strips 'RuneLite - ' prefix).
+
+        Args:
+            skill: Skill name (lowercase), e.g. "fletching", "herblore"
+            force_update: If True, trigger a WOM data refresh before lookup
+
+        Returns:
+            Skill level as int, or None if lookup failed
+        """
+        from osrsbot.services.wom_service import get_skill_level
+
+        window_title = self.config.get("window_title", default="")
+        rsn = window_title.replace("RuneLite - ", "").strip()
+        if not rsn:
+            logger.warning("Cannot determine RSN from window_title for WOM lookup")
+            return None
+
+        if force_update:
+            try:
+                import requests
+                requests.post(
+                    f"https://api.wiseoldman.net/v2/players/{rsn}",
+                    headers={"User-Agent": "OSRSAutomationFramework"},
+                    timeout=10,
+                )
+                logger.info(f"WOM: Triggered data refresh for '{rsn}'")
+            except Exception as e:
+                logger.warning(f"WOM: Failed to trigger refresh for '{rsn}': {e}")
+
+        return get_skill_level(rsn, skill)
+
     # --- Screen Region Queries (delegate to ScreenService) ---
     def get_game_viewport_region(self) -> Optional[Tuple[int, int, int, int]]:
         """Get the game viewport region excluding UI elements.

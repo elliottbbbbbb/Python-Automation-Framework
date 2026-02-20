@@ -2,10 +2,10 @@
 Fletching Bankstander - GE bow-stringing workflow using BankstanderBot base class.
 
 Workflow:
-1. Right-click tagged banker (color) → select "Bank Banker"
+1. Right-click tagged banker (color) -> select "Bank Banker"
 2. Deposit all finished products, withdraw 14 bowstrings + 14 unstrung bows from tab
 3. Close bank, click bowstring on unstrung bow in inventory
-4. Press Space for Make All, press Space every ~5s for level-up popups
+4. Press Space for Make All, monitor for level-ups
 5. Detect completion via template matching (no more raw materials in inventory)
 6. Loop
 
@@ -13,615 +13,249 @@ Uses a pre-configured bank tab with withdraw quantity set to 14.
 """
 
 import logging
-import random
-import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from osrsbot.core.state_types import StateExecutionContext, StateResult
 from osrsbot.core.base_bankstander import BankstanderBot
-from osrsbot.services.keyboard_service import KeyboardService
-from osrsbot.services.wom_service import get_skill_level
+from osrsbot.core.state_types import StateExecutionContext, StateResult
 from osrsbot.scripts.bankstanding.fletching_items import get_best_tier, FLETCHING_TIERS
+from osrsbot.scripts.bankstanding import craft_helpers
+from osrsbot.scripts.bankstanding.craft_helpers import (
+    glob_templates,
+    load_item_templates,
+    open_bank_via_color,
+    wait_for_menu,
+    monitor_craft_loop,
+    find_best_available_tier,
+)
 
 logger = logging.getLogger(__name__)
 
+MAX_NO_MATERIALS = 3
+WOM_CHECK_INTERVAL = 5
+
 
 class FletchingBot(BankstanderBot):
-    """
-    GE bow-stringing bankstander.
-
-    Right-clicks a color-tagged banker at the Grand Exchange,
-    withdraws bowstrings and unstrung bows from a pre-made bank tab,
-    combines them in inventory, and waits for fletching to complete.
-    """
-
-    # Menu offset from right-click position to "Bank Banker" option
-    DEFAULT_BANK_MENU_OFFSET = 45
-
-    # Safety timeout for fletching wait loop (seconds)
-    FLETCHING_TIMEOUT = 90.0
-
-    # Minimum seconds before considering re-initiation (fletching 14 items takes ~20-25s)
-    MIN_TIME_BEFORE_REINITIATE = 25.0
-
-    # Re-check WOM every N cycles to confirm/correct level counter
-    WOM_CHECK_INTERVAL = 5
+    """GE bow-stringing bankstander."""
 
     def __init__(self, *args, **kwargs):
-        """
-        Initialize GE fletching bankstander.
-
-        Auto-selects the best bow tier based on the player's Fletching level
-        via the Wise Old Man API. Falls back to oak shortbow if lookup fails.
-        """
-        # Auto-select tier from WOM before setting up templates
-        tool_name = "bow string"
-        material_name = "oak shortbow (u)"
-        product_name = "oak shortbow"
-        starting_level = 20  # default if WOM lookup fails
-
         config = kwargs.get("config")
-        if config:
-            # Manual override takes priority over WOM
-            manual_level = config.get("fletching_starting_level", default="")
-            if manual_level:
-                try:
-                    starting_level = int(manual_level)
-                    logger.info(f"CONFIG: Using manual starting level {starting_level}")
-                except (ValueError, TypeError):
-                    logger.warning(f"CONFIG: Invalid fletching_starting_level '{manual_level}', ignoring")
-                    manual_level = ""
-
-            window_title = config.get("window_title", default="")
-            rsn = window_title.replace("RuneLite - ", "") if window_title.startswith("RuneLite - ") else ""
-            if rsn and not manual_level:
-                # Force WOM to refresh hiscores before fetching level
-                try:
-                    import requests
-                    requests.post(
-                        f"https://api.wiseoldman.net/v2/players/{rsn}",
-                        headers={"User-Agent": "OSRSAutomationFramework"},
-                        timeout=10,
-                    )
-                    logger.info(f"WOM: Forced hiscores update for {rsn}")
-                except Exception:
-                    pass  # Best-effort update
-
-                level = get_skill_level(rsn, "fletching")
-                if level is not None:
-                    starting_level = level
-                else:
-                    logger.warning("WOM: Could not fetch stats, defaulting to oak shortbow")
-
-            # Select tier based on starting level (from config, WOM, or default)
-            tier = get_best_tier(starting_level)
-            if tier:
-                tool_name = tier["tool_name"]
-                material_name = tier["material_name"]
-                product_name = tier["product_name"]
-                logger.info(
-                    f"Fletching level {starting_level} -> "
-                    f"crafting {product_name}"
-                )
-            elif starting_level > 0:
-                logger.warning(
-                    f"Fletching level {starting_level} too low, "
-                    f"defaulting to oak shortbow"
-                )
-
-        # Anchor to package root (src/osrsbot/) so paths work from any CWD
+        starting_level = 20
         images_dir = Path(__file__).resolve().parent.parent.parent / "images" / "bot"
 
-        # Tool templates (bowstring - shared across all tiers)
-        tool_templates = sorted(images_dir.glob("items/bowstring*.png"))
-        tool_template = [str(p) for p in tool_templates] if tool_templates else [
-            str(images_dir / "items" / "bowstring.png")
-        ]
+        # Determine starting level: config override > WOM > default
+        if config:
+            manual = config.get("fletching_starting_level", default="")
+            if manual:
+                try:
+                    starting_level = int(manual)
+                    logger.info(f"CONFIG: Manual starting level {starting_level}")
+                except (ValueError, TypeError):
+                    pass
+            else:
+                wom = self._initial_wom_lookup(config, "fletching")
+                if wom is not None:
+                    starting_level = wom
 
-        # Material templates - derive glob from material_name
-        # "oak shortbow (u)" -> "oak_shortbow_u"
-        mat_slug = material_name.replace(" ", "_").replace("(", "").replace(")", "")
-        material_templates = sorted(images_dir.glob(f"items/{mat_slug}*.png"))
-        material_template = [str(p) for p in material_templates] if material_templates else [
-            str(images_dir / "items" / f"{mat_slug}.png")
-        ]
+        tier = get_best_tier(starting_level)
+        tool_name = tier["tool_name"] if tier else "bow string"
+        material_name = tier["material_name"] if tier else "oak shortbow (u)"
+        product_name = tier["product_name"] if tier else "oak shortbow"
 
-        # Base class handles state machine setup
+        logger.info(f"Fletching level {starting_level} -> crafting {product_name}")
+
+        # Load templates
+        # Bowstring is shared across all tiers (tool_is_shared)
+        tool_template = (
+            glob_templates(images_dir, "items/bowstring*.png")
+            or [str(images_dir / "items" / "bowstring.png")]
+        )
+        material_template = load_item_templates(images_dir, material_name)
+
         super().__init__(
             item_name=material_name,
             item_search_text="",
             item_template=material_template[0],
             item_search_threshold=0.75,
             processed_item_name=product_name,
-            *args,
-            **kwargs,
+            *args, **kwargs,
             script_name="Fletching (GE Bow Stringing)",
         )
 
-        # Banker interaction config
-        self._banker_color = "ge_banker"
-        self._bank_menu_offset = self.DEFAULT_BANK_MENU_OFFSET
-
-        # Item templates (used for both bank tab clicking and inventory detection)
+        # Item state
         self._tool_name = tool_name
         self._tool_template = tool_template
         self._material_name = material_name
         self._material_template = material_template
         self._product_name = product_name
-
-        # Level tracking for auto-upgrade
         self._current_level = starting_level
         self._images_dir = images_dir
-
-        # Processing config
-        self._space_interval = 5.0
-
-        # Keyboard service for pressing Space (GameActions doesn't have one)
-        self.keyboard = KeyboardService()
-
-        # Track whether X quantity button has been clicked this session
+        self._banker_color = "ge_banker"
         self._x_quantity_set = False
-
-        # Track consecutive "no materials found" scans for graceful exit
         self._no_materials_count = 0
-        self.MAX_NO_MATERIALS_ATTEMPTS = 3
 
-        # Fletching Make All menu template(s) for detection
-        menu_templates = sorted(images_dir.glob("ui_templates/fletching_menu*.png"))
-        self._fletching_menu_templates = (
-            [str(p) for p in menu_templates] if menu_templates
-            else [str(images_dir / "ui_templates" / "fletching_menu.png")]
+        # UI templates
+        self._menu_templates = (
+            glob_templates(images_dir, "ui_templates/fletching_menu*.png")
+            or [str(images_dir / "ui_templates" / "fletching_menu.png")]
         )
-
-        # Bank X quantity button template(s)
-        x_button_templates = sorted(images_dir.glob("ui_templates/bank_button_x*.png"))
-        self._bank_x_button_templates = (
-            [str(p) for p in x_button_templates] if x_button_templates
-            else [str(images_dir / "ui_templates" / "bank_button_x.png")]
+        self._bank_x_templates = (
+            glob_templates(images_dir, "ui_templates/bank_button_x*.png")
+            or [str(images_dir / "ui_templates" / "bank_button_x.png")]
         )
-
-        # Deposit inventory button template(s)
-        deposit_templates = sorted(images_dir.glob("ui_templates/bank_deposit_inventory*.png"))
-        self._deposit_inventory_templates = (
-            [str(p) for p in deposit_templates] if deposit_templates
-            else [str(images_dir / "ui_templates" / "bank_deposit_inventory.png")]
+        self._deposit_templates = (
+            glob_templates(images_dir, "ui_templates/bank_deposit_inventory*.png")
+            or [str(images_dir / "ui_templates" / "bank_deposit_inventory.png")]
         )
-
-        # Finished product template(s) for deposit verification
-        prod_slug = product_name.replace(" ", "_")
-        product_templates = sorted(images_dir.glob(f"items/{prod_slug}*.png"))
-        self._product_template = (
-            [str(p) for p in product_templates] if product_templates
-            else [str(images_dir / "items" / f"{prod_slug}.png")]
-        )
-
-        # Level-up popup template(s) for detection
-        levelup_templates = sorted(images_dir.glob("ui_templates/fletching_level_up*.png"))
+        self._product_template = load_item_templates(images_dir, product_name)
         self._levelup_templates = (
-            [str(p) for p in levelup_templates] if levelup_templates
-            else [str(images_dir / "ui_templates" / "fletching_level_up.png")]
+            glob_templates(images_dir, "ui_templates/fletching_level_up*.png")
+            or [str(images_dir / "ui_templates" / "fletching_level_up.png")]
+        )
+        self._bank_menu_templates = glob_templates(
+            images_dir, "ui_templates/bank_banker_menu*.png"
         )
 
-        # Config reference for periodic WOM re-checks
-        self._config = config
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
 
-        # Cycle counter for periodic WOM sanity checks
-        self._cycle_count = 0
-        self._wom_check_interval = 10
+    @staticmethod
+    def _initial_wom_lookup(config, skill: str) -> Optional[int]:
+        """One-time WOM lookup at init (before state/actions are available)."""
+        from osrsbot.services.wom_service import get_skill_level
 
-        # Bank Banker menu verification template (to avoid clicking collection booth)
-        bank_banker_templates = sorted(images_dir.glob("ui_templates/bank_banker_menu*.png"))
-        self._bank_banker_menu_templates = (
-            [str(p) for p in bank_banker_templates] if bank_banker_templates else []
-        )
-
-    def _upgrade_tier(self) -> bool:
-        """Check if level crossed a tier threshold and upgrade templates."""
-        tier = get_best_tier(self._current_level)
-        if not tier or tier["material_name"] == self._material_name:
-            return False
-
-        old_name = self._material_name
-        self._material_name = tier["material_name"]
-        self._product_name = tier["product_name"]
-
-        # Reload material templates
-        mat_slug = self._material_name.replace(" ", "_").replace("(", "").replace(")", "")
-        mat_paths = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
-        self._material_template = (
-            [str(p) for p in mat_paths] if mat_paths
-            else [str(self._images_dir / "items" / f"{mat_slug}.png")]
-        )
-
-        # Reload product templates
-        prod_slug = self._product_name.replace(" ", "_")
-        prod_paths = sorted(self._images_dir.glob(f"items/{prod_slug}*.png"))
-        self._product_template = (
-            [str(p) for p in prod_paths] if prod_paths
-            else [str(self._images_dir / "items" / f"{prod_slug}.png")]
-        )
-
-        logger.info(
-            f"UPGRADE: Level {self._current_level} - "
-            f"switching from {old_name} to {self._material_name}"
-        )
-        return True
-
-    def _find_best_available_tier(self, exclude_current: bool = False) -> Optional[dict]:
-        """
-        Scan bank for the highest tier with available materials.
-
-        Args:
-            exclude_current: If True, skip the current tier (used for fallback after failure)
-
-        Returns:
-            Tier dict if found, None if no materials available.
-        """
-        for tier in FLETCHING_TIERS:
-            # Skip tiers we can't make yet (level too low)
-            if tier["min_level"] > self._current_level:
-                continue
-
-            # Skip current tier if requested (fallback mode)
-            if exclude_current and tier["material_name"] == self._material_name:
-                continue
-
-            mat_slug = tier["material_name"].replace(" ", "_").replace("(", "").replace(")", "")
-            test_templates = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
-
-            if not test_templates:
-                continue
-
-            template_paths = [str(p) for p in test_templates]
-
-            # Check if this material is visible in bank (0.8 threshold to avoid false positives)
-            result = self.state.find_multi_template(template_paths, threshold=0.8)
-            if result is not None:
-                return tier
-
-        return None
-
-    def _switch_to_tier(self, tier: dict) -> None:
-        """Switch to a new tier, reloading all templates."""
-        old_product = self._product_name
-
-        self._material_name = tier["material_name"]
-        self._product_name = tier["product_name"]
-        # Note: Do NOT change _current_level here - player's actual level
-        # doesn't change when switching what item we're making
-
-        # Reload material templates
-        mat_slug = tier["material_name"].replace(" ", "_").replace("(", "").replace(")", "")
-        material_templates = sorted(self._images_dir.glob(f"items/{mat_slug}*.png"))
-        self._material_template = [str(p) for p in material_templates] if material_templates else [
-            str(self._images_dir / "items" / f"{mat_slug}.png")
-        ]
-
-        # Reload product templates
-        prod_slug = tier["product_name"].replace(" ", "_")
-        product_templates = sorted(self._images_dir.glob(f"items/{prod_slug}*.png"))
-        self._product_template = [str(p) for p in product_templates] if product_templates else [
-            str(self._images_dir / "items" / f"{prod_slug}.png")
-        ]
-
-        logger.info(f"TIER: Switched from {old_product} to {tier['product_name']}")
-        print(f"\n  Switched to: {tier['product_name']} (requires level {tier['min_level']})")
-
-    def _get_wom_level(self, force_update: bool = True) -> Optional[int]:
-        """Fetch current fletching level from WOM, optionally forcing a refresh."""
-        if not self._config:
-            return None
-
-        window_title = self._config.get("window_title", default="")
-        rsn = (
-            window_title.replace("RuneLite - ", "")
-            if window_title.startswith("RuneLite - ")
-            else ""
-        )
+        window_title = config.get("window_title", default="")
+        rsn = window_title.replace("RuneLite - ", "").strip() if window_title else ""
         if not rsn:
             return None
+        try:
+            import requests
+            requests.post(
+                f"https://api.wiseoldman.net/v2/players/{rsn}",
+                headers={"User-Agent": "OSRSAutomationFramework"},
+                timeout=10,
+            )
+        except Exception:
+            pass
+        return get_skill_level(rsn, skill)
 
-        if force_update:
-            try:
-                import requests
-                requests.post(
-                    f"https://api.wiseoldman.net/v2/players/{rsn}",
-                    headers={"User-Agent": "OSRSAutomationFramework"},
-                    timeout=10,
-                )
-            except Exception:
-                pass  # Best-effort update
+    def _reload_templates(self, tier: dict) -> None:
+        """Reload material + product templates after tier switch."""
+        old = self._material_name
+        self._material_name = tier["material_name"]
+        self._product_name = tier["product_name"]
+        # Bowstring stays the same (tool_is_shared)
+        self._material_template = load_item_templates(self._images_dir, tier["material_name"])
+        self._product_template = load_item_templates(self._images_dir, tier["product_name"])
+        logger.info(f"TIER: Switched from {old} to {tier['material_name']}")
 
-        return get_skill_level(rsn, "fletching")
+    def _open_bank(self) -> bool:
+        return open_bank_via_color(self, self._banker_color, self._bank_menu_templates)
 
     def _wom_level_check(self) -> None:
         """Periodic WOM re-check to confirm/correct level counter."""
-        if self._cycles % self.WOM_CHECK_INTERVAL != 0 or self._cycles == 0:
+        if self._cycles % WOM_CHECK_INTERVAL != 0 or self._cycles == 0:
             return
+        wom_level = self.state.get_skill_level_from_wom("fletching", force_update=True)
+        if wom_level is not None and wom_level > self._current_level:
+            logger.info(f"WOM CHECK: Correcting level {self._current_level} -> {wom_level}")
+            self._current_level = wom_level
+            tier = get_best_tier(self._current_level)
+            if tier and tier["material_name"] != self._material_name:
+                self._reload_templates(tier)
 
-        wom_level = self._get_wom_level(force_update=True)
-        if wom_level is not None and wom_level != self._current_level:
-            if wom_level > self._current_level:
-                # WOM shows higher level - player may have trained outside bot
-                logger.info(
-                    f"WOM CHECK: Correcting level UP "
-                    f"{self._current_level} -> {wom_level}"
-                )
-                self._current_level = wom_level
-                self._upgrade_tier()
-            else:
-                # WOM shows lower level - WOM data is stale, trust tracking
-                logger.warning(
-                    f"WOM CHECK: WOM reports {wom_level} but tracking "
-                    f"{self._current_level} - WOM data likely stale, keeping tracked level"
-                )
-        elif wom_level is not None:
-            logger.info(
-                f"WOM CHECK: Level confirmed at {wom_level}"
-            )
-
-    def _open_bank_via_color(self) -> bool:
-        """
-        Find tagged banker by color, right-click, and select "Bank Banker".
-
-        Returns:
-            True if bank was opened successfully, False otherwise.
-        """
-        actions = self.actions
-
-        # Get banker color hex from config
-        banker_hex = self.config.get("colors", self._banker_color)
-        if not banker_hex:
-            logger.error(
-                f"BANKING: Banker color '{self._banker_color}' not found in config"
-            )
-            return False
-
-        # Find banker on screen by color (restrict to game viewport)
-        viewport_region = actions.screen.get_game_viewport_region()
-        matches = actions.screen.find_color(
-            banker_hex, tolerance=10, region=viewport_region, find_all=True
-        )
-        if not matches:
-            logger.error("BANKING: Could not find banker color on screen")
-            return False
-
-        # Compute centroid of all matching pixels for accurate clicking
-        total_x = sum(m.x for m in matches)
-        total_y = sum(m.y for m in matches)
-        center_x = total_x // len(matches)
-        center_y = total_y // len(matches)
-
-        # Convert window-relative coords to absolute screen coords
-        abs_x, abs_y = actions.coord_resolver.to_absolute(center_x, center_y)
-        logger.info(
-            f"BANKING: Found banker centroid at window=({center_x}, {center_y}) "
-            f"abs=({abs_x}, {abs_y}) from {len(matches)} pixels"
-        )
-
-        # Right-click the banker (converted to absolute screen coords)
-        if not actions.mouse.click_at(
-            abs_x, abs_y, button="right", move_style="curved"
-        ):
-            logger.error("BANKING: Failed to right-click banker")
-            return False
-
-        actions.wait("short")
-
-        # Verify "Bank Banker" menu option is visible (avoids clicking collection booth)
-        if self._bank_banker_menu_templates:
-            menu_result = self.state.find_multi_template(
-                self._bank_banker_menu_templates, threshold=0.7
-            )
-            if menu_result is None:
-                logger.warning(
-                    "BANKING: 'Bank Banker' menu not found - clicked wrong NPC (collection booth?)"
-                )
-                self.keyboard.press("escape")
-                actions.wait("short")
-                return False  # Will trigger retry
-
-            # Click the detected menu option directly
-            menu_x, menu_y, conf, _ = menu_result
-            abs_menu_x, abs_menu_y = actions.coord_resolver.to_absolute(menu_x, menu_y)
-            logger.info(
-                f"BANKING: Found 'Bank Banker' menu at ({menu_x}, {menu_y}) conf={conf:.2f}"
-            )
-            if not actions.mouse.click_at(
-                abs_menu_x, abs_menu_y, button="left", move_style="linear"
-            ):
-                logger.error("BANKING: Failed to click Bank Banker menu option")
-                return False
-        else:
-            # Fallback to offset-based click if no template available
-            menu_y = abs_y + self._bank_menu_offset
-            if not actions.mouse.click_at(
-                abs_x, menu_y, button="left", move_style="linear"
-            ):
-                logger.error("BANKING: Failed to click Bank Banker menu option")
-                return False
-
-        actions.wait("long")
-        return True
+    # ------------------------------------------------------------------
+    # State handlers
+    # ------------------------------------------------------------------
 
     def _handle_banking(self, context: StateExecutionContext) -> StateResult:
-        """
-        Handle BANKING state - open bank, deposit, and withdraw items.
-
-        Combines deposit + withdraw into one bank session:
-        1. Right-click banker → "Bank Banker"
-        2. Deposit all (finished products from previous cycle)
-        3. Click bowstring in bank tab (qty pre-set to 14)
-        4. Click oak shortbow (u) in bank tab (qty pre-set to 14)
-        5. Close bank
-        """
         self._check_exit_requested()
-        self._update_ui(
-            "BANKING",
-            f"Opening bank for {self._tool_name} and {self._material_name}...",
-        )
-        logger.info(
-            f"BANKING: Opening bank for {self._tool_name} + {self._material_name}"
-        )
+        self._update_ui("BANKING", f"Opening bank for {self._tool_name} + {self._material_name}...")
+        actions = self.actions
 
         try:
-            actions = self.actions
-
-            # If bank is already open (left open by DEPOSIT), skip re-opening
-            if self._bank_open:
-                logger.info("BANKING: Bank already open from deposit, skipping open")
-            else:
-                # Close any open interfaces first
+            if not self._bank_open:
                 actions.close_interface()
                 actions.wait("short")
-
-                # Right-click banker to open bank
-                logger.info("BANKING: Right-clicking banker to open bank")
-                if not self._open_bank_via_color():
-                    logger.error("BANKING: Failed to open bank via color")
+                if not self._open_bank():
                     return StateResult.FAILURE
-
                 self._bank_open = True
 
-                # Verify bank actually opened (not collection box)
-                # Use X button template since bank_search_button.PNG doesn't exist
-                bank_check = self.state.find_multi_template(
-                    self._bank_x_button_templates, threshold=0.6
-                )
-                if not bank_check:
-                    logger.warning(
-                        "BANKING: Bank not detected after clicking banker, retrying"
-                    )
+                # Verify bank opened
+                if not self.state.find_multi_template(self._bank_x_templates, threshold=0.6):
+                    logger.warning("BANKING: Bank not detected after click")
                     self._bank_open = False
                     self._x_quantity_set = False
                     return StateResult.FAILURE
-                logger.info("BANKING: Bank verified open (X button detected)")
 
-                # Deposit any leftover items before withdrawing
-                # (only needed on fresh open — DEPOSIT already cleared inventory)
-                self._update_ui("BANKING", "Depositing inventory...")
-                logger.info("BANKING: Depositing all items before withdrawal")
-                actions.click_template(
-                    self._deposit_inventory_templates, "deposit inventory", threshold=0.7
-                )
+                # Deposit leftovers
+                actions.click_template(self._deposit_templates, "deposit inventory", threshold=0.7)
                 actions.wait("short")
 
-            # Click X quantity button only on first cycle (stays set for session)
+            # Set X quantity on first cycle
             if not self._x_quantity_set:
-                self._update_ui("BANKING", "Selecting X quantity...")
-                logger.info("BANKING: Clicking X quantity button")
-                if actions.click_template(
-                    self._bank_x_button_templates, "bank X button", threshold=0.6
-                ):
+                if actions.click_template(self._bank_x_templates, "bank X button", threshold=0.6):
                     self._x_quantity_set = True
-                else:
-                    logger.warning("BANKING: Could not find X button, continuing anyway")
+                actions.wait("short")
 
-            actions.wait("short")
+            # Check for best tier
+            best = find_best_available_tier(
+                self, FLETCHING_TIERS, self._images_dir,
+                self._current_level, self._material_name,
+                tool_is_shared=True,
+            )
+            if best and best["material_name"] != self._material_name:
+                self._reload_templates(best)
 
-            # CHECK FOR BEST AVAILABLE TIER before withdrawing
-            # This enables both upgrade (higher tier available) and
-            # pre-emptive downgrade (current tier not available)
-            best_tier = self._find_best_available_tier(exclude_current=False)
-            if best_tier and best_tier["material_name"] != self._material_name:
-                self._switch_to_tier(best_tier)
-
-            # Step 1: Click tool (bowstring) in bank tab
-            self._update_ui("BANKING", f"Withdrawing {self._tool_name}...")
-            logger.info(f"BANKING: Clicking {self._tool_name} in bank tab")
-
-            if not actions.click_template(
-                self._tool_template, self._tool_name, threshold=0.8
-            ):
-                logger.error(
-                    f"BANKING: Failed to find {self._tool_name} in bank tab"
-                )
+            # Withdraw tool (bowstring)
+            if not actions.click_template(self._tool_template, self._tool_name, threshold=0.8):
+                logger.error(f"BANKING: {self._tool_name} not found in bank")
                 self._bank_open = False
                 self._x_quantity_set = False
                 return StateResult.FAILURE
-
             actions.wait("short")
 
-            # Step 2: Click material (oak shortbow u) in bank tab
-            self._update_ui("BANKING", f"Withdrawing {self._material_name}...")
-            logger.info(f"BANKING: Clicking {self._material_name} in bank tab")
-
-            if not actions.click_template(
-                self._material_template, self._material_name, threshold=0.8
-            ):
-                logger.warning(
-                    f"BANKING: {self._material_name} not found, searching for alternatives..."
+            # Withdraw material
+            if not actions.click_template(self._material_template, self._material_name, threshold=0.8):
+                # Fallback: try next best tier
+                fallback = find_best_available_tier(
+                    self, FLETCHING_TIERS, self._images_dir,
+                    self._current_level, self._material_name,
+                    exclude_current=True, tool_is_shared=True,
                 )
-
-                # Find any available tier (excluding current since it just failed)
-                fallback_tier = self._find_best_available_tier(exclude_current=True)
-                if fallback_tier:
-                    self._switch_to_tier(fallback_tier)
-                    # Retry with new tier
-                    if not actions.click_template(
-                        self._material_template, self._material_name, threshold=0.8
-                    ):
-                        logger.error(
-                            f"BANKING: Fallback material {self._material_name} also not found"
-                        )
+                if fallback:
+                    self._reload_templates(fallback)
+                    if not actions.click_template(self._material_template, self._material_name, threshold=0.8):
                         self._bank_open = False
                         self._x_quantity_set = False
                         return StateResult.FAILURE
                 else:
                     self._no_materials_count += 1
-                    logger.error(
-                        f"BANKING: No materials available at any tier "
-                        f"({self._no_materials_count}/{self.MAX_NO_MATERIALS_ATTEMPTS})"
-                    )
-                    if self._no_materials_count >= self.MAX_NO_MATERIALS_ATTEMPTS:
-                        logger.info("BANKING: Max no-materials attempts reached, stopping bot")
-                        print(
-                            f"\n✅ No craftable materials found after "
-                            f"{self.MAX_NO_MATERIALS_ATTEMPTS} scans. "
-                            f"Bot stopping gracefully.\n"
-                        )
+                    if self._no_materials_count >= MAX_NO_MATERIALS:
+                        logger.info("BANKING: No materials at any tier, stopping")
                         self._exit_requested = True
                     self._bank_open = False
                     self._x_quantity_set = False
                     return StateResult.FAILURE
-
             actions.wait("short")
 
-            # VERIFY withdrawals before closing bank
-            if not self._find_tool_in_inventory():
-                logger.error(
-                    f"BANKING: {self._tool_name} not found in inventory after withdrawal - "
-                    f"wrong item may have been clicked"
-                )
+            # Verify withdrawals
+            has_tool = self.state.find_multi_template(self._tool_template, threshold=0.85)
+            has_mat = self.state.find_multi_template(self._material_template, threshold=0.85)
+            if not has_tool or not has_mat:
+                logger.error("BANKING: Withdrawal verification failed")
                 self._bank_open = False
                 self._x_quantity_set = False
                 return StateResult.FAILURE
 
-            if not self._find_material_in_inventory():
-                logger.error(
-                    f"BANKING: {self._material_name} not found in inventory after withdrawal - "
-                    f"wrong item may have been clicked"
-                )
-                self._bank_open = False
-                self._x_quantity_set = False
-                return StateResult.FAILURE
-
-            logger.info("BANKING: Withdrawal verified - both items in inventory")
-
-            # Reset no-materials counter on successful withdrawal
             self._no_materials_count = 0
-
-            # Step 3: Close bank
-            logger.info("BANKING: Closing bank interface")
             actions.close_interface()
             actions.wait("short")
 
-            # Record action for anti-ban
-            if hasattr(actions, "anti_ban") and actions.anti_ban:
+            if actions.anti_ban:
                 actions.anti_ban.record_action("bank_withdraw")
 
-            logger.info("BANKING: Both items withdrawn successfully")
             return StateResult.SUCCESS
 
         except Exception as e:
@@ -630,397 +264,86 @@ class FletchingBot(BankstanderBot):
             self._x_quantity_set = False
             return StateResult.FAILURE
 
-    def _handle_deposit(self, context: StateExecutionContext) -> StateResult:
-        """
-        Handle DEPOSIT state - open bank and deposit all finished products.
+    def process_items(self, context: StateExecutionContext) -> StateResult:
+        try:
+            actions = self.actions
+            if not actions.ensure_inventory_open():
+                return StateResult.FAILURE
+            actions.wait("short")
 
-        After fletching completes, open the bank and deposit all oak shortbows.
-        Leaves bank open so the next BANKING state can skip re-opening.
-        """
+            # Click tool in inventory
+            tool_match = self.state.find_multi_template(self._tool_template, threshold=0.7)
+            if not tool_match:
+                logger.error(f"PROCESS: {self._tool_name} not found in inventory")
+                return StateResult.FAILURE
+            cx, cy, _, _ = tool_match
+            ax, ay = actions.coord_resolver.to_absolute(cx, cy)
+            actions.mouse.click_at(ax, ay, move_style="curved")
+            actions.wait("short")
+
+            # Click material in inventory
+            mat_match = self.state.find_multi_template(self._material_template, threshold=0.7)
+            if not mat_match:
+                logger.error(f"PROCESS: {self._material_name} not found in inventory")
+                return StateResult.FAILURE
+            cx, cy, _, _ = mat_match
+            ax, ay = actions.coord_resolver.to_absolute(cx, cy)
+            actions.mouse.click_at(ax, ay, move_style="curved")
+
+            # Wait for Make All menu and press Space
+            wait_for_menu(self, self._menu_templates)
+            actions.press_key("space")
+
+            # Monitor crafting loop
+            def on_level_up():
+                self._current_level += 1
+                logger.info(f"Level-up! Now level {self._current_level}")
+
+            level_ups = monitor_craft_loop(
+                self,
+                self._tool_template,
+                self._material_template,
+                self._levelup_templates,
+                on_level_up,
+            )
+
+            if actions.anti_ban:
+                actions.anti_ban.record_action("fletch_cycle")
+
+            self._items_processed += 14
+            return StateResult.SUCCESS
+
+        except Exception as e:
+            logger.error(f"PROCESS: Failed - {e}")
+            return StateResult.FAILURE
+
+    def _handle_deposit(self, context: StateExecutionContext) -> StateResult:
         self._check_exit_requested()
         self._update_ui("DEPOSIT", f"Depositing {self._product_name}...")
-        logger.info(f"DEPOSIT: Opening bank to deposit {self._product_name}")
 
         try:
             actions = self.actions
-
-            # Open bank via right-click banker
-            if not self._open_bank_via_color():
-                logger.error("DEPOSIT: Failed to open bank via color")
+            if not self._open_bank():
                 return StateResult.FAILURE
-
             self._bank_open = True
 
-            # Deposit all items
-            self._update_ui("DEPOSIT", "Depositing all items...")
-            logger.info("DEPOSIT: Clicking deposit inventory")
-            if not actions.click_template(
-                self._deposit_inventory_templates, "deposit inventory", threshold=0.7
-            ):
-                logger.warning(
-                    "DEPOSIT: Deposit inventory button not found, "
-                    "continuing anyway"
-                )
+            actions.click_template(self._deposit_templates, "deposit inventory", threshold=0.7)
 
-            # Verify deposit worked — retry if items still in inventory
-            # Check for finished product (oak shortbow) in inventory region only
+            # Verify deposit
             inv_region = self.state.get_inventory_region()
-            for retry in range(2):
+            for _ in range(2):
                 actions.wait("short")
-                still_has_items = self.state.find_multi_template(
-                    self._product_template, threshold=0.8, region=inv_region
-                )
-                if not still_has_items:
-                    logger.info("DEPOSIT: Inventory cleared successfully")
+                if not self.state.find_multi_template(self._product_template, threshold=0.8, region=inv_region):
                     break
-                logger.warning(
-                    f"DEPOSIT: Items still in inventory, "
-                    f"retrying deposit (attempt {retry + 2})"
-                )
-                actions.click_template(
-                    self._deposit_inventory_templates, "deposit inventory", threshold=0.7
-                )
+                actions.click_template(self._deposit_templates, "deposit inventory", threshold=0.7)
 
-            # Leave bank open for next BANKING state to withdraw
             self._cycles += 1
-            logger.info(
-                f"DEPOSIT: Cycle {self._cycles} complete "
-                f"(~{self._items_processed} items total)"
-            )
-
-            # Periodic WOM re-check to confirm/correct level counter
+            logger.info(f"DEPOSIT: Cycle {self._cycles} (~{self._items_processed} items total)")
             self._wom_level_check()
-
             return StateResult.SUCCESS
 
         except Exception as e:
             logger.error(f"DEPOSIT: Failed - {e}")
             self._bank_open = False
             self._x_quantity_set = False
-            return StateResult.FAILURE
-
-    def _find_tool_in_inventory(self) -> bool:
-        """Check if the tool (bowstring) is still visible in inventory."""
-        result = self.state.find_multi_template(
-            self._tool_template, threshold=0.85
-        )
-        return result is not None
-
-    def _find_material_in_inventory(self) -> bool:
-        """Check if the material (unstrung bow) is still visible in inventory."""
-        result = self.state.find_multi_template(
-            self._material_template, threshold=0.85
-        )
-        return result is not None
-
-    def process_items(self, context: StateExecutionContext) -> StateResult:
-        """
-        Process items - combine bowstring with unstrung bow, wait for fletching.
-
-        Flow:
-        1. Ensure inventory is open
-        2. Find and click bowstring in inventory
-        3. Find and click oak shortbow (u) in inventory
-        4. Wait for Make All interface → press Space
-        5. Press Space every ~5s (handles level-up popups)
-        6. Detect completion: bowstring template no longer found in inventory
-        """
-        try:
-            actions = self.actions
-
-            # Open inventory
-            if not actions.ensure_inventory_open():
-                logger.error("PROCESS: Failed to open inventory")
-                return StateResult.FAILURE
-
-            actions.wait("short")
-
-            # Step 1: Find and click the tool (bowstring) in inventory
-            self._update_ui("PROCESS", f"Clicking {self._tool_name}...")
-            logger.info(f"PROCESS: Finding {self._tool_name} in inventory")
-
-            tool_match = self.state.find_multi_template(
-                self._tool_template, threshold=0.7
-            )
-            if not tool_match:
-                logger.error(
-                    f"PROCESS: Could not find {self._tool_name} in inventory"
-                )
-                return StateResult.FAILURE
-
-            center_x, center_y, confidence, _tmpl = tool_match
-            abs_x, abs_y = actions.coord_resolver.to_absolute(center_x, center_y)
-            logger.info(
-                f"PROCESS: Found {self._tool_name} at ({center_x}, {center_y}) "
-                f"conf={confidence:.2f}"
-            )
-            actions.mouse.click_at(abs_x, abs_y, move_style="curved")
-            actions.wait("short")
-
-            # Step 2: Find and click the material (oak shortbow u) in inventory
-            self._update_ui("PROCESS", f"Using on {self._material_name}...")
-            logger.info(f"PROCESS: Finding {self._material_name} in inventory")
-
-            material_match = self.state.find_multi_template(
-                self._material_template, threshold=0.7
-            )
-            if not material_match:
-                logger.error(
-                    f"PROCESS: Could not find {self._material_name} in inventory"
-                )
-                return StateResult.FAILURE
-
-            center_x, center_y, confidence, _tmpl = material_match
-            abs_x, abs_y = actions.coord_resolver.to_absolute(center_x, center_y)
-            logger.info(
-                f"PROCESS: Found {self._material_name} at ({center_x}, {center_y}) "
-                f"conf={confidence:.2f}"
-            )
-            actions.mouse.click_at(abs_x, abs_y, move_style="curved")
-
-            # Step 3: Wait for Make All interface to appear (poll with timeout)
-            logger.info("PROCESS: Waiting for Make All interface...")
-            self._update_ui("PROCESS", "Waiting for Make All menu...")
-            menu_timeout = 5.0
-            poll_interval = 0.3
-            poll_start = time.time()
-            menu_found = False
-
-            while time.time() - poll_start < menu_timeout:
-                result = self.state.find_multi_template(
-                    self._fletching_menu_templates, threshold=0.6
-                )
-                if result:
-                    logger.info(
-                        f"PROCESS: Make All menu detected (conf={result[2]:.2f})"
-                    )
-                    menu_found = True
-                    break
-                time.sleep(poll_interval)
-
-            if not menu_found:
-                logger.warning(
-                    "PROCESS: Make All menu not detected within timeout, "
-                    "pressing Space anyway"
-                )
-
-            # Step 4: Press Space for Make All
-            self._update_ui("PROCESS", "Pressing Space for Make All...")
-            logger.info("PROCESS: Pressing Space for Make All")
-            self.keyboard.press("space", mode="humanized")
-
-            # Step 5: Fletching wait loop — monitor for completion and level-ups
-            # No periodic space presses; space is only pressed when a level-up
-            # popup is detected, so the template matcher can reliably catch it.
-            start_time = time.time()
-            last_craft_start = time.time()
-
-            while True:
-                self._check_exit_requested()
-
-                elapsed = time.time() - start_time
-
-                # Safety timeout
-                if elapsed > self.FLETCHING_TIMEOUT:
-                    logger.warning(
-                        f"PROCESS: Fletching timeout after {elapsed:.0f}s"
-                    )
-                    break
-
-                # Wait with jitter (no space press)
-                jitter = random.uniform(-0.5, 1.0)
-                sleep_time = max(1.0, self._space_interval + jitter)
-                self._update_ui(
-                    "PROCESS",
-                    f"Fletching... ({elapsed:.0f}s elapsed)",
-                )
-                time.sleep(sleep_time)
-
-                # Check if raw materials are gone (fletching complete)
-                # Must check BOTH tool AND material - finished bows can falsely
-                # match unstrung bow templates, so checking both is more reliable
-                if not self._find_tool_in_inventory() or not self._find_material_in_inventory():
-                    logger.info(
-                        f"PROCESS: Materials depleted - "
-                        f"fletching complete after {elapsed:.0f}s"
-                    )
-                    break
-
-                # Check for level-up popup (no prior space press to dismiss it)
-                levelup_result = self.state.find_multi_template(
-                    self._levelup_templates, threshold=0.7
-                )
-                if levelup_result:
-                    self._current_level += 1
-                    logger.info(f"PROCESS: Level-up detected! Now level {self._current_level}")
-                    # Tier switching deferred to BANKING state (materials in inventory unchanged)
-                    # Dismiss level-up dialog
-                    self.keyboard.press("space", mode="humanized")
-                    # Wait for "items unlocked" screen to appear
-                    time.sleep(2.0)
-                    # Dismiss items unlocked screen
-                    self.keyboard.press("space", mode="humanized")
-                    time.sleep(0.5)
-
-                    # Re-initiate craft: click bowstring → material → Make All
-                    logger.info("PROCESS: Re-initiating craft after level-up")
-                    self._update_ui("PROCESS", "Re-initiating craft after level-up...")
-                    tool_match = self.state.find_multi_template(
-                        self._tool_template, threshold=0.7
-                    )
-                    if tool_match:
-                        cx, cy, conf, _ = tool_match
-                        ax, ay = actions.coord_resolver.to_absolute(cx, cy)
-                        actions.mouse.click_at(ax, ay, move_style="curved")
-                        actions.wait("short")
-
-                        mat_match = self.state.find_multi_template(
-                            self._material_template, threshold=0.7
-                        )
-                        if mat_match:
-                            cx, cy, conf, _ = mat_match
-                            ax, ay = actions.coord_resolver.to_absolute(cx, cy)
-                            actions.mouse.click_at(ax, ay, move_style="curved")
-                            time.sleep(2.0)
-                            self.keyboard.press("space", mode="humanized")
-                            logger.info("PROCESS: Craft re-initiated after level-up")
-                        else:
-                            logger.warning("PROCESS: Can't find material after level-up")
-                            self.keyboard.press("escape")  # Cancel "use item on" mode
-                    else:
-                        logger.warning("PROCESS: Can't find bowstring after level-up")
-
-                    last_craft_start = time.time()
-                    continue
-
-                # Only consider re-initiation after minimum time has passed
-                # (during normal fletching, bowstrings are present and no
-                # Make All menu — that's the expected state)
-                # Require BOTH tool AND material - avoids false positives from finished bows
-                time_since_craft = time.time() - last_craft_start
-                if time_since_craft > self.MIN_TIME_BEFORE_REINITIATE:
-                    if self._find_tool_in_inventory() and self._find_material_in_inventory():
-                        time.sleep(1.5)
-                        if self._find_tool_in_inventory() and self._find_material_in_inventory():
-                            # Check if level-up popup appeared
-                            levelup_result2 = self.state.find_multi_template(
-                                self._levelup_templates, threshold=0.7
-                            )
-                            if levelup_result2:
-                                self._current_level += 1
-                                logger.info(
-                                    f"PROCESS: Level-up detected (re-check)! "
-                                    f"Now level {self._current_level}"
-                                )
-                                # Tier switching deferred to BANKING state
-                                self.keyboard.press("space", mode="humanized")
-                                time.sleep(2.0)
-                                self.keyboard.press("space", mode="humanized")
-                                time.sleep(0.5)
-
-                                # Re-initiate craft after level-up
-                                logger.info("PROCESS: Re-initiating craft after level-up (re-check)")
-                                tool_match_lu = self.state.find_multi_template(
-                                    self._tool_template, threshold=0.7
-                                )
-                                if tool_match_lu:
-                                    cx, cy, conf, _ = tool_match_lu
-                                    ax, ay = actions.coord_resolver.to_absolute(cx, cy)
-                                    actions.mouse.click_at(ax, ay, move_style="curved")
-                                    actions.wait("short")
-                                    mat_match_lu = self.state.find_multi_template(
-                                        self._material_template, threshold=0.7
-                                    )
-                                    if mat_match_lu:
-                                        cx, cy, conf, _ = mat_match_lu
-                                        ax, ay = actions.coord_resolver.to_absolute(cx, cy)
-                                        actions.mouse.click_at(ax, ay, move_style="curved")
-                                        time.sleep(2.0)
-                                        self.keyboard.press("space", mode="humanized")
-                                        logger.info("PROCESS: Craft re-initiated after level-up (re-check)")
-                                    else:
-                                        logger.warning("PROCESS: Can't find material after level-up (re-check)")
-                                        self.keyboard.press("escape")  # Cancel "use item on" mode
-
-                                last_craft_start = time.time()
-                            else:
-                                # Fletching stopped — re-click items to restart
-                                logger.info(
-                                    "PROCESS: Fletching appears stopped, "
-                                    "re-initiating craft"
-                                )
-                                self._update_ui(
-                                    "PROCESS",
-                                    "Re-initiating craft after interruption...",
-                                )
-
-                                tool_match = self.state.find_multi_template(
-                                    self._tool_template, threshold=0.7
-                                )
-                                if not tool_match:
-                                    logger.warning(
-                                        "PROCESS: Can't find bowstring for "
-                                        "re-initiation"
-                                    )
-                                    continue
-
-                                cx, cy, conf, _ = tool_match
-                                ax, ay = actions.coord_resolver.to_absolute(cx, cy)
-                                actions.mouse.click_at(
-                                    ax, ay, move_style="curved"
-                                )
-                                actions.wait("short")
-
-                                mat_match = self.state.find_multi_template(
-                                    self._material_template, threshold=0.7
-                                )
-                                if not mat_match:
-                                    logger.warning(
-                                        "PROCESS: Can't find material for "
-                                        "re-initiation"
-                                    )
-                                    continue
-
-                                cx, cy, conf, _ = mat_match
-                                ax, ay = actions.coord_resolver.to_absolute(cx, cy)
-                                actions.mouse.click_at(
-                                    ax, ay, move_style="curved"
-                                )
-
-                                # Wait for Make All and press Space
-                                time.sleep(2.0)
-                                self.keyboard.press("space", mode="humanized")
-                                last_craft_start = time.time()
-                                logger.info(
-                                    "PROCESS: Re-initiated craft, pressed Space"
-                                )
-
-            # Record action for anti-ban
-            if hasattr(actions, "anti_ban") and actions.anti_ban:
-                actions.anti_ban.record_action("fletch_cycle")
-
-            self._items_processed += 14
-            self._cycle_count += 1
-            logger.info(
-                f"PROCESS: Fletching cycle complete "
-                f"(~{self._items_processed} items total)"
-            )
-
-            # Periodic WOM sanity check (every N cycles)
-            if self._cycle_count % self._wom_check_interval == 0:
-                wom_level = self._get_wom_level(force_update=True)
-                if wom_level is not None:
-                    if wom_level != self._current_level:
-                        logger.warning(
-                            f"WOM SANITY CHECK: WOM reports level {wom_level}, "
-                            f"but tracking level {self._current_level} "
-                            f"(diff: {self._current_level - wom_level})"
-                        )
-                    else:
-                        logger.info(f"WOM SANITY CHECK: Level {wom_level} confirmed")
-
-            return StateResult.SUCCESS
-
-        except Exception as e:
-            logger.error(f"PROCESS: Failed - {e}")
             return StateResult.FAILURE

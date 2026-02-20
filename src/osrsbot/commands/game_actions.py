@@ -22,7 +22,9 @@ import random
 import time
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
-import pyautogui  # Used for keyboard input (write/press) - no keyboard service yet
+import cv2 as cv
+import numpy as np
+import pyautogui  # Fallback for keyboard input when KeyboardService not injected
 
 from osrsbot.commands.bank_actions import BankActions
 from osrsbot.commands.combat_actions import CombatActions
@@ -61,6 +63,7 @@ class GameActions:
         walker: Optional[Any] = None,
         ui_manager: Optional[Any] = None,
         inventory_state: Optional[Any] = None,
+        keyboard_service: Optional[Any] = None,
     ):
         """Initialize actions with services (all injected via DI)."""
         # Services (injected by runner)
@@ -73,6 +76,7 @@ class GameActions:
         self.loot_detection = loot_detection_service
         self.walker = walker
         self.ui_manager = ui_manager
+        self.keyboard = keyboard_service
 
         # Utility helpers (injected by runner)
         self.coord_resolver = coord_resolver
@@ -95,6 +99,28 @@ class GameActions:
     def wait(self, timing_type: str) -> None:
         """Wait for configured duration with anti-ban variance."""
         self.timing.wait(timing_type)
+
+    # --- Keyboard Methods (delegates to KeyboardService) ---
+    def press_key(self, key: str, mode: str = "humanized") -> bool:
+        """Press a key using KeyboardService (falls back to pyautogui)."""
+        if self.keyboard:
+            return self.keyboard.press(key, mode=mode)
+        pyautogui.press(key)
+        return True
+
+    def type_text(self, text: str, mode: str = "humanized") -> bool:
+        """Type text using KeyboardService (falls back to pyautogui)."""
+        if self.keyboard:
+            return self.keyboard.write(text, mode=mode)
+        pyautogui.write(text, interval=0.05)
+        return True
+
+    def hotkey(self, *keys: str) -> bool:
+        """Press key combination using KeyboardService (falls back to pyautogui)."""
+        if self.keyboard:
+            return self.keyboard.hotkey(*keys)
+        pyautogui.hotkey(*keys)
+        return True
 
     # --- Private helper methods (keep for backward compatibility) ---
     def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
@@ -390,7 +416,6 @@ class GameActions:
 
     def bank_deposit_all(self) -> bool:
         """Click bank deposit all button."""
-    
         if not self.click_template(
             "images/bot/ui_templates/bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
         ):
@@ -415,14 +440,14 @@ class GameActions:
 
         self.wait("short")
 
-        pyautogui.write(item_name)
+        self.type_text(item_name)
         self.wait("short")
 
         return True
 
     def close_interface(self) -> bool:
         """Close interface with ESC (may not work with dialog boxes)."""
-        pyautogui.press("escape")
+        self.press_key("escape")
         self.wait("short")
         return True
 
@@ -467,17 +492,74 @@ class GameActions:
         return self.walker.walk_path(waypoints, move_style=move_style)
 
     # ==================== Template Matching + Click Methods ====================
-    # These do query+click in one call for convenience. The query uses
-    # template_service (already injected), keeping Commands layer clean.
+    # These use screen capture + OpenCV directly (no Queries layer import).
+    # resolve_template_path is imported from utils layer.
+
+    def _find_template_on_screen(
+        self,
+        template_paths: List[str],
+        threshold: float = 0.7,
+        label: str = "template",
+    ) -> Optional[Tuple[int, int, float]]:
+        """
+        Find best matching template on screen using OpenCV.
+
+        Args:
+            template_paths: List of template image paths to try
+            threshold: Minimum confidence threshold
+            label: Name for logging
+
+        Returns:
+            (center_x, center_y, confidence) if found, None otherwise
+        """
+        from osrsbot.utils.template_helpers import resolve_template_path
+
+        screenshot = self.screen.capture()
+        if screenshot is None:
+            logger.error("Failed to capture screenshot")
+            return None
+
+        img_np = cv.cvtColor(np.array(screenshot), cv.COLOR_RGB2BGR)
+
+        best_center = None
+        best_confidence = 0.0
+
+        for path in template_paths:
+            try:
+                resolved = resolve_template_path(path)
+                template = cv.imread(str(resolved), cv.IMREAD_COLOR)
+                if template is None:
+                    logger.warning(f"Failed to load template: {path}")
+                    continue
+
+                result = cv.matchTemplate(img_np, template, cv.TM_CCOEFF_NORMED)
+                _, max_val, _, max_loc = cv.minMaxLoc(result)
+
+                if max_val > best_confidence:
+                    best_confidence = max_val
+                    h, w = template.shape[:2]
+                    best_center = (max_loc[0] + w // 2, max_loc[1] + h // 2)
+            except Exception as e:
+                logger.warning(f"Error matching template {path}: {e}")
+                continue
+
+        template_name = Path(template_paths[0]).name if template_paths else "unknown"
+        logger.info(
+            f"Template match '{label}': best_confidence={best_confidence:.3f}, "
+            f"threshold={threshold}"
+        )
+
+        if best_center and best_confidence >= threshold:
+            return (*best_center, best_confidence)
+
+        return None
 
     def is_bank_open(self, search_button_template: str, threshold: float = 0.7) -> bool:
         """Check if bank interface is open by detecting the search button."""
-        if not self.template_service:
-            logger.warning("Template service not available")
-            return False
-
-        match = self.template_service.find_template(search_button_template, threshold=threshold)
-        is_open = match is not None
+        result = self._find_template_on_screen(
+            [search_button_template], threshold, label="bank_open_check"
+        )
+        is_open = result is not None
         logger.debug(f"Bank open check: {'YES' if is_open else 'NO'}")
         return is_open
 
@@ -485,26 +567,14 @@ class GameActions:
         self, banker_templates: List[str], threshold: float = 0.7
     ) -> bool:
         """Find and click banker using multiple templates."""
-        if not self.template_service:
-            logger.warning("Template service not available")
-            return False
+        result = self._find_template_on_screen(banker_templates, threshold, label="banker")
 
-        # Try each template, take best match
-        best_match = None
-        best_confidence = 0.0
-
-        for template_path in banker_templates:
-            match = self.template_service.find_template(template_path, threshold=threshold)
-            if match and match.get('confidence', 0) > best_confidence:
-                best_match = match
-                best_confidence = match.get('confidence', 0)
-
-        if not best_match:
+        if result is None:
             logger.warning(f"Banker not found (threshold: {threshold})")
             return False
 
-        center_x, center_y = best_match['center']
-        logger.info(f"Found banker at ({center_x}, {center_y}) with confidence {best_confidence:.3f}")
+        center_x, center_y, confidence = result
+        logger.info(f"Found banker at ({center_x}, {center_y}) with confidence {confidence:.3f}")
 
         abs_x, abs_y = self._to_absolute(center_x, center_y)
         return self.mouse.click_at(
@@ -522,32 +592,19 @@ class GameActions:
             item_name: Name for logging
             threshold: Match confidence (0.0-1.0)
         """
-        if not self.template_service:
-            logger.warning("Template service not available")
-            return False
+        paths = [template_path] if isinstance(template_path, str) else template_path
 
-        # Handle both single path and list of paths
-        if isinstance(template_path, str):
-            match = self.template_service.find_template(template_path, threshold=threshold)
-        elif isinstance(template_path, list):
-            # Try each template, take best match
-            match = None
-            best_confidence = 0.0
-            for path in template_path:
-                m = self.template_service.find_template(path, threshold=threshold)
-                if m and m.get('confidence', 0) > best_confidence:
-                    match = m
-                    best_confidence = m.get('confidence', 0)
-        else:
+        if not isinstance(paths, list):
             logger.error(f"Invalid template_path type: {type(template_path)}")
             return False
 
-        if not match:
+        result = self._find_template_on_screen(paths, threshold, label=item_name)
+
+        if result is None:
             logger.warning(f"{item_name} not found (threshold: {threshold})")
             return False
 
-        center_x, center_y = match['center']
-        confidence = match.get('confidence', 0)
+        center_x, center_y, confidence = result
         logger.info(f"Found {item_name} at ({center_x}, {center_y}) with confidence {confidence:.3f}")
 
         abs_x, abs_y = self._to_absolute(center_x, center_y)
@@ -572,28 +629,24 @@ class GameActions:
     ) -> bool:
         """Search for an item in bank and withdraw it."""
         try:
-            # Click search button
             if not self.click_template(search_button_template, "bank search button", threshold=0.7):
                 logger.error("Failed to find bank search button")
                 return False
 
             self.wait("medium")
 
-            # Type search text
             logger.info(f"Typing '{search_text}' in bank search")
-            pyautogui.write(search_text, interval=0.05)
+            self.type_text(search_text)
             self.wait("long")
 
-            # Click item
             if not self.click_template(item_template, item_name, threshold=item_threshold):
                 logger.error(f"Failed to find {item_name} in bank")
-                pyautogui.press("escape")
+                self.press_key("escape")
                 return False
 
             self.wait("medium")
 
-            # Clear search
-            pyautogui.press("escape")
+            self.press_key("escape")
             self.wait("medium")
 
             return True
@@ -601,7 +654,7 @@ class GameActions:
         except Exception as e:
             logger.error(f"Error in bank search and withdraw: {e}")
             try:
-                pyautogui.press("escape")
+                self.press_key("escape")
             except Exception:
                 pass
             return False
@@ -611,27 +664,16 @@ class GameActions:
     def hover_template(
         self, template_path: str, template_name: str = "item"
     ) -> bool:
-        """
-        Hover mouse over template match without clicking.
-
-        Args:
-            template_path: Path to template image
-            template_name: Name for logging
-
-        Returns:
-            True if hover successful, False if template not found
-        """
-        if not self.template_service:
-            logger.warning("Template service not available for hover_template")
-            return False
-
+        """Hover mouse over template match without clicking."""
         try:
-            match = self.template_service.find_template(template_path)
-            if not match:
+            result = self._find_template_on_screen(
+                [template_path], threshold=0.7, label=template_name
+            )
+            if not result:
                 logger.debug(f"Template '{template_name}' not found for hover")
                 return False
 
-            center_x, center_y = match['center']
+            center_x, center_y, _ = result
             abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
 
             hover_duration = random.uniform(0.3, 1.0)
@@ -693,17 +735,15 @@ class GameActions:
         Returns:
             True if right-click successful, False if template not found
         """
-        if not self.template_service:
-            logger.warning("Template service not available for right_click_template")
-            return False
-
         try:
-            match = self.template_service.find_template(template_path)
-            if not match:
+            result = self._find_template_on_screen(
+                [template_path], threshold=0.7, label=template_name
+            )
+            if not result:
                 logger.debug(f"Template '{template_name}' not found for right-click")
                 return False
 
-            center_x, center_y = match['center']
+            center_x, center_y, _ = result
             abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
 
             success = self.mouse.click(abs_x, abs_y, button="right", variance=True)

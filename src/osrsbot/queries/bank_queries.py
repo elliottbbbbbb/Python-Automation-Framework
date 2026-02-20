@@ -21,7 +21,7 @@ import cv2 as cv
 import numpy as np
 
 from osrsbot.services.screen_service import ScreenService
-from osrsbot.utils.path_helpers import resolve_template_path as _resolve_template_path
+from osrsbot.utils.template_helpers import resolve_template_path
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class BankQueries:
         """
         try:
             # Load search button template
-            resolved_path = _resolve_template_path(search_button_template)
+            resolved_path = resolve_template_path(search_button_template)
             template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
             if template is None:
                 logger.warning(
@@ -103,7 +103,7 @@ class BankQueries:
         """
         try:
             # Resolve template path for .exe
-            resolved_path = _resolve_template_path(template_path)
+            resolved_path = resolve_template_path(template_path)
 
             # Load template
             template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
@@ -194,7 +194,7 @@ class BankQueries:
         for template_path in template_paths:
             try:
                 # Resolve and load template
-                resolved_path = _resolve_template_path(template_path)
+                resolved_path = resolve_template_path(template_path)
                 template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
                 if template is None:
                     logger.warning(f"Failed to load template: {template_path}")
@@ -302,7 +302,7 @@ class BankQueries:
 
         for template_path in template_paths:
             try:
-                resolved_path = _resolve_template_path(template_path)
+                resolved_path = resolve_template_path(template_path)
                 template = cv.imread(str(resolved_path), cv.IMREAD_COLOR)
                 if template is None:
                     logger.warning(f"Failed to load template: {template_path}")

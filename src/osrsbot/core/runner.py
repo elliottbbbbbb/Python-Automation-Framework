@@ -13,6 +13,7 @@ from osrsbot.services.anti_ban_service import AntiBanService
 from osrsbot.services.loot_detection_service import LootDetectionService
 from osrsbot.services.mouse_service import MouseConfig, MouseService
 from osrsbot.services.screen_service import ScreenService
+from osrsbot.services.keyboard_service import KeyboardService
 from osrsbot.services.template_match_service import TemplateMatchService
 from osrsbot.services.template_ocr_service import TemplateOCRService
 
@@ -188,6 +189,10 @@ class ScriptRunner:
             self.ocr = TemplateOCRService()
             logger.info("TemplateOCRService initialized successfully")
 
+            logger.debug("Initializing KeyboardService")
+            self.keyboard = KeyboardService()
+            logger.info("KeyboardService initialized successfully")
+
             # Initialize ItemDetectionService if enabled
             logger.debug("Checking item detection configuration")
             item_detection_config = self.config.get("item_detection", default={})
@@ -318,6 +323,7 @@ class ScriptRunner:
                 walker=self.walker,
                 ui_manager=self.ui_manager,
                 inventory_state=self.state.inventory,
+                keyboard_service=self.keyboard,
             )
             logger.info("GameActions initialized successfully")
         except Exception as e:
