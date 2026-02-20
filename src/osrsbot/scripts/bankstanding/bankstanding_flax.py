@@ -27,7 +27,7 @@ class GrimyFlaxBot(BankstanderBot):
     the item processing logic specific to cleaning herbs.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         """Initialize manual cleaning bankstander."""
         # Pass item config to base class - that's it!
         # Base class handles ALL the banking logic
@@ -37,9 +37,8 @@ class GrimyFlaxBot(BankstanderBot):
             item_template="images/bot/items/grimy_toadflax.PNG",
             item_search_threshold=0.75,
             processed_item_name="cleaned toadflax",
-            *args,
-            **kwargs,
             script_name="Manual Cleaning Bankstander",
+            **kwargs,
         )
 
     def process_items(self, context: StateExecutionContext) -> StateResult:
@@ -85,7 +84,6 @@ class GrimyFlaxBot(BankstanderBot):
 
             # Click each inventory slot to clean herbs
             herbs_this_cycle = 0
-            # NOTE: Lazily implemented - to be moved to game actions later
             for slot in slot_order:
                 # Check for exit request
                 self._check_exit_requested()

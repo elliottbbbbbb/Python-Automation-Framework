@@ -3,6 +3,10 @@ Path resolution utilities for template images.
 
 Centralizes all template path resolution so it works consistently
 in both development mode and PyInstaller .exe mode.
+
+User overrides: place an image with the same relative filename inside a
+`user_images/` folder next to the exe (or project root in dev mode) and it
+will be used instead of the bundled version automatically.
 """
 
 import logging
@@ -11,86 +15,67 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Cache the package root so we don't recompute it every call
-# In dev: src/osrsbot/
-# In exe: sys._MEIPASS/osrsbot/
+# Cache roots so we don't recompute every call
 _PACKAGE_ROOT: Path | None = None
+_USER_IMAGES_DIR: Path | None = None
 
 
 def _get_package_root() -> Path:
-    """Get the osrsbot package root directory."""
     global _PACKAGE_ROOT
-    if _PACKAGE_ROOT is not None:
-        return _PACKAGE_ROOT
-
-    if getattr(sys, "frozen", False):
-        _PACKAGE_ROOT = Path(sys._MEIPASS) / "osrsbot"
-    else:
-        # path_helpers.py is at src/osrsbot/utils/path_helpers.py
-        # .parent = utils/, .parent.parent = src/osrsbot/
-        _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
-
+    if _PACKAGE_ROOT is None:
+        if getattr(sys, "frozen", False):
+            _PACKAGE_ROOT = Path(sys._MEIPASS) / "osrsbot"
+        else:
+            # path_helpers.py lives at src/osrsbot/utils/path_helpers.py
+            _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
     return _PACKAGE_ROOT
+
+
+def _get_user_images_dir() -> Path:
+    global _USER_IMAGES_DIR
+    if _USER_IMAGES_DIR is None:
+        if getattr(sys, "frozen", False):
+            _USER_IMAGES_DIR = Path(sys.executable).parent / "user_images"
+        else:
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            _USER_IMAGES_DIR = project_root / "user_images"
+        _USER_IMAGES_DIR.mkdir(exist_ok=True)
+    return _USER_IMAGES_DIR
 
 
 def resolve_template_path(template_path: str) -> Path:
     """
-    Resolve template path for both development and .exe environments.
+    Resolve a template image path for both development and .exe environments.
 
-    Anchors all paths relative to the osrsbot package directory, so resolution
-    works regardless of the current working directory.
+    Resolution order:
+    1. Absolute paths are returned as-is.
+    2. user_images/<relative_path> next to the exe — if it exists, it wins.
+    3. Bundled image from the package (inside the exe or src/osrsbot/).
 
-    Supports three path formats:
-    1. Custom user images: 'custom:my_item.png' -> looks in user_images/ folder next to exe
-    2. Short bundled paths: 'images/bot/items/my_item.png' -> resolved from package root
-    3. Full bundled paths: 'src/osrsbot/images/bot/items/my_item.png' -> prefix stripped, resolved from package root
+    To override any bundled image, place a file with the same relative path
+    inside the user_images/ folder next to the exe.  For example, to override
+    'images/bot/items/prayer_potion.png', place your replacement at:
+        user_images/images/bot/items/prayer_potion.png
 
-    When running as .exe:
-    - 'custom:' paths resolve to './user_images/' folder (created if missing)
-    - Bundled paths resolve to _MEIPASS directory
-
-    Args:
-        template_path: Original template path (relative or absolute)
-                      Examples:
-                      - 'custom:my_custom_item.png' (user images folder)
-                      - 'images/bot/items/my_item.png' (resolved from package root)
-                      - 'src/osrsbot/images/bot/items/my_item.png' (prefix stripped automatically)
-
-    Returns:
-        Resolved Path object
+    The 'src/osrsbot/' prefix is stripped automatically if present.
     """
-    resolved_path = Path(template_path)
+    resolved = Path(template_path)
 
-    # Skip resolution if already an absolute path
-    if resolved_path.is_absolute():
-        return resolved_path
+    if resolved.is_absolute():
+        return resolved
 
-    # Normalize path to use forward slashes for comparison (Windows uses backslashes)
-    normalized_path = template_path.replace("\\", "/")
+    normalized = template_path.replace("\\", "/")
 
-    # Handle 'custom:' prefix for user images
-    if normalized_path.startswith("custom:"):
-        custom_filename = normalized_path.replace("custom:", "", 1)
+    # Strip legacy src/osrsbot/ prefix if present
+    if normalized.startswith("src/osrsbot/"):
+        normalized = normalized[len("src/osrsbot/"):]
 
-        if getattr(sys, "frozen", False):
-            user_images_dir = Path(sys.executable).parent / "user_images"
-        else:
-            # Project root is 4 levels up from this file:
-            # src/osrsbot/utils/path_helpers.py -> project root
-            project_root = Path(__file__).resolve().parent.parent.parent.parent
-            user_images_dir = project_root / "user_images"
+    # Check user_images/ override first
+    user_override = _get_user_images_dir() / normalized
+    if user_override.exists():
+        logger.debug(f"User override found: {template_path} -> {user_override}")
+        return user_override
 
-        user_images_dir.mkdir(exist_ok=True)
-
-        resolved_path = user_images_dir / custom_filename
-        logger.debug(f"Resolved custom template: {template_path} -> {resolved_path}")
-        return resolved_path
-
-    # Strip 'src/osrsbot/' prefix if present - we resolve from package root
-    if normalized_path.startswith("src/osrsbot/"):
-        normalized_path = normalized_path[len("src/osrsbot/"):]
-
-    resolved_path = _get_package_root() / normalized_path
-
-    logger.debug(f"Resolved template: {template_path} -> {resolved_path}")
-    return resolved_path
+    bundled = _get_package_root() / normalized
+    logger.debug(f"Resolved template: {template_path} -> {bundled}")
+    return bundled
