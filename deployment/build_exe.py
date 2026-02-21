@@ -40,11 +40,17 @@ SEP = ";" if sys.platform == "win32" else ":"
 pyinstaller_args = [
     str(ENTRY_POINT),
     '--name=OSRS_Bot',
-    '--onefile',
+    '--onedir',
     '--icon=NONE',
 
-    # Bundle the entire osrsbot package (includes images, fonts, config)
-    f'--add-data={OSRSBOT_DIR}{SEP}osrsbot',
+    # Bundle only the images directory - Python source is compiled by PyInstaller separately
+    f'--add-data={OSRSBOT_DIR / "images"}{SEP}osrsbot/images',
+
+    # Add src/ to path so PyInstaller can locate the osrsbot package for analysis
+    f'--paths={SRC_DIR}',
+
+    # Keep the spec file in the deployment folder
+    f'--specpath={Path(__file__).parent}',
 
     # --- Package roots ---
     '--hidden-import=osrsbot',
@@ -95,6 +101,7 @@ pyinstaller_args = [
 
     # --- Models ---
     '--hidden-import=osrsbot.models.config',
+    '--hidden-import=osrsbot.models.config_defaults',
     '--hidden-import=osrsbot.models.ui_elements',
 
     # --- Queries ---
@@ -159,6 +166,7 @@ pyinstaller_args = [
     '--hidden-import=osrsbot.services.template_match_service',
     '--hidden-import=osrsbot.services.template_ocr_service',
     '--hidden-import=osrsbot.services.ui_manager_service',
+    '--hidden-import=osrsbot.services.live_view_service',
     '--hidden-import=osrsbot.services.walker_service',
     '--hidden-import=osrsbot.services.win32_mouse_service',
     '--hidden-import=osrsbot.services.wom_service',
@@ -205,7 +213,7 @@ try:
     print("  Build Complete!")
     print("=" * 60)
     print()
-    print(f"Executable: {PROJECT_ROOT / 'dist' / 'OSRS_Bot.exe'}")
+    print(f"Executable: {PROJECT_ROOT / 'dist' / 'OSRS_Bot' / 'OSRS_Bot.exe'}")
     print()
 
 except Exception as e:
