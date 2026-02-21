@@ -34,6 +34,8 @@ def resolve_config_path(config_file: str) -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent / config_file
 
+    return path
+
 class ScriptRunner:
     """Main script runner that sets up everything"""
 
@@ -68,7 +70,7 @@ class ScriptRunner:
                     primary_config = Path.cwd() / config_file
 
             logger.debug(f"Trying config from: {primary_config}")
-            self.config = Config(primary_config)
+            self.config = Config(str(primary_config))
             logger.info("Config loaded successfully from primary location")
 
         except FileNotFoundError:
@@ -79,7 +81,7 @@ class ScriptRunner:
             try:
                 if getattr(sys, "frozen", False):
                     # Try bundled config in .exe
-                    bundled_config = Path(sys._MEIPASS) / "osrsbot" / "config.json"
+                    bundled_config = Path(getattr(sys, "_MEIPASS", "")) / "osrsbot" / "config.json"
                     logger.debug(f"Trying bundled config: {bundled_config}")
                     self.config = Config(str(bundled_config))
                 else:
@@ -95,19 +97,22 @@ class ScriptRunner:
             logger.error(f"Failed to load config: {e}", exc_info=True)
             raise
 
+        print("\nStarting bot...")
         # Validate license before proceeding
         logger.info("Checking license...")
-        print("Validating license...")
+        print("  Validating license...")
         self._validate_license()
 
         if window_title:
             self.config.data["window_title"] = window_title
             logger.debug(f"Updated window title in config to: '{window_title}'")
 
+        print(f"  Finding game window '{window_title}'...")
         try:
             logger.debug("Initializing GameInterface")
             self.interface = GameInterface(self.config)
             logger.info("GameInterface initialized successfully")
+            print("  Game window found.")
         except Exception as e:
             logger.error(f"Failed to initialize GameInterface: {e}", exc_info=True)
             raise Exception(
@@ -151,7 +156,7 @@ class ScriptRunner:
                 from osrsbot.services.win32_mouse_service import Win32MouseService
 
                 logger.debug("Initializing Win32MouseService (SendInput)")
-                self.mouse = Win32MouseService(mouse_config)
+                self.mouse = Win32MouseService(mouse_config)  # type: ignore[arg-type]
                 logger.info("Win32MouseService initialized successfully")
             except Exception as e:
                 logger.warning(f"Win32MouseService not available: {e}. Falling back to MouseService.")
@@ -163,6 +168,7 @@ class ScriptRunner:
             self.screen = ScreenService(window_getter=self.interface.get_bounds)
             logger.info("ScreenService initialized successfully")
 
+            print("  Loading UI templates...")
             logger.debug("Initializing TemplateMatchService")
             self.template_service = TemplateMatchService()
 
@@ -185,6 +191,32 @@ class ScriptRunner:
             else:
                 logger.info("UIManager initialized (no templates available)")
 
+            # LiveViewService — enabled via LIVE_VIEW=true env var or config
+            live_view_config = self.config.get("live_view", default={})
+            live_view_enabled = (
+                os.getenv("LIVE_VIEW", "").lower() in ("1", "true", "yes")
+                or live_view_config.get("enabled", False)
+            )
+            if live_view_enabled:
+                print("  Starting live view window...")
+                try:
+                    from osrsbot.services.live_view_service import LiveViewService
+
+                    self.live_view = LiveViewService(
+                        screen_service=self.screen,
+                        fps=live_view_config.get("fps", 10),
+                    )
+                    self.ui_manager.register_live_overlay(self.live_view)
+                    self.live_view.start()
+                    logger.info("LiveViewService started")
+                    print("  Live view started.")
+                except Exception as e:
+                    logger.warning(f"LiveViewService failed to start: {e}")
+                    print(f"  Live view unavailable: {e}")
+                    self.live_view = None
+            else:
+                self.live_view = None
+
             logger.debug("Initializing TemplateOCRService")
             self.ocr = TemplateOCRService()
             logger.info("TemplateOCRService initialized successfully")
@@ -197,6 +229,7 @@ class ScriptRunner:
             logger.debug("Checking item detection configuration")
             item_detection_config = self.config.get("item_detection", default={})
             if item_detection_config.get("enabled", False):
+                print("  Loading item templates...")
                 try:
                     from osrsbot.services.item_detection_service import ItemDetectionService
 
@@ -248,7 +281,7 @@ class ScriptRunner:
                 self.walker = WalkerService(
                     config=walker_config,
                     status_socket=self.position_service,
-                    mouse=self.mouse,
+                    mouse=self.mouse,  # type: ignore[arg-type]
                     screen=self.screen,
                     interface=self.interface,
                 )
@@ -311,7 +344,7 @@ class ScriptRunner:
         try:
             logger.debug("Initializing GameActions (Commands)")
             self.actions = GameActions(
-                self.mouse,
+                self.mouse,  # type: ignore[arg-type]
                 self.screen,
                 self.interface,
                 self.config,
@@ -330,6 +363,7 @@ class ScriptRunner:
             logger.error(f"Failed to initialize GameActions: {e}", exc_info=True)
             raise
 
+        print("  Ready!\n")
         logger.info("ScriptRunner initialization complete")
 
     def _validate_license(self) -> None:
@@ -461,6 +495,10 @@ class ScriptRunner:
                 f"Script '{script_name}' failed with error: {e}", exc_info=True
             )
             raise Exception(f"Script '{script_name}' failed: {e}") from e
+        finally:
+            live_view = getattr(self, "live_view", None)
+            if live_view is not None:
+                live_view.stop()
 
     def run_script(self, script: Union[Callable, type, "Bot"], **kwargs: Any) -> None:
         """

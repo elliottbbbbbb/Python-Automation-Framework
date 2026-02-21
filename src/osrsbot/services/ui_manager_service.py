@@ -283,3 +283,20 @@ class UIManager:
 
         return info
 
+    def register_live_overlay(self, live_view_service) -> None:
+        """
+        Register UIManager's detection visualisation with LiveViewService.
+
+        The overlay callback reads from UIManager's cached detection results
+        (grid.visible, grid.detected_bbox, etc.) without triggering any new
+        detection — zero performance cost.
+
+        Args:
+            live_view_service: LiveViewService instance to register with.
+        """
+        def _ui_overlay_callback(frame_bgr):
+            return self.draw_debug_overlay(frame_bgr)
+
+        live_view_service.register_overlay("ui_manager", _ui_overlay_callback)
+        logger.info("UIManager registered live overlay with LiveViewService")
+

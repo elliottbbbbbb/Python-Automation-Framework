@@ -418,6 +418,10 @@ class Config:
                 "threshold": 0.75,
                 "load_at_startup": True,
             },
+            "live_view": {
+                "enabled": False,
+                "fps": 10,
+            },
         }
 
     def save(self) -> bool:
