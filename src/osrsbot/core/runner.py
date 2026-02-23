@@ -199,6 +199,28 @@ class ScriptRunner:
                     self.live_view.start()
                     logger.info("LiveViewService started")
                     print("  Live view started.")
+
+                    # Register fixed OCR stat regions so they're always visible in the overlay.
+                    # Colors are BGR. Coordinates are window-relative (same space as the capture).
+                    _ocr = self.config.get("coordinates", "ocr", default={})
+                    _stat_defs = [
+                        ("hp_region",            "HP",     (80,  80,  255)),  # red
+                        ("prayer_region",         "Prayer", (255, 140,  0)),   # blue
+                        ("run_energy_region",     "Run",    (0,   220, 255)),  # yellow
+                        ("special_attack_region", "Spec",   (180, 0,   255)),  # purple
+                        ("world_coord_region",    "Coords", (200, 200, 200)),  # grey
+                    ]
+                    for key, label, color in _stat_defs:
+                        r = _ocr.get(key)
+                        if r:
+                            self.ui_manager.register_static_region(
+                                key,
+                                r["x"], r["y"],
+                                r.get("width", r.get("w", 30)),
+                                r.get("height", r.get("h", 20)),
+                                color=color,
+                                label=label,
+                            )
                 except Exception as e:
                     logger.warning(f"LiveViewService failed to start: {e}")
                     print(f"  Live view unavailable: {e}")
@@ -235,49 +257,37 @@ class ScriptRunner:
                 logger.debug("Item detection disabled in config")
                 self.item_detection = None
 
-            # Initialize Position Tracking Service (OCR-based)
+            # Initialize Position Tracking Service
+            # Uses MinimapLocalizationService if a map image is configured.
             logger.debug("Initializing position tracking service")
-            from osrsbot.services.coordinate_ocr_service import CoordinateOCRService
+            self.position_service = None
+            position_service_available = False
 
-            ocr_service = CoordinateOCRService(
-                screen=self.screen,
-                ocr=self.ocr,
-                config=self.config
-            )
+            minimap_cfg = self.config.get("walker", "minimap_localization", default={})
+            map_image = minimap_cfg.get("map_image", "")
+            if map_image:
+                try:
+                    from osrsbot.services.minimap_localization_service import MinimapLocalizationService
+                    from osrsbot.utils.path_helpers import get_maps_path
 
-            if ocr_service.is_available():
-                logger.info("Using CoordinateOCRService for position tracking")
-                self.position_service = ocr_service
-                position_service_available = True
+                    map_path = get_maps_path(map_image)
+                    localization = MinimapLocalizationService(
+                        screen=self.screen,
+                        map_image_path=map_path,
+                        map_origin_world_x=minimap_cfg.get("map_origin_world_x", 0),
+                        map_origin_world_y=minimap_cfg.get("map_origin_world_y", 0),
+                        minimap_center_x=self.config.get("walker", "minimap_center_x", default=654),
+                        minimap_center_y=self.config.get("walker", "minimap_center_y", default=111),
+                    )
+                    self.position_service = localization
+                    position_service_available = True
+                    logger.info(f"Using MinimapLocalizationService with map: {map_image}")
+                except Exception as e:
+                    logger.warning(f"MinimapLocalizationService failed to init: {e}. Walker disabled.")
             else:
-                logger.warning("Position tracking unavailable. Walker disabled.")
-                self.position_service = None
-                position_service_available = False
+                logger.info("No minimap map image configured — walker disabled. "
+                            "Set walker.minimap_localization.map_image in config to enable.")
 
-            # Initialize Walker Service if we have position tracking
-            if position_service_available and self.position_service:
-                logger.debug("Initializing WalkerService")
-                walker_config_dict = self.config.get("walker", default={})
-                from osrsbot.services.walker_service import WalkerConfig, WalkerService
-
-                walker_config = WalkerConfig(
-                    minimap_center_x=walker_config_dict.get("minimap_center_x", 654),
-                    minimap_center_y=walker_config_dict.get("minimap_center_y", 111),
-                    tile_size=walker_config_dict.get("tile_size", 4),
-                    arrival_tolerance=walker_config_dict.get("arrival_tolerance", 2),
-                    max_click_distance=walker_config_dict.get("max_click_distance", 15),
-                )
-                self.walker = WalkerService(
-                    config=walker_config,
-                    status_socket=self.position_service,
-                    mouse=self.mouse,  # type: ignore[arg-type]
-                    screen=self.screen,
-                    interface=self.interface,
-                )
-                logger.info("✓ WalkerService initialized successfully")
-            else:
-                logger.info("✗ WalkerService disabled (no position tracking available)")
-                self.walker = None
 
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}", exc_info=True)
@@ -342,7 +352,6 @@ class ScriptRunner:
                 self.loot_detection,
                 coord_resolver=self.coord_resolver,
                 timing_helper=self.timing,
-                walker=self.walker,
                 ui_manager=self.ui_manager,
                 inventory_state=self.state.inventory,
                 keyboard_service=self.keyboard,

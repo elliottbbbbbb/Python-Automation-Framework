@@ -60,7 +60,6 @@ class GameActions:
         loot_detection_service: Optional[Any] = None,
         coord_resolver: Optional[Any] = None,
         timing_helper: Optional[Any] = None,
-        walker: Optional[Any] = None,
         ui_manager: Optional[Any] = None,
         inventory_state: Optional[Any] = None,
         keyboard_service: Optional[Any] = None,
@@ -74,7 +73,6 @@ class GameActions:
         self.template_service = template_service
         self.anti_ban = anti_ban_service
         self.loot_detection = loot_detection_service
-        self.walker = walker
         self.ui_manager = ui_manager
         self.keyboard = keyboard_service
 
@@ -467,30 +465,6 @@ class GameActions:
 
         return match is not None
 
-    def walk_to_world_coordinate(
-        self, x: int, y: int, move_style: MovementStyle = "curved"
-    ) -> bool:
-        """Walk to world tile coordinates using advanced walker."""
-        if not self.walker:
-            logger.error(
-                "WalkerService not initialized. Ensure Status Socket plugin is enabled."
-            )
-            return False
-
-        return self.walker.walk_to(x, y, move_style=move_style)
-
-    def walk_path(
-        self, waypoints: List[Tuple[int, int]], move_style: MovementStyle = "random"
-    ) -> bool:
-        """Follow a predefined path of world coordinates."""
-        if not self.walker:
-            logger.error(
-                "WalkerService not initialized. Ensure Status Socket plugin is enabled."
-            )
-            return False
-
-        return self.walker.walk_path(waypoints, move_style=move_style)
-
     # ==================== Template Matching + Click Methods ====================
     # These use screen capture + OpenCV directly (no Queries layer import).
     # resolve_template_path is imported from utils layer.
@@ -658,132 +632,3 @@ class GameActions:
             except Exception:
                 pass
             return False
-
-    # ==================== ANTI-BAN: Pre-Action Behaviors ====================
-
-    def hover_template(
-        self, template_path: str, template_name: str = "item"
-    ) -> bool:
-        """Hover mouse over template match without clicking."""
-        try:
-            result = self._find_template_on_screen(
-                [template_path], threshold=0.7, label=template_name
-            )
-            if not result:
-                logger.debug(f"Template '{template_name}' not found for hover")
-                return False
-
-            center_x, center_y, _ = result
-            abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
-
-            hover_duration = random.uniform(0.3, 1.0)
-            success = self.mouse.hover_at(abs_x, abs_y, duration=hover_duration)
-
-            if success:
-                logger.debug(f"Hovered over {template_name} for {hover_duration:.2f}s")
-
-            return success
-
-        except Exception as e:
-            logger.error(f"Failed to hover over template '{template_name}': {e}")
-            return False
-
-    def open_skills_tab(self) -> bool:
-        """
-        Open the skills tab.
-
-        Returns:
-            True if opened successfully, False otherwise
-        """
-        logger.debug("Opening skills tab")
-
-        try:
-            button_pos = self.coord_resolver.resolve_ui_button("skills_tab", force_detect=True)
-            if not button_pos:
-                logger.error("Failed to detect skills tab button")
-                return False
-
-            rel_x, rel_y = button_pos
-            abs_x, abs_y = self.coord_resolver.to_absolute(rel_x, rel_y)
-
-            success = self.mouse.click_at(
-                abs_x,
-                abs_y,
-                speed_multiplier=self.timing.get_mouse_speed_multiplier()
-            )
-
-            if success:
-                self.timing.wait("short")
-                logger.debug("Skills tab opened")
-
-            return success
-
-        except Exception as e:
-            logger.error(f"Failed to open skills tab: {e}")
-            return False
-
-    def right_click_template(
-        self, template_path: str, template_name: str = "item"
-    ) -> bool:
-        """
-        Right-click on template match (for examine/cancel actions).
-
-        Args:
-            template_path: Path to template image
-            template_name: Name for logging
-
-        Returns:
-            True if right-click successful, False if template not found
-        """
-        try:
-            result = self._find_template_on_screen(
-                [template_path], threshold=0.7, label=template_name
-            )
-            if not result:
-                logger.debug(f"Template '{template_name}' not found for right-click")
-                return False
-
-            center_x, center_y, _ = result
-            abs_x, abs_y = self.coord_resolver.to_absolute(center_x, center_y)
-
-            success = self.mouse.click(abs_x, abs_y, button="right", variance=True)
-
-            if success:
-                logger.debug(f"Right-clicked on {template_name}")
-
-            return success
-
-        except Exception as e:
-            logger.error(f"Failed to right-click template '{template_name}': {e}")
-            return False
-
-    def random_camera_movement(self) -> None:
-        """
-        Simulate looking around by moving mouse (simulates camera movement).
-
-        Note: This is a simplified version. For actual camera control,
-        you would use arrow keys or middle mouse drag.
-        """
-        logger.debug("ANTI-BAN: Random camera movement")
-
-        try:
-            current_x, current_y = pyautogui.position()
-
-            # Move to random location near minimap area
-            minimap_x = random.randint(600, 750)
-            minimap_y = random.randint(50, 200)
-
-            self.mouse.move_to(minimap_x, minimap_y, style="curved")
-            time.sleep(random.uniform(0.3, 0.8))
-
-            # Return near original position (with variance)
-            variance_x = random.randint(-30, 30)
-            variance_y = random.randint(-30, 30)
-            self.mouse.move_to(
-                current_x + variance_x,
-                current_y + variance_y,
-                style="curved"
-            )
-
-        except Exception as e:
-            logger.error(f"Failed random camera movement: {e}")
