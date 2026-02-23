@@ -23,6 +23,35 @@ class UIManager:
     - Screenshot annotations with element labels and confidence scores
     """
 
+    # Maps open-state template button name → grid shown when that tab is active.
+    # Detection: button.visible == True AND open_confidence > closed_confidence.
+    # Add an entry here when you have a *_open.PNG template for a tab.
+    _TAB_OPEN_MAP: Dict[str, str] = {
+        "inventory_open":      "inventory",
+        "worn_equipment_open": "equipment",
+        "prayer_open":         "prayer",
+        "magic_open":          "spellbook",
+    }
+
+    # Maps open-state button → its corresponding always-visible closed-state button.
+    # Used to disambiguate false positives: if the closed template scores higher
+    # than the open template, the tab is actually closed.
+    _TAB_OPEN_CLOSED_PAIR: Dict[str, str] = {
+        "inventory_open":      "inventory_tab",
+        "worn_equipment_open": "equipment_tab",
+        "prayer_open":         "prayer_tab",
+        "magic_open":          "spellbook_tab",
+    }
+
+    # Maps always-visible tab button name → grid name for colour-based detection.
+    # Used as fallback for tabs that don't yet have an open-state template.
+    # All tabs now have open-state templates, so this is empty — kept for extensibility.
+    _TAB_GRID_MAP: Dict[str, str] = {}
+
+    # Active tab highlight colour: #230c0a = RGB(35,12,10) = BGR(10,12,35)
+    _TAB_ACTIVE_BGR  = (10,  12,  35)
+    _TAB_COLOR_TOL   = 45   # per-channel tolerance
+
     def __init__(self, template_service: Optional["TemplateMatchService"] = None):
         """
         Initialize UIManager.
@@ -34,6 +63,13 @@ class UIManager:
         self.active_grid_name: Optional[str] = None
         self.buttons: Dict[str, UIButton] = {}
         self.template_service = template_service
+
+        # Static regions: always drawn in live view regardless of detection state.
+        # Format: {name: {"x", "y", "w", "h", "color" (BGR), "label"}}
+        self._static_regions: Dict[str, dict] = {}
+
+        # Last known active tab-gated grid name (inventory / equipment / prayer / spellbook)
+        self._active_panel_grid: Optional[str] = None
 
         # Debug settings
         self.debug_enabled = False
@@ -126,6 +162,38 @@ class UIManager:
         self.debug_enabled = False
         logger.info("UI debug visualization disabled")
 
+    def register_static_region(
+        self,
+        name: str,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        color: tuple = (0, 200, 255),
+        label: Optional[str] = None,
+    ) -> None:
+        """
+        Register a named region that is always drawn in the live view overlay.
+
+        Unlike grids/buttons, static regions don't require template detection —
+        they're drawn on every frame at the given window-relative coordinates.
+        Useful for OCR stat regions (HP, prayer, run energy, spec) and any
+        other fixed UI areas the bot reads from.
+
+        Args:
+            name: Unique identifier (re-registering replaces the existing entry).
+            x, y: Top-left corner relative to the game window.
+            w, h: Width and height in pixels.
+            color: BGR colour tuple for the overlay box.
+            label: Text label drawn above the box. Defaults to ``name``.
+        """
+        self._static_regions[name] = {
+            "x": x, "y": y, "w": w, "h": h,
+            "color": color,
+            "label": label if label is not None else name,
+        }
+        logger.debug(f"UIManager: registered static region '{name}' at ({x},{y}) {w}×{h}")
+
     def draw_debug_overlay(
         self,
         img: np.ndarray,
@@ -157,12 +225,15 @@ class UIManager:
 
         # Color mapping for different grids (BGR format)
         grid_colors = {
-            "inventory": (0, 255, 0),      # Green
-            "spellbook": (0, 0, 255),      # Red
-            "prayer": (255, 0, 0),         # Blue
-            "equipment": (0, 255, 255),    # Yellow
-            "chat": (255, 255, 0),         # Cyan
-            "minimap": (255, 0, 255),      # Magenta
+            "inventory":    (0, 255, 0),      # Green
+            "spellbook":    (0, 0, 255),      # Red
+            "prayer":       (255, 0, 0),      # Blue
+            "equipment":    (0, 255, 255),    # Yellow
+            "chat":         (255, 255, 0),    # Cyan
+            "minimap":      (255, 0, 255),    # Magenta
+            "all_settings": (0, 165, 255),    # Orange
+            "audio":        (255, 50, 180),   # Pink
+            "activities":   (50, 255, 180),   # Lime
         }
         default_color = (128, 128, 128)    # Gray for unknown grids
 
@@ -200,7 +271,26 @@ class UIManager:
                             cx, cy = element.center
                             cv.circle(img_debug, (cx, cy), 2, color, -1)
 
-        # Buttons are not drawn - only grids are visualized
+        # Draw buttons
+        if show_buttons:
+            button_color = (0, 165, 255)  # Orange
+            for name, button in self.buttons.items():
+                if button.visible and button.element:
+                    x0, y0, x1, y1 = button.element.bbox
+                    cv.rectangle(img_debug, (x0, y0), (x1, y1), button_color, 1)
+                    if show_labels:
+                        cv.putText(img_debug, name, (x0, y0 - 4),
+                                   cv.FONT_HERSHEY_SIMPLEX, 0.4, button_color, 1)
+
+        # Draw static regions (always visible, no detection required)
+        for region in self._static_regions.values():
+            rx, ry, rw, rh = region["x"], region["y"], region["w"], region["h"]
+            rcolor = region["color"]
+            cv.rectangle(img_debug, (rx, ry), (rx + rw, ry + rh), rcolor, 1)
+            if show_labels and region["label"]:
+                label_y = max(ry - 4, 10)
+                cv.putText(img_debug, region["label"], (rx + 2, label_y),
+                           cv.FONT_HERSHEY_SIMPLEX, 0.45, rcolor, 1)
 
         return img_debug
 
@@ -283,19 +373,175 @@ class UIManager:
 
         return info
 
-    def register_live_overlay(self, live_view_service) -> None:
-        """
-        Register UIManager's detection visualisation with LiveViewService.
+    # ── Tab-state detection ────────────────────────────────────────────────────
 
-        The overlay callback reads from UIManager's cached detection results
-        (grid.visible, grid.detected_bbox, etc.) without triggering any new
-        detection — zero performance cost.
+    def _button_region_has_active_color(
+        self, frame_bgr: np.ndarray, button
+    ) -> bool:
+        """
+        Return True if ANY pixel inside the button's bounding box matches the
+        active-tab highlight colour within tolerance.
+
+        Scanning the full region is necessary because the reddish highlight can
+        appear at different positions within the button (corners, edges, or
+        scattered pixels) rather than at a single fixed point.
+        """
+        if not button.element:
+            return False
+        x0, y0, x1, y1 = button.element.bbox
+        fh, fw = frame_bgr.shape[:2]
+        y0, y1 = max(0, y0), min(fh, y1)
+        x0, x1 = max(0, x0), min(fw, x1)
+        if y0 >= y1 or x0 >= x1:
+            return False
+        region = frame_bgr[y0:y1, x0:x1].astype(np.int16)
+        tb, tg, tr = self._TAB_ACTIVE_BGR  # stored as BGR
+        tol = self._TAB_COLOR_TOL
+        diff = np.abs(region - np.array([tb, tg, tr], dtype=np.int16))
+        return bool(np.any(np.all(diff <= tol, axis=2)))
+
+    def _detect_active_tab_from_frame(self, frame_bgr: np.ndarray) -> Optional[str]:
+        """
+        Determine the active tab-gated grid from the current BGR live-view frame.
+
+        Detection order:
+          1. Template-based: if a button in ``_TAB_OPEN_MAP`` is marked visible
+             (its open-state template was matched in the last detection pass),
+             that grid is active — no pixel sampling needed.
+          2. Colour-based fallback: scan each button in ``_TAB_GRID_MAP`` for the
+             reddish active-tab highlight (#230c0a ± tolerance).
+
+        Called inside the live-view overlay callback — no extra screen capture.
+        When no tab matches, ``_active_panel_grid`` is cleared to None.
+        """
+        # 1. Template-based (most reliable)
+        for btn_name, grid_name in self._TAB_OPEN_MAP.items():
+            button = self.buttons.get(btn_name)
+            if not button or not button.visible:
+                continue
+            # Guard against false positives: the open and closed templates often
+            # look similar enough that both match. Only trust "open" if its
+            # confidence beats the closed-state button's confidence.
+            open_conf = button.last_confidence
+            closed_btn_name = self._TAB_OPEN_CLOSED_PAIR.get(btn_name)
+            if closed_btn_name:
+                closed_btn = self.buttons.get(closed_btn_name)
+                closed_conf = closed_btn.last_confidence if closed_btn else 0.0
+                if open_conf <= closed_conf:
+                    continue  # Closed template matches better — tab is not open
+            self._active_panel_grid = grid_name
+            return grid_name
+
+        # 2. Colour-based fallback for tabs without open-state templates
+        for btn_name, grid_name in self._TAB_GRID_MAP.items():
+            button = self.buttons.get(btn_name)
+            if not button or not button.element:
+                continue
+            if self._button_region_has_active_color(frame_bgr, button):
+                self._active_panel_grid = grid_name
+                return grid_name
+
+        # Nothing matched — clear so the last tab doesn't linger
+        self._active_panel_grid = None
+        return None
+
+    def update_active_tab(self, screen) -> Optional[str]:
+        """
+        Determine the active tab-gated grid for use in the detection loop.
+
+        Detection order:
+          1. Template-based: check ``_TAB_OPEN_MAP`` buttons — if any is marked
+             visible (open-state template matched), that grid is active.
+          2. Colour-based fallback: search each ``_TAB_GRID_MAP`` button region
+             for the reddish active-tab highlight via ScreenService.find_color.
 
         Args:
-            live_view_service: LiveViewService instance to register with.
+            screen: ScreenService instance (used for colour fallback only).
+
+        Returns:
+            Grid name of the active tab panel, or None if undetermined.
         """
-        def _ui_overlay_callback(frame_bgr):
-            return self.draw_debug_overlay(frame_bgr)
+        # 1. Template-based (most reliable)
+        for btn_name, grid_name in self._TAB_OPEN_MAP.items():
+            button = self.buttons.get(btn_name)
+            if not button or not button.visible:
+                continue
+            open_conf = button.last_confidence
+            closed_btn_name = self._TAB_OPEN_CLOSED_PAIR.get(btn_name)
+            if closed_btn_name:
+                closed_btn = self.buttons.get(closed_btn_name)
+                closed_conf = closed_btn.last_confidence if closed_btn else 0.0
+                if open_conf <= closed_conf:
+                    continue  # Closed template matches better — tab is not open
+            self._active_panel_grid = grid_name
+            return grid_name
+
+        # 2. Colour-based fallback for tabs without open-state templates
+        tb, tg, tr = self._TAB_ACTIVE_BGR  # BGR → RGB hex
+        active_hex = f"#{tr:02x}{tg:02x}{tb:02x}"
+        for btn_name, grid_name in self._TAB_GRID_MAP.items():
+            button = self.buttons.get(btn_name)
+            if not button or not button.element:
+                continue
+            x0, y0, x1, y1 = button.element.bbox
+            try:
+                match = screen.find_color(
+                    active_hex,
+                    tolerance=self._TAB_COLOR_TOL,
+                    region=(x0, y0, x1 - x0, y1 - y0),
+                )
+                if match:
+                    self._active_panel_grid = grid_name
+                    return grid_name
+            except Exception:
+                continue
+        self._active_panel_grid = None
+        return None
+
+    def get_active_panel_grid(self) -> Optional[str]:
+        """
+        Return the name of the currently active tab-gated grid
+        (inventory / equipment / prayer / spellbook), or None if unknown.
+
+        Updated automatically each live-view frame, or explicitly via
+        ``update_active_tab(screen)``.
+        """
+        return self._active_panel_grid
+
+    def _build_visible_grids_filter(self) -> Dict[str, bool]:
+        """
+        Return a visible_grids dict for draw_debug_overlay.
+
+        Tab-gated grids (from both _TAB_OPEN_MAP and _TAB_GRID_MAP) are only
+        shown when their tab is active. Non-tab grids (minimap, chat) are always shown.
+        """
+        tab_grids = set(self._TAB_OPEN_MAP.values()) | set(self._TAB_GRID_MAP.values())
+        return {
+            name: (name not in tab_grids or name == self._active_panel_grid)
+            for name in self.grids
+        }
+
+    # ── Live overlay ───────────────────────────────────────────────────────────
+
+    def register_live_overlay(self, live_view_service) -> None:
+        """
+        Register UIManager's visualisation with LiveViewService.
+
+        Each frame the overlay:
+          1. Samples tab-button pixel colours to determine the active panel.
+          2. Draws only the active tab-gated grid (inventory/equipment/prayer/spellbook).
+          3. Always draws non-tab grids (minimap, chat) and static regions.
+
+        Zero extra screen captures — pixels are sampled from the frame already
+        in the live-view pipeline.
+        """
+        def _ui_overlay_callback(frame_bgr: np.ndarray) -> np.ndarray:
+            self._detect_active_tab_from_frame(frame_bgr)
+            return self.draw_debug_overlay(
+                frame_bgr,
+                show_labels=False,
+                visible_grids=self._build_visible_grids_filter(),
+            )
 
         live_view_service.register_overlay("ui_manager", _ui_overlay_callback)
         logger.info("UIManager registered live overlay with LiveViewService")

@@ -109,6 +109,10 @@ class Config:
             return default
 
     def get_window_title(self) -> str:
+        # If an explicit window_title was set at runtime (e.g. by menu/runner), use it directly
+        explicit = self.data.get("window_title")
+        if explicit:
+            return explicit
         account_name = self.get("account_name", default="")
         if not account_name or account_name == "YourAccountName":
             logger.warning("account_name not set in config.json — defaulting to 'RuneLite - '")

@@ -10,6 +10,7 @@ This script:
 """
 
 import logging
+import os
 import time
 
 from osrsbot.core.game_interface import GameInterface
@@ -17,6 +18,7 @@ from osrsbot.models.config import Config
 from osrsbot.services.mouse_service import MouseConfig, MouseService
 from osrsbot.services.screen_service import ScreenService
 from osrsbot.services.template_match_service import TemplateMatchService
+from osrsbot.services.ui_manager_service import UIManager
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ def test_inventory_clicks():
         True if test completed successfully, False otherwise
     """
     # Load config to get window title
-    config = Config("config.json")
+    config = Config()
     window_title = config.get("window_title")
 
     if not window_title:
@@ -68,6 +70,26 @@ def test_inventory_clicks():
     except Exception as e:
         logger.error(f"Failed to register templates: {e}")
         return False
+
+    # Start live view if enabled
+    live_view = None
+    live_view_config = config.get("live_view", default={})
+    live_view_enabled = (
+        os.getenv("LIVE_VIEW", "").lower() in ("1", "true", "yes")
+        or live_view_config.get("enabled", False)
+    )
+    if live_view_enabled:
+        try:
+            from osrsbot.services.live_view_service import LiveViewService
+            ui_manager = UIManager(template_service)
+            ui_manager.sync_from_template_service()
+            live_view = LiveViewService(screen_service=screen, fps=live_view_config.get("fps", 10))
+            ui_manager.register_live_overlay(live_view)
+            live_view.start()
+            logger.info("Live view started")
+        except Exception as e:
+            logger.warning(f"Live view failed to start: {e}")
+            live_view = None
 
     # Capture screenshot for detection
     logger.info("Capturing screenshot...")
@@ -329,6 +351,9 @@ def test_inventory_clicks():
     except Exception as e:
         logger.error(f"Error during test: {e}", exc_info=True)
         return False
+    finally:
+        if live_view is not None:
+            live_view.stop()
 
 
 if __name__ == "__main__":

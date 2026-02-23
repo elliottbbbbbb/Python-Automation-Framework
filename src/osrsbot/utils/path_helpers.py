@@ -43,6 +43,26 @@ def _get_user_images_dir() -> Path:
     return _USER_IMAGES_DIR
 
 
+def get_maps_path(filename: str) -> Path:
+    """
+    Return the path to a map image used by MinimapLocalizationService.
+
+    Checks user_images/images/maps/<filename> first (user override),
+    then falls back to the bundled images/maps/<filename>.
+
+    Args:
+        filename: Map image filename, e.g. "sand_crabs.png"
+
+    Returns:
+        Resolved Path (may not exist yet if the map hasn't been created).
+    """
+    relative = f"images/maps/{filename}"
+    user_override = _get_user_images_dir() / relative
+    if user_override.exists():
+        return user_override
+    return _get_package_root() / relative
+
+
 def resolve_template_path(template_path: str) -> Path:
     """
     Resolve a template image path for both development and .exe environments.

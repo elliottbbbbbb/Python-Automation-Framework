@@ -118,12 +118,6 @@ def get_defaults() -> dict:
             "click_offset": [0, 0],
         },
 
-        # ── OCR ───────────────────────────────────────────────────────────────
-        "ocr": {
-            "hp_ttl": 0.1,
-            "window_size": 5,
-        },
-
         # ── Mouse ─────────────────────────────────────────────────────────────
         "mouse": {
             "min_speed": 0.2,
@@ -143,6 +137,14 @@ def get_defaults() -> dict:
             "arrival_tolerance": 2,
             "max_click_distance": 15,
             "enable_anti_ban_variance": True,
+            # Minimap localisation — set these to enable the walker.
+            # map_image: filename inside images/maps/ (e.g. "sand_crabs.png")
+            # map_origin_world_x/y: world tile coords of the map image's top-left (NW) corner.
+            "minimap_localization": {
+                "map_image": "",
+                "map_origin_world_x": 0,
+                "map_origin_world_y": 0,
+            },
         },
 
         # ── Arduino ───────────────────────────────────────────────────────────
@@ -221,11 +223,45 @@ def get_defaults() -> dict:
                     "threshold": 0.40,
                     "sticky": True,
                 },
+                "all_settings": {
+                    "path": "images/bot/ui_templates/all_settings.PNG",
+                    "rows": 1,
+                    "cols": 1,
+                    "threshold": 0.65,
+                },
+                "audio": {
+                    "path": "images/bot/ui_templates/audio.PNG",
+                    "rows": 1,
+                    "cols": 1,
+                    "threshold": 0.65,
+                },
+                "activities": {
+                    "path": "images/bot/ui_templates/activities.PNG",
+                    "rows": 1,
+                    "cols": 1,
+                    "threshold": 0.65,
+                },
             },
             "ui_buttons": {
                 "inventory_tab": {
                     "path": "images/bot/ui_templates/inventory.png",
                     "threshold": 0.50,
+                },
+                "inventory_open": {
+                    "path": "images/bot/ui_templates/inventory_open.PNG",
+                    "threshold": 0.70,
+                },
+                "worn_equipment_open": {
+                    "path": "images/bot/ui_templates/worn_equipment_open.PNG",
+                    "threshold": 0.70,
+                },
+                "prayer_open": {
+                    "path": "images/bot/ui_templates/prayer_open.PNG",
+                    "threshold": 0.70,
+                },
+                "magic_open": {
+                    "path": "images/bot/ui_templates/magic_open.PNG",
+                    "threshold": 0.70,
                 },
                 "equipment_tab": {
                     "path": "images/bot/ui_templates/equipment.PNG",
@@ -257,6 +293,10 @@ def get_defaults() -> dict:
                 },
                 "logout_tab": {
                     "path": "images/bot/ui_templates/logout.PNG",
+                    "threshold": 0.70,
+                },
+                "settings_tab": {
+                    "path": "images/bot/ui_templates/settings_tab.PNG",
                     "threshold": 0.70,
                 },
                 "logout": {

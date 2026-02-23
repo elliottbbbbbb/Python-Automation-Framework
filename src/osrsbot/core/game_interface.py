@@ -35,7 +35,7 @@ class GameInterface:
 
     def __init__(self, config: Config):
         self.config = config
-        window_title = config.get("window_title")
+        window_title = config.get_window_title()
 
         if not window_title:
             raise ValueError("Window title must be set in config")
