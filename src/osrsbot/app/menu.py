@@ -11,6 +11,7 @@ from osrsbot.models.config import Config
 from osrsbot.scripts.tests.comprehensive_state_bot_test import ComprehensiveTestBot
 from osrsbot.scripts.tests.hp_tracker import HPTrackerBot
 from osrsbot.scripts.tests.test_inventory_clicks import test_inventory_clicks
+from osrsbot.scripts.tests.ui_detection_test import run_ui_detection
 from osrsbot.scripts.bankstanding.bankstanding_flax import GrimyFlaxBot
 from osrsbot.scripts.afk.nmz_afk import NMZAfkBot
 from osrsbot.scripts.bosses.zulrah import ZulrahBot
@@ -155,6 +156,7 @@ def main() -> None:
         print("12. Fletching Bankstander (GE Bow Stringing)")
         print("13. Herblore Bankstander (GE Potion Making)")
         print("14. Chinning Monkeys (Maniacal Monkey AoE Training)")
+        print("15. UI Detection Test (Live View of Everything the Bot Can See)")
 
         choice = input("\nSelect: ").strip()
 
@@ -693,6 +695,23 @@ def main() -> None:
             except Exception as e:
                 logger.error(f"Chinning Monkeys Bot failed: {e}", exc_info=True)
                 print(f"❌ Script error: {e}")
+                sys.exit(1)
+
+        elif choice == "15":
+            logger.info("Starting UI Detection Test")
+            try:
+                print("\n🔍 UI Detection Test")
+                print("Shows everything the bot can currently see:")
+                print("  • Template-matched grids (inventory, minimap, chat, etc.)")
+                print("  • Template-matched buttons")
+                print("  • OCR stat scan regions (HP, Prayer, Run, Spec) — always outlined")
+                print("  • Live stat values beside each scan region")
+                print("\nMake sure RuneLite is open and visible.")
+                input("\nPress Enter to start...")
+                run_ui_detection()
+            except Exception as e:
+                logger.error(f"UI Detection Test failed: {e}", exc_info=True)
+                print(f"❌ Test error: {e}")
                 sys.exit(1)
 
         else:

@@ -60,37 +60,26 @@ class ScriptRunner:
 
 
         try:
-            # First: try config next to the exe (or cwd when not frozen)
-            primary_config = Path(config_file)
-
-            if not primary_config.is_absolute():
-                if getattr(sys, "frozen", False):
-                    primary_config = Path(sys.executable).parent / config_file
-                else:
-                    primary_config = Path.cwd() / config_file
-
-            logger.debug(f"Trying config from: {primary_config}")
-            self.config = Config(str(primary_config))
-            logger.info("Config loaded successfully from primary location")
+            config_path = Path(config_file)
+            if config_path.is_absolute():
+                # Explicit absolute path — use it directly
+                self.config = Config(str(config_path))
+            elif getattr(sys, "frozen", False):
+                # Frozen exe: look for config.json next to the exe
+                self.config = Config(str(Path(sys.executable).parent / config_file))
+            else:
+                # Dev mode: let Config resolve its own canonical path (src/osrsbot/config.json)
+                self.config = Config()
+            logger.info("Config loaded successfully")
 
         except FileNotFoundError:
-            # Fallback: use bundled config inside .exe (or default behavior)
-            logger.warning(
-                f"Primary config not found ({primary_config}), falling back to bundled config"
-            )
-            try:
-                if getattr(sys, "frozen", False):
-                    # Try bundled config in .exe
-                    bundled_config = Path(getattr(sys, "_MEIPASS", "")) / "osrsbot" / "config.json"
-                    logger.debug(f"Trying bundled config: {bundled_config}")
-                    self.config = Config(str(bundled_config))
-                else:
-                    # In dev mode, use default Config behavior
-                    logger.debug("Using default config location")
-                    self.config = Config()
-                logger.info("Config loaded successfully from fallback location")
-            except Exception as e:
-                logger.error(f"Failed to load config from both locations: {e}", exc_info=True)
+            if getattr(sys, "frozen", False):
+                # Last resort: bundled config baked into the exe
+                bundled_config = Path(getattr(sys, "_MEIPASS", "")) / "osrsbot" / "config.json"
+                logger.warning(f"Exe config not found, falling back to bundled: {bundled_config}")
+                self.config = Config(str(bundled_config))
+                logger.info("Config loaded from bundled fallback")
+            else:
                 raise
 
         except Exception as e:
