@@ -137,14 +137,6 @@ def get_defaults() -> dict:
             "arrival_tolerance": 2,
             "max_click_distance": 15,
             "enable_anti_ban_variance": True,
-            # Minimap localisation — set these to enable the walker.
-            # map_image: filename inside images/maps/ (e.g. "sand_crabs.png")
-            # map_origin_world_x/y: world tile coords of the map image's top-left (NW) corner.
-            "minimap_localization": {
-                "map_image": "",
-                "map_origin_world_x": 0,
-                "map_origin_world_y": 0,
-            },
         },
 
         # ── Arduino ───────────────────────────────────────────────────────────
@@ -336,105 +328,6 @@ def get_defaults() -> dict:
                     "threshold": 0.89,
                 },
             },
-        },
-
-        # ── License ───────────────────────────────────────────────────────────
-        "license": {
-            "api_url": "https://osrs-automation-framework-production.up.railway.app",
-            "purchase_url": "https://yoursite.com/buy",
-            "timeout": 10,
-            "cache_file": ".license_cache",
-            "offline_grace_period_hours": 24,
-        },
-
-        # ── Zulrah ────────────────────────────────────────────────────────────
-        "zulrah": {
-            "tile_colors": {
-                "middle": "#FF0000",
-                "south": "#00FF00",
-                "west": "#0000FF",
-                "east": "#FFFF00",
-                "pillar_west_side": "#00FFFF",
-                "pillar_east_side": "#FF00FF",
-                "north": "#FFA500",
-                "starting_area": "#800080",
-            },
-            "rotations": {
-                "1": {
-                    "phases": [
-                        {"phase_num": 1, "safe_position": "starting_area", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 2, "safe_position": "south", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": True},
-                        {"phase_num": 3, "safe_position": "west", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 4, "safe_position": "south", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 5, "safe_position": "middle", "prayer": "protect_magic", "attack_style": "range", "form": "magma", "spawns_snakelings": False},
-                        {"phase_num": 6, "safe_position": "west", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 7, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 8, "safe_position": "east", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 9, "safe_position": "middle", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 10, "safe_position": "west", "prayer": "protect_both", "attack_style": "both", "form": "tanzanite", "spawns_snakelings": False},
-                    ]
-                },
-                "2": {
-                    "phases": [
-                        {"phase_num": 1, "safe_position": "starting_area", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 2, "safe_position": "north", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 3, "safe_position": "west", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": True},
-                        {"phase_num": 4, "safe_position": "south", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 5, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 6, "safe_position": "west", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 7, "safe_position": "pillar_west_side", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 8, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 9, "safe_position": "pillar_east_side", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 10, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 11, "safe_position": "east", "prayer": "protect_both", "attack_style": "both", "form": "tanzanite", "spawns_snakelings": False},
-                    ]
-                },
-                "3": {
-                    "phases": [
-                        {"phase_num": 1, "safe_position": "starting_area", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 2, "safe_position": "west", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 3, "safe_position": "south", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": True},
-                        {"phase_num": 4, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 5, "safe_position": "east", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 6, "safe_position": "north", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 7, "safe_position": "west", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 8, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 9, "safe_position": "pillar_west_side", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 10, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 11, "safe_position": "west", "prayer": "protect_both", "attack_style": "both", "form": "tanzanite", "spawns_snakelings": False},
-                    ]
-                },
-                "4": {
-                    "phases": [
-                        {"phase_num": 1, "safe_position": "starting_area", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 2, "safe_position": "east", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": True},
-                        {"phase_num": 3, "safe_position": "south", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 4, "safe_position": "west", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 5, "safe_position": "east", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 6, "safe_position": "middle", "prayer": "protect_magic", "attack_style": "range", "form": "magma", "spawns_snakelings": False},
-                        {"phase_num": 7, "safe_position": "west", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 8, "safe_position": "east", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 9, "safe_position": "middle", "prayer": "protect_ranged", "attack_style": "mage", "form": "serpentine", "spawns_snakelings": False},
-                        {"phase_num": 10, "safe_position": "pillar_west_side", "prayer": "protect_magic", "attack_style": "range", "form": "tanzanite", "spawns_snakelings": False},
-                        {"phase_num": 11, "safe_position": "east", "prayer": "protect_both", "attack_style": "both", "form": "tanzanite", "spawns_snakelings": False},
-                    ]
-                },
-            },
-            "form_colors": {
-                "serpentine": "#006400",
-                "tanzanite": "#4169E1",
-                "magma": "#DC143C",
-            },
-            "hp_threshold": 40,
-            "prayer_threshold": 20,
-            "food_slot": 1,
-            "prayer_potion_slot": 2,
-            "teleport_threshold_hp": 15,
-            "phase_duration": 30,
-            "color_tolerance": 30,
-            "form_detection_delay": 0.5,
-            "movement_delay": "medium",
-            "attack_delay": "short",
         },
 
         # ── Feature flags ─────────────────────────────────────────────────────

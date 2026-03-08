@@ -51,7 +51,6 @@ class Bot(ABC):
             self._start_keyboard_listener()
 
     def _start_keyboard_listener(self):
-        """Start a background thread to listen for 'q' key press to exit."""
 
         def on_press(key):
             try:

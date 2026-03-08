@@ -1,7 +1,7 @@
 """
 Anti-Ban Service - Behavioral randomization and break scheduling.
 
-Provides comprehensive anti-detection features:
+Features:
 - Scheduled breaks with randomized timing and duration
 - Micro-breaks between actions (random pauses)
 - Session-level behavioral variance (timing/speed multipliers)
@@ -180,7 +180,6 @@ class BreakScheduler:
         return segments
 
     def initialize_schedule(self, session: SessionState) -> None:
-        """Generate the schedule, stamp the first segment, and log it."""
         if not self.enabled:
             logger.info("Break scheduler disabled")
             return
@@ -449,7 +448,6 @@ class AntiBanService:
         return random.random() < self.micro_break_chance
 
     def execute_break(self):
-        """Execute a scheduled break using the current segment's duration."""
         if not self.enabled:
             return
 
@@ -489,7 +487,6 @@ class AntiBanService:
         logger.info("=" * 70)
 
     def execute_micro_break(self):
-        """Execute a short micro-break (0.5-2s)."""
         if not self.enabled or not self.micro_breaks_enabled:
             return
 
@@ -751,7 +748,6 @@ class AntiBanService:
     def _idle_check_tab(
         self, actions: "GameActions", tab_name: str
     ) -> None:
-        """Click a UI tab, hover briefly, then return to inventory."""
         logger.debug(f"Idle: checking {tab_name}")
 
         button_pos = actions.coord_resolver.resolve_ui_button(

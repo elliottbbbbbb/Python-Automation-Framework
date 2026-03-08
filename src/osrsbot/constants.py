@@ -559,7 +559,7 @@ class ValidationRanges:
     # HP/Prayer/Energy ranges
     min_stat_value: int = 0
     max_stat_value: int = 99
-    max_run_energy: int = 100  # Run energy goes to 100%
+    max_run_energy: int = 100
 
     # Color channel validation
     min_rgb_value: int = 0
@@ -653,7 +653,7 @@ class AntiBanConfig:
     """
     Configuration for anti-ban behavioral randomization system.
 
-    Comprehensive anti-detection features:
+    Anti-detection features:
     - Scheduled breaks with randomized timing/duration
     - Micro-breaks between actions (short random pauses)
     - Session-level behavioral variance (timing/speed multipliers)

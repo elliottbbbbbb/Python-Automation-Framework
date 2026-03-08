@@ -1354,7 +1354,7 @@ class ConstructionTrainingBot(StateMachineBot):
                 if self.state.inventory.has_item(item_key):
                     logger.debug(f"Item '{item_name}' found via inventory detection")
                     return True
-            except Exception:
+            except (KeyError, AttributeError):
                 pass  # Fall through to template matching
 
         # Fallback: template matching restricted to inventory region

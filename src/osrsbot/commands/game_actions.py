@@ -80,7 +80,6 @@ class GameActions:
         self.coord_resolver = coord_resolver
         self.timing = timing_helper
 
-        # Initialize focused modules
         self.inventory = InventoryActions(
             mouse, self.coord_resolver, self.timing, anti_ban_service,
             inventory_state=inventory_state,
@@ -100,21 +99,18 @@ class GameActions:
 
     # --- Keyboard Methods (delegates to KeyboardService) ---
     def press_key(self, key: str, mode: str = "humanized") -> bool:
-        """Press a key using KeyboardService (falls back to pyautogui)."""
         if self.keyboard:
             return self.keyboard.press(key, mode=mode)
         pyautogui.press(key)
         return True
 
     def type_text(self, text: str, mode: str = "humanized") -> bool:
-        """Type text using KeyboardService (falls back to pyautogui)."""
         if self.keyboard:
             return self.keyboard.write(text, mode=mode)
         pyautogui.write(text, interval=0.05)
         return True
 
     def hotkey(self, *keys: str) -> bool:
-        """Press key combination using KeyboardService (falls back to pyautogui)."""
         if self.keyboard:
             return self.keyboard.hotkey(*keys)
         pyautogui.hotkey(*keys)
@@ -122,22 +118,18 @@ class GameActions:
 
     # --- Private helper methods (keep for backward compatibility) ---
     def _to_absolute(self, x: int, y: int) -> Tuple[int, int]:
-        """Convert relative coords to absolute screen coords."""
         return self.coord_resolver.to_absolute(x, y)
 
     def _get_player_position(self) -> Tuple[int, int]:
-        """Get player position (center of window)."""
         return self.coord_resolver.get_player_position()
 
     def _get_mouse_speed_multiplier(self) -> float:
-        """Get anti-ban mouse speed variance."""
         return self.timing.get_mouse_speed_multiplier()
 
     # --- Inventory Methods (delegate to InventoryActions) ---
     def click_inventory_slot(
         self, slot_num: int, move_style: MovementStyle = "curved"
     ) -> bool:
-        """Click inventory slot (1-28) using config coords."""
         return self.inventory.click_slot(slot_num, move_style)
 
     def click_inventory_slot_detected(
@@ -146,61 +138,48 @@ class GameActions:
         move_style: MovementStyle = "curved",
         force_detect: bool = False,
     ) -> bool:
-        """Click inventory slot using template matching."""
         # Ensure inventory open first
         if not self.inventory.ensure_open():
             return False
         return self.inventory.click_slot(slot_num, move_style)
 
     def ensure_inventory_open(self) -> bool:
-        """Ensure inventory is open."""
         return self.inventory.ensure_open()
 
     def drop_item(self, slot: int, shift_drop: bool = False) -> bool:
-        """Drop item from inventory slot."""
         return self.inventory.drop_item(slot, shift_drop)
 
     def drop_all_except(self, keep_slots: Optional[list[int]] = None) -> int:
-        """Drop all items except specified slots."""
         return self.inventory.drop_all_except(keep_slots)
 
     def drop_until_empty_slots(
         self, target_empty: int, keep_slots: Optional[list[int]] = None
     ) -> int:
-        """Drop items until we have N empty slots."""
         return self.inventory.drop_until_empty_slots(target_empty, keep_slots)
 
     # --- Combat Methods (delegate to CombatActions) ---
     def attack_npc(self, npc_color_name: str) -> bool:
-        """Attack NPC by color."""
         return self.combat.attack_npc(npc_color_name)
 
     def eat_food(self, food_color_name: str) -> bool:
-        """Eat food."""
         return self.combat.eat(food_color_name)
 
     def drink_potion(self, potion_color_name: str) -> bool:
-        """Drink potion."""
         return self.combat.drink_potion(potion_color_name)
 
     def open_prayer_tab(self) -> bool:
-        """Open prayer tab."""
         return self.combat.open_prayer_tab()
 
     def toggle_prayer(self, prayer_name: str) -> bool:
-        """Toggle prayer on/off."""
         return self.combat.toggle_prayer(prayer_name)
 
     def activate_protect_from_melee(self) -> bool:
-        """Activate Protect from Melee prayer."""
         return self.combat.activate_protect_from_melee()
 
     def activate_protect_from_magic(self) -> bool:
-        """Activate Protect from Magic prayer."""
         return self.combat.activate_protect_from_magic()
 
     def activate_protect_from_ranged(self) -> bool:
-        """Activate Protect from Ranged prayer."""
         return self.combat.activate_protect_from_ranged()
 
     def click_color(
@@ -210,7 +189,6 @@ class GameActions:
         tolerance: Optional[int] = None,
         region: Optional[Tuple[int, int, int, int]] = None,
     ) -> bool:
-        """Click color."""
         return self.combat.click_color(color_name, move_style, tolerance, region)
 
     def click_color_smart(
@@ -224,7 +202,6 @@ class GameActions:
         region: Optional[Tuple[int, int, int, int]] = None,
         restrict_to_viewport: bool = True,
     ) -> bool:
-        """Click color with smart targeting."""
         return self.combat.click_color_smart(
             color_name,
             player_position,
@@ -237,7 +214,6 @@ class GameActions:
         )
 
     def reset_click_tracking(self) -> None:
-        """Reset target tracking."""
         self.combat.reset_targeting()
 
     def mark_last_attack_failed(self) -> None:
@@ -319,7 +295,6 @@ class GameActions:
     def click_coordinate(
         self, coord_path: Tuple[str, ...], move_style: MovementStyle = "curved"
     ) -> bool:
-        """Click config coordinate path."""
         pos = self.coord_resolver.resolve_coordinate_path(*coord_path)
         if not pos:
             return False
@@ -337,15 +312,12 @@ class GameActions:
         )
 
     def use_item(self, item_color_name: str) -> bool:
-        """Use item by color."""
         return self.click_color(item_color_name)
 
     def walk_to_marker(self, marker_color_name: str) -> bool:
-        """Walk to marker by color."""
         return self.click_color(marker_color_name)
 
     def click_minimap(self, location_name: str) -> bool:
-        """Click minimap location from config."""
         return self.click_coordinate(("minimap", location_name))
 
     def walk_tiles(
@@ -413,7 +385,6 @@ class GameActions:
         return True
 
     def bank_deposit_all(self) -> bool:
-        """Click bank deposit all button."""
         if not self.click_template(
             "images/bot/ui_templates/bank_deposit_all_button.PNG", "bank_deposit_all_button", threshold=0.7
         ):
@@ -452,7 +423,6 @@ class GameActions:
     def wait_for_color(
         self, color_name: str, timeout: float = 10.0, check_interval: float = 0.5
     ) -> bool:
-        """Wait for color to appear on screen."""
         hex_color = self.config.get("colors", color_name)
 
         if not hex_color:
@@ -629,6 +599,6 @@ class GameActions:
             logger.error(f"Error in bank search and withdraw: {e}")
             try:
                 self.press_key("escape")
-            except Exception:
+            except OSError:
                 pass
             return False

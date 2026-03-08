@@ -141,6 +141,10 @@ config.json
 ocr_debug/
 segmentation_debug/
 
+# Build artifacts
+deployment/dist/
+deployment/build/
+
 # Debug/runtime images (NOT bot template images - those are tracked)
 screenshots/
 *_debug*.png

@@ -77,12 +77,10 @@ class UIManager:
         self.debug_output_dir.mkdir(exist_ok=True)
 
     def add_grid(self, name: str, grid: UIElementGrid):
-        """Add a UI grid to the manager."""
         self.grids[name] = grid
         logger.debug(f"Added grid '{name}' to UIManager")
 
     def set_active_grid(self, name: str):
-        """Set the currently active grid for context-aware operations."""
         if name in self.grids:
             self.active_grid_name = name
             logger.debug(f"Active grid set to '{name}'")
@@ -90,22 +88,18 @@ class UIManager:
             raise ValueError(f"Grid '{name}' not found in UIManager.")
 
     def get_active_grid(self) -> Optional[UIElementGrid]:
-        """Get the currently active grid."""
         if self.active_grid_name:
             return self.grids.get(self.active_grid_name)
         return None
 
     def get_grid(self, name: str) -> Optional[UIElementGrid]:
-        """Get a specific grid by name."""
         return self.grids.get(name)
 
     def add_button(self, name: str, button: UIButton):
-        """Add a UI button to the manager."""
         self.buttons[name] = button
         logger.debug(f"Added button '{name}' to UIManager")
 
     def get_button(self, name: str) -> Optional[UIButton]:
-        """Get a specific button by name."""
         return self.buttons.get(name)
 
     def sync_from_template_service(self):
@@ -158,7 +152,6 @@ class UIManager:
         logger.info(f"UI debug visualization enabled. Output: {self.debug_output_dir}")
 
     def disable_debug(self):
-        """Disable debug visualization mode."""
         self.debug_enabled = False
         logger.info("UI debug visualization disabled")
 
@@ -217,7 +210,6 @@ class UIManager:
         Returns:
             Image with debug overlay drawn
         """
-        # Convert grayscale to BGR if needed
         if len(img.shape) == 2:
             img_debug = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
         else:
@@ -240,20 +232,17 @@ class UIManager:
         # Draw grids
         if show_grids:
             for name, grid in self.grids.items():
-                # Check if this grid should be visible based on filter
                 if visible_grids is not None and not visible_grids.get(name, False):
                     continue
 
                 if grid.visible and grid.detected_bbox:
                     x, y, w, h = grid.detected_bbox
 
-                    # Get color for this grid
                     color = grid_colors.get(name, default_color)
 
                     # Draw grid bounding box (thick)
                     cv.rectangle(img_debug, (x, y), (x + w, y + h), color, 1)
 
-                    # Add grid name label at top-left
                     if show_labels:
                         label = f"{name}"
                         cv.putText(img_debug, label, (x + 5, y + 20),
@@ -327,7 +316,6 @@ class UIManager:
             img, show_grids, show_buttons, show_slots, show_labels, visible_grids
         )
 
-        # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         filename = f"{prefix}_{timestamp}.png"
         filepath = self.debug_output_dir / filename

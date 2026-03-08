@@ -117,7 +117,6 @@ class Win32MouseService:
     def move_to(self, x: int, y: int, style: MovementStyle = "curved", duration: Optional[float] = None, speed_multiplier: float = 1.0) -> bool:
         try:
             logger.debug(f"[Win32] Moving to ({x}, {y}) using style={style}")
-            # get current pos
             pt = ctypes.wintypes.POINT()
             ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
             start_x, start_y = pt.x, pt.y

@@ -96,9 +96,6 @@ pyinstaller_args = [
     '--hidden-import=osrsbot.core.state_machine_bot',
     '--hidden-import=osrsbot.core.state_types',
 
-    # --- Exceptions ---
-    '--hidden-import=osrsbot.exceptions.license_exceptions',
-
     # --- Models ---
     '--hidden-import=osrsbot.models.config',
     '--hidden-import=osrsbot.models.config_defaults',
@@ -156,10 +153,8 @@ pyinstaller_args = [
     '--hidden-import=osrsbot.services.click_target_tracker',
     '--hidden-import=osrsbot.services.coordinate_ocr_service',
     '--hidden-import=osrsbot.services.feature_match_service',
-    '--hidden-import=osrsbot.services.hardware_fingerprint',
     '--hidden-import=osrsbot.services.item_detection_service',
     '--hidden-import=osrsbot.services.keyboard_service',
-    '--hidden-import=osrsbot.services.license_service',
     '--hidden-import=osrsbot.services.loot_detection_service',
     '--hidden-import=osrsbot.services.mouse_service',
     '--hidden-import=osrsbot.services.screen_service',
@@ -167,12 +162,8 @@ pyinstaller_args = [
     '--hidden-import=osrsbot.services.template_ocr_service',
     '--hidden-import=osrsbot.services.ui_manager_service',
     '--hidden-import=osrsbot.services.live_view_service',
-    '--hidden-import=osrsbot.services.walker_service',
     '--hidden-import=osrsbot.services.win32_mouse_service',
     '--hidden-import=osrsbot.services.wom_service',
-
-    # --- UI ---
-    '--hidden-import=osrsbot.ui.license_dialog',
 
     # --- Utils ---
     '--hidden-import=osrsbot.utils.color_helpers',

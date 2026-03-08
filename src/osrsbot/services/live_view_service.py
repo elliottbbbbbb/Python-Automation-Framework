@@ -64,7 +64,6 @@ class LiveViewService:
         logger.debug(f"LiveViewService: registered overlay '{name}'")
 
     def unregister_overlay(self, name: str) -> None:
-        """Remove an overlay callback by name.  Thread-safe."""
         with self._overlay_lock:
             self._overlays = [(n, cb) for n, cb in self._overlays if n != name]
         logger.debug(f"LiveViewService: unregistered overlay '{name}'")
@@ -72,7 +71,6 @@ class LiveViewService:
     # ==================== Lifecycle ====================
 
     def start(self) -> None:
-        """Start the background display thread."""
         if self._thread and self._thread.is_alive():
             logger.warning("LiveViewService is already running")
             return
@@ -86,12 +84,11 @@ class LiveViewService:
         logger.info(f"LiveViewService started at {self._fps} FPS")
 
     def stop(self) -> None:
-        """Signal the thread to stop and close the viewer window."""
         self._stop_event.set()
         if self._root is not None:
             try:
                 self._root.quit()
-            except Exception:
+            except tk.TclError:
                 pass
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=3.0)

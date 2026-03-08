@@ -50,10 +50,9 @@ class DebugUI:
         self.enabled = False
         self.live: Optional[Live] = None
         self.update_thread: Optional[threading.Thread] = None
-        self._original_handlers = []  # Store original logging handlers
+        self._original_handlers = []
 
     def start(self):
-        """Start the live UI in a background thread."""
         if self.enabled:
             logger.warning("Debug UI already running")
             return
@@ -64,7 +63,6 @@ class DebugUI:
         self.enabled = True
         self.live = Live(self._build_layout(), refresh_per_second=2, screen=True)
 
-        # Start background update thread
         self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
 
         self.live.start()
@@ -73,7 +71,6 @@ class DebugUI:
         logger.info("Debug UI started")
 
     def stop(self):
-        """Stop the UI and cleanup."""
         if not self.enabled:
             return
 
@@ -83,7 +80,6 @@ class DebugUI:
         if self.update_thread and self.update_thread.is_alive():
             self.update_thread.join(timeout=1.0)
 
-        # Stop live display
         if self.live:
             self.live.stop()
 
@@ -93,7 +89,6 @@ class DebugUI:
         logger.info("Debug UI stopped")
 
     def _build_layout(self) -> Layout:
-        """Build the UI layout with panels."""
         layout = Layout()
 
         layout.split(
@@ -112,7 +107,6 @@ class DebugUI:
             Layout(name="stats", ratio=1), Layout(name="anti_ban", ratio=1)
         )
 
-        # Update panels
         layout["header"].update(Panel("OSRS Bot Debug UI", style="bold cyan"))
         layout["current_state"].update(self._render_current_state())
         layout["events"].update(self._render_recent_events())
@@ -136,7 +130,6 @@ class DebugUI:
         retry_count = self.bot.get_retry_count(state)
         metadata = self.bot._state_metadata.get(state)
 
-        # Build status line
         status_color = "yellow" if retry_count > 0 else "green"
         status_text = Text()
         status_text.append("State: ", style="bold")
@@ -147,11 +140,9 @@ class DebugUI:
                 f" ({retry_count}/{metadata.max_retries} retries)", style="dim"
             )
 
-        # Add description if available
         if metadata and metadata.description:
             status_text.append(f"\n{metadata.description}", style="dim italic")
 
-        # Add game status if available
         if hasattr(self.bot, "state"):
             try:
                 hp = self.bot.state.get_hp()
@@ -181,7 +172,6 @@ class DebugUI:
         """Render last 10 events from state history and anti-ban actions."""
         events = []
 
-        # Get state history
         try:
             history = self.bot.get_state_history(10)
 
@@ -207,11 +197,9 @@ class DebugUI:
                     f"[dim]({entry.duration:.1f}s)[/dim]"
                 )
 
-                # Add error message if failed
                 if entry.failed and entry.error_message:
                     events.append(f"  [red]↳ {entry.error_message}[/red]")
 
-            # Get recent anti-ban actions if available
             if hasattr(self.bot, "actions") and self.bot.actions.anti_ban:
                 recent_actions = list(self.bot.actions.anti_ban.session.recent_actions)
                 for action in reversed(recent_actions[-5:]):
@@ -237,7 +225,6 @@ class DebugUI:
         stats_text = Text()
 
         try:
-            # Get session stats from anti-ban if available
             if hasattr(self.bot, "actions") and self.bot.actions.anti_ban:
                 stats = self.bot.actions.anti_ban.get_session_stats()
 
@@ -321,17 +308,12 @@ class DebugUI:
         """Redirect all logging to file to prevent console interference."""
         import logging as log_module
 
-        # Get root logger
         root_logger = log_module.getLogger()
-
-        # Save current handlers
         self._original_handlers = root_logger.handlers.copy()
 
-        # Remove all console handlers
         for handler in root_logger.handlers[:]:
             root_logger.removeHandler(handler)
 
-        # Add file handler
         file_handler = log_module.FileHandler("bot_debug.log", mode="a")
         file_handler.setLevel(log_module.DEBUG)
         formatter = log_module.Formatter(
@@ -346,14 +328,11 @@ class DebugUI:
         """Restore original logging handlers."""
         import logging as log_module
 
-        # Get root logger
         root_logger = log_module.getLogger()
 
-        # Remove file handler
         for handler in root_logger.handlers[:]:
             root_logger.removeHandler(handler)
 
-        # Restore original handlers
         for handler in self._original_handlers:
             root_logger.addHandler(handler)
 

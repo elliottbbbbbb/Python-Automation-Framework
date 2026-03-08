@@ -108,29 +108,15 @@ class BankstanderBot(StateMachineBot):
     # ==================== State Machine Configuration ====================
 
     def define_states(self) -> type[Enum]:
-        """Define the states for this bot."""
         return BankstanderStates
 
     def define_transitions(self) -> List[StateTransition]:
-        """Define state transitions."""
         return [
             StateTransition(BankstanderStates.IDLE, BankstanderStates.BANKING),
             StateTransition(BankstanderStates.BANKING, BankstanderStates.PROCESS),
             StateTransition(BankstanderStates.PROCESS, BankstanderStates.DEPOSIT),
             StateTransition(BankstanderStates.DEPOSIT, BankstanderStates.BANKING),
-            # Recovery failovers
-            StateTransition(
-                BankstanderStates.BANKING,
-                BankstanderStates.RECOVERY,
-            ),
-            StateTransition(
-                BankstanderStates.PROCESS,
-                BankstanderStates.RECOVERY,
-            ),
-            StateTransition(
-                BankstanderStates.DEPOSIT,
-                BankstanderStates.RECOVERY,
-            ),
+            # Recovery exits back to IDLE (entered via failover_state in metadata)
             StateTransition(BankstanderStates.RECOVERY, BankstanderStates.IDLE),
         ]
 
@@ -178,7 +164,6 @@ class BankstanderBot(StateMachineBot):
         )
 
     def get_initial_state(self) -> Enum:
-        """Get initial state (always start at IDLE)."""
         return BankstanderStates.IDLE
 
     # ==================== State Handlers ====================
